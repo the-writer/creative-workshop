@@ -1,7 +1,24 @@
 // 生成页：族群/类型/规则选择 + 批量生成引擎 + 名称笺结果区 + 单条保存/收藏/复制/换一批
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Copy, Minus, Plus, RefreshCw, Save, Star, UserPlus, X } from 'lucide-react';
+import {
+  Badge,
+  ChevronDown,
+  Copy,
+  Info,
+  MapPin,
+  Minus,
+  PenLine,
+  Plus,
+  RefreshCw,
+  Save,
+  ScrollText,
+  SlidersHorizontal,
+  Star,
+  UserPlus,
+  UserRound,
+  X,
+} from 'lucide-react';
 import { DEFAULT_GEN_PARAMS, generateBatch, rerollCombo, rerollOne, type GenParams, type PersonSuffix, type ShortMode } from '@/lib/generator';
 import { computeCombinationTotals, formatCombination, LEXICON } from '@/data/lexicon';
 import { insertCandidate } from '@/lib/db';
@@ -32,24 +49,25 @@ interface GenPrefs {
   params: GenParams;
 }
 
-const PREFS_KEY = 'mingpu_gen_prefs_v1';
-
-function loadPrefs(): GenPrefs {
+function normalizePrefs(raw: unknown): GenPrefs {
   const fallback: GenPrefs = { race: 'human', types: ['person'], params: { ...DEFAULT_GEN_PARAMS } };
   try {
-    const raw = window.localStorage.getItem(PREFS_KEY);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as GenPrefs;
+    if (!raw || typeof raw !== 'object') return fallback;
+    const parsed = raw as Partial<GenPrefs>;
     const params = { ...DEFAULT_GEN_PARAMS, ...(parsed.params ?? {}) };
     params.professions = Array.isArray(params.professions) ? params.professions.filter((s) => typeof s === 'string') : [];
     params.abilities = Array.isArray(params.abilities) ? params.abilities.filter((s) => typeof s === 'string') : [];
     params.nicknameSources = Array.isArray(params.nicknameSources) ? params.nicknameSources.filter((s) => typeof s === 'string') : [];
-    params.nicknameChars = typeof params.nicknameChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.nicknameChars))) : DEFAULT_GEN_PARAMS.nicknameChars;
+    params.nicknameChars =
+      typeof params.nicknameChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.nicknameChars))) : DEFAULT_GEN_PARAMS.nicknameChars;
     params.minChars = typeof params.minChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.minChars))) : DEFAULT_GEN_PARAMS.minChars;
     params.maxChars = typeof params.maxChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.maxChars))) : DEFAULT_GEN_PARAMS.maxChars;
     return {
       race: parsed.race === 'demon' ? 'demon' : 'human',
-      types: Array.isArray(parsed.types) && parsed.types.length > 0 ? parsed.types.filter((t) => ['person', 'place', 'office', 'nickname'].includes(t)) : ['person'],
+      types:
+        Array.isArray(parsed.types) && parsed.types.some((t) => ['person', 'place', 'office', 'nickname'].includes(t))
+          ? parsed.types.filter((t) => ['person', 'place', 'office', 'nickname'].includes(t))
+          : ['person'],
       params,
     };
   } catch {
@@ -58,10 +76,10 @@ function loadPrefs(): GenPrefs {
 }
 
 const TYPE_ICONS: Record<NameTypeKey, ReactNode> = {
-  person: <span className="material-icons">person</span>,
-  place: <span className="material-icons">location_on</span>,
-  office: <span className="material-icons">description</span>,
-  nickname: <span className="material-icons">sell</span>,
+  person: <UserRound size={15} />,
+  place: <MapPin size={15} />,
+  office: <ScrollText size={15} />,
+  nickname: <Badge size={15} />,
 };
 
 const NICK_SOURCE_OPTIONS: Array<[string, string]> = [
@@ -74,7 +92,8 @@ const NICK_SOURCE_OPTIONS: Array<[string, string]> = [
 
 export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   const toast = useAppToast();
-  const [prefs, setPrefs] = useState<GenPrefs>(loadPrefs);
+  const [prefs, setPrefs] = useState<GenPrefs>({ race: 'human', types: ['person'], params: { ...DEFAULT_GEN_PARAMS } });
+  const [prefsReady, setPrefsReady] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [results, setResults] = useState<Candidate[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -88,21 +107,41 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   const { race, types, params } = prefs;
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-    } catch {
-      // 忽略本地存储失败
-    }
-  }, [prefs]);
+    void window.workshop.preferences
+      .get('generator')
+      .then((raw) => setPrefs(normalizePrefs(raw)))
+      .catch(() => undefined)
+      .finally(() => setPrefsReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!prefsReady) return;
+    void window.workshop.preferences.set('generator', prefs).catch(() => undefined);
+  }, [prefs, prefsReady]);
 
   const combination = useMemo(() => computeCombinationTotals(), []);
   const comboFoot = useMemo(() => {
     const raceInfo = combination.perRace[race];
-    const typeCount = types.length > 0 ? types.reduce((sum, t) => sum + (t === 'person' ? raceInfo.person : t === 'place' ? raceInfo.place : t === 'office' ? raceInfo.office : raceInfo.nickname), 0) : 0;
+    const typeCount =
+      types.length > 0
+        ? types.reduce(
+            (sum, t) => sum + (t === 'person' ? raceInfo.person : t === 'place' ? raceInfo.place : t === 'office' ? raceInfo.office : raceInfo.nickname),
+            0n,
+          )
+        : 0n;
     return typeCount;
   }, [combination, race, types]);
 
-  const setRace = (r: RaceKey) => setPrefs((p) => ({ ...p, race: r }));
+  const setRace = (r: RaceKey) =>
+    setPrefs((p) => ({
+      ...p,
+      race: r,
+      params: {
+        ...p.params,
+        professions: p.params.professions.filter((value) => LEXICON[r].professions.includes(value)),
+        abilities: p.params.abilities.filter((value) => LEXICON[r].abilities.includes(value)),
+      },
+    }));
   const toggleType = (t: NameTypeKey) =>
     setPrefs((p) => {
       const has = p.types.includes(t);
@@ -255,7 +294,10 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
       }
     }
     setSavingAll(false);
-    toast.show(`本批已入谱 ${okCount} 条${okCount < unsaved.length ? `，${unsaved.length - okCount} 条失败` : ''}`, okCount === unsaved.length ? 'success' : 'error');
+    toast.show(
+      `本批已入谱 ${okCount} 条${okCount < unsaved.length ? `，${unsaved.length - okCount} 条失败` : ''}`,
+      okCount === unsaved.length ? 'success' : 'error',
+    );
   };
 
   const rerollItem = (index: number) => {
@@ -358,7 +400,14 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             </div>
             <div className="param-chip-wrap">
               {LEXICON[race].professions.map((p) => (
-                <Chip key={p} selected={params.professions.includes(p)} tone={race} className="param-chip" dataTestId={`prof-${p}`} onClick={() => toggleProfession(p)}>
+                <Chip
+                  key={p}
+                  selected={params.professions.includes(p)}
+                  tone={race}
+                  className="param-chip"
+                  dataTestId={`prof-${p}`}
+                  onClick={() => toggleProfession(p)}
+                >
                   {p}
                 </Chip>
               ))}
@@ -376,22 +425,31 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             </div>
             <div className="param-chip-wrap">
               {LEXICON[race].abilities.map((a) => (
-                <Chip key={a} selected={params.abilities.includes(a)} tone={race} className="param-chip" dataTestId={`ability-${a}`} onClick={() => toggleAbility(a)}>
+                <Chip
+                  key={a}
+                  selected={params.abilities.includes(a)}
+                  tone={race}
+                  className="param-chip"
+                  dataTestId={`ability-${a}`}
+                  onClick={() => toggleAbility(a)}
+                >
                   {a}
                 </Chip>
               ))}
             </div>
           </div>
-          <p className="param-hint">不勾选时生成会随机抽取；所选职业与能力会融入组合设定与 AI 详细设定。</p>
+          <p className="param-hint">不勾选时生成会随机抽取；所选职业与能力会融入组合设定。</p>
         </div>
 
         {/* 规则设置 */}
         <div className="rules-panel">
           <button type="button" className="rules-toggle" onClick={() => setRulesOpen((v) => !v)} data-testid="rules-toggle">
-            <span className="material-icons">tune</span>
+            <SlidersHorizontal size={15} />
             <span>规则设置</span>
-            <span className="rules-summary">{params.count}条 · 短名{params.shortMode === 'two' ? '2字' : params.shortMode === 'three' ? '3字' : '2-3字'}</span>
-            <span className={cn('material-icons rules-chevron', rulesOpen && 'rules-chevron-open')}>expand_more</span>
+            <span className="rules-summary">
+              {params.count}条 · 短名{params.shortMode === 'two' ? '2字' : params.shortMode === 'three' ? '3字' : '2-3字'}
+            </span>
+            <ChevronDown size={15} className={cn('rules-chevron', rulesOpen && 'rules-chevron-open')} />
           </button>
           {rulesOpen ? (
             <div className="rules-body">
@@ -528,37 +586,37 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
 
               {/* 全名字数范围（组合模式不限制，仅单类型人名时生效） */}
               {!comboMode ? (
-              <div className="rule-row">
-                <span className="rule-label">人名全名字数</span>
-                <div className="range-inputs">
-                  <input
-                    type="number"
-                    className="range-input"
-                    value={params.minChars}
-                    min={2}
-                    max={8}
-                    data-testid="chars-min"
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (!Number.isNaN(v)) setParams({ minChars: Math.max(2, Math.min(8, Math.round(v))) });
-                    }}
-                  />
-                  <span className="range-sep">至</span>
-                  <input
-                    type="number"
-                    className="range-input"
-                    value={params.maxChars}
-                    min={2}
-                    max={8}
-                    data-testid="chars-max"
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (!Number.isNaN(v)) setParams({ maxChars: Math.max(2, Math.min(8, Math.round(v))) });
-                    }}
-                  />
-                  <span className="range-note">字（名字与外号最大均 8 字）</span>
+                <div className="rule-row">
+                  <span className="rule-label">人名全名字数</span>
+                  <div className="range-inputs">
+                    <input
+                      type="number"
+                      className="range-input"
+                      value={params.minChars}
+                      min={2}
+                      max={8}
+                      data-testid="chars-min"
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (!Number.isNaN(v)) setParams({ minChars: Math.max(2, Math.min(8, Math.round(v))) });
+                      }}
+                    />
+                    <span className="range-sep">至</span>
+                    <input
+                      type="number"
+                      className="range-input"
+                      value={params.maxChars}
+                      min={2}
+                      max={8}
+                      data-testid="chars-max"
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (!Number.isNaN(v)) setParams({ maxChars: Math.max(2, Math.min(8, Math.round(v))) });
+                      }}
+                    />
+                    <span className="range-note">字（名字与外号最大均 8 字）</span>
+                  </div>
                 </div>
-              </div>
               ) : null}
 
               <button type="button" className="reset-rules" onClick={restoreDefaults} data-testid="reset-rules">
@@ -578,19 +636,19 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
         <button type="button" className="generate-btn" data-testid="generate-btn" onClick={handleGenerate} disabled={isGenerating}>
           {isGenerating ? (
             <>
-              <span className="material-icons ink-icon">ink_pen</span>
+              <PenLine size={17} className="ink-icon" />
               正在落笔…
             </>
           ) : (
             <>
-              <span className="material-icons ink-icon">ink_pen</span>
+              <PenLine size={17} className="ink-icon" />
               落笔生成
             </>
           )}
         </button>
         <p className="combo-foot" data-testid="combo-foot">
-          当前词库理论组合量 <strong>{formatCombination(combination.grandTotal)}</strong>，已达标 ≥30 万
-          {comboFoot > 0 ? `；所选类型理论组合 ${formatCombination(comboFoot)}` : ''}
+          当前词库理论组合量 <strong>{formatCombination(combination.grandTotal)}</strong>
+          {comboFoot > 0n ? `；所选类型理论组合 ${formatCombination(comboFoot)}` : ''}
         </p>
 
         {/* 结果区 */}
@@ -599,7 +657,8 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             <>
               <div className="batch-bar">
                 <span data-testid="batch-stats">
-                  本批 {batchStats?.total ?? results.length} 条{typeof batchStats?.deduped === 'number' && batchStats.deduped > 0 ? `（去重 ${batchStats.deduped} 条）` : ''}
+                  本批 {batchStats?.total ?? results.length} 条
+                  {typeof batchStats?.deduped === 'number' && batchStats.deduped > 0 ? `（去重 ${batchStats.deduped} 条）` : ''}
                 </span>
                 <button type="button" className="batch-save-btn" onClick={saveAll} disabled={savingAll} data-testid="save-all">
                   <Save size={15} />
@@ -655,7 +714,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                       </div>
                       <StructureTags parts={c.structure} race={c.race} />
                       <button type="button" className="ai-card-btn" data-testid={`detail-${idx}`} onClick={() => openDetail(idx)}>
-                        <span className="material-icons">info</span>
+                        <Info size={14} />
                         查看详情
                       </button>
                     </div>
@@ -665,19 +724,19 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             </>
           ) : (
             <div className="result-empty">
-              <EmptyState
-                title="等待落笔"
-                desc={`选择${raceLabel(race)}与名称类型，点击「落笔生成」开始成稿`}
-                testId="generate-empty"
-              />
+              <EmptyState title="等待落笔" desc={`选择${raceLabel(race)}与名称类型，点击「落笔生成」开始成稿`} testId="generate-empty" />
             </div>
           )}
         </div>
         {/* 候选详情面板：结构 + 备注编辑 + 保存入谱（AI 设定请到候选库详情页） */}
         {detailIdx !== null && results[detailIdx] ? (
-          <div className="ai-panel-overlay" data-testid="detail-panel" onClick={(e) => {
-            if (e.target === e.currentTarget) closeDetail();
-          }}>
+          <div
+            className="ai-panel-overlay"
+            data-testid="detail-panel"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeDetail();
+            }}
+          >
             <div className="ai-panel detail-panel">
               <div className="ai-panel-header">
                 <div className="ai-panel-title">

@@ -116,7 +116,14 @@ const NICK_SOURCES: Array<{ key: string; label: string; get: (r: RaceKey) => str
 
 export const NICK_SOURCE_KEYS = NICK_SOURCES.map((s) => s.key);
 
-type LexiconLike = { nickProfession: string[]; nickAppearance: string[]; nickDeed: string[]; nickTerrain: string[]; nickContract: string[]; nickSingles: string[] };
+type LexiconLike = {
+  nickProfession: string[];
+  nickAppearance: string[];
+  nickDeed: string[];
+  nickTerrain: string[];
+  nickContract: string[];
+  nickSingles: string[];
+};
 
 // 绰号 2-8 字：双字词根 2 字/词 + 单字补字；来源多选时只从所选来源取词
 function nickWordPool(race: RaceKey, sources: string[]): Array<{ word: string; label: string }> {
@@ -339,7 +346,12 @@ export function generateBatch(race: RaceKey, types: NameTypeKey[], params: GenPa
   return { candidates: out, total: out.length, deduped };
 }
 
-export function rerollCombo(race: RaceKey, types: NameTypeKey[], params: GenParams, excludes: Set<string>): { name: string; structure: StructurePart[] } | null {
+export function rerollCombo(
+  race: RaceKey,
+  types: NameTypeKey[],
+  params: GenParams,
+  excludes: Set<string>,
+): { name: string; structure: StructurePart[] } | null {
   let guard = 0;
   while (guard < 80) {
     guard += 1;

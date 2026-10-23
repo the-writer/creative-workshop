@@ -1,20 +1,10 @@
 // 共享 UI 组件：提示条、印章、印框 chip、空态、结构标签等
 
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RaceKey, StructurePart } from '@/lib/types';
 import { raceLabel } from '@/lib/types';
-import demonSeal from '@/assets/demon_seal.png';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 /* ---------------- Toast ---------------- */
 
@@ -66,12 +56,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 /* ---------------- 族群印章 ---------------- */
 
 export function Seal({ race, size = 28, className }: { race: RaceKey; size?: number; className?: string }) {
-  if (race === 'demon') {
-    return <img src={demonSeal} alt="妖族" className={cn('seal-img', className)} style={{ width: size, height: size }} data-testid={`seal-demon-${size}`} />;
-  }
   return (
-    <span className={cn('seal-fallback', className)} style={{ width: size, height: size, fontSize: Math.max(12, size * 0.5) }} data-testid={`seal-human-${size}`}>
-      人
+    <span
+      className={cn('seal-fallback', race === 'demon' && 'seal-demon', className)}
+      style={{ width: size, height: size, fontSize: Math.max(11, size * 0.46) }}
+      data-testid={`seal-${race}-${size}`}
+      aria-label={race === 'demon' ? '妖族' : '人族'}
+    >
+      {race === 'demon' ? '妖' : '人'}
     </span>
   );
 }
@@ -98,12 +90,7 @@ export function Chip({
   dataTestId?: string;
 }) {
   return (
-    <button
-      type="button"
-      data-testid={dataTestId}
-      onClick={onClick}
-      className={cn('app-chip', selected && `app-chip-selected chip-tone-${tone}`, className)}
-    >
+    <button type="button" data-testid={dataTestId} onClick={onClick} className={cn('app-chip', selected && `app-chip-selected chip-tone-${tone}`, className)}>
       {children}
     </button>
   );
@@ -126,17 +113,7 @@ export function StructureTags({ parts, race }: { parts: StructurePart[]; race: R
 
 /* ---------------- 空态 ---------------- */
 
-export function EmptyState({
-  title,
-  desc,
-  actions,
-  testId,
-}: {
-  title: string;
-  desc?: string;
-  actions?: React.ReactNode;
-  testId?: string;
-}) {
+export function EmptyState({ title, desc, actions, testId }: { title: string; desc?: string; actions?: React.ReactNode; testId?: string }) {
   return (
     <div className="empty-state" data-testid={testId}>
       <div className="empty-seal-row">
@@ -171,6 +148,7 @@ export function ConfirmDialog({
   confirmText = '确认',
   cancelText = '取消',
   destructive,
+  showCancel = true,
   onConfirm,
   testId,
 }: {
@@ -181,44 +159,102 @@ export function ConfirmDialog({
   confirmText?: string;
   cancelText?: string;
   destructive?: boolean;
+  showCancel?: boolean;
   onConfirm: () => void;
   testId?: string;
 }) {
+  useEscape(open, () => onOpenChange(false));
+  if (!open) return null;
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="confirm-dialog" data-testid={testId}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{cancelText}</AlertDialogCancel>
-          <AlertDialogAction
+    <div
+      className="modal-layer"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onOpenChange(false);
+      }}
+    >
+      <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" data-testid={testId}>
+        <h2 id="confirm-title" className="dialog-title">
+          {title}
+        </h2>
+        {description ? <div className="dialog-description">{description}</div> : null}
+        <div className="dialog-actions">
+          {showCancel ? (
+            <button type="button" className="secondary-btn" onClick={() => onOpenChange(false)} data-testid={testId ? `${testId}-cancel` : undefined}>
+              {cancelText}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={destructive ? 'danger-btn' : 'primary-btn'}
             onClick={() => onConfirm()}
-            className={destructive ? 'bg-[#B23A2E] hover:bg-[#9c2f25]' : ''}
             data-testid={testId ? `${testId}-confirm` : undefined}
           >
             {confirmText}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </button>
+        </div>
+      </section>
+    </div>
   );
+}
+
+export function BottomSheet({
+  open,
+  onClose,
+  children,
+  className,
+  testId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  className?: string;
+  testId?: string;
+}) {
+  useEscape(open, onClose);
+  if (!open) return null;
+  return (
+    <div
+      className="modal-layer sheet-layer"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className={cn('bottom-sheet', className)} role="dialog" aria-modal="true" data-testid={testId}>
+        <button type="button" className="bottom-sheet-close" aria-label="关闭" onClick={onClose}>
+          <X size={16} />
+        </button>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function useEscape(open: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
 }
 
 /* ---------------- 通用辅助 ---------------- */
 
-export function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   try {
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      return navigator.clipboard.writeText(text).then(
-        () => true,
-        () => false,
-      );
+    if (window.workshop?.clipboard) {
+      await window.workshop.clipboard.writeText(text);
+      return true;
     }
-    return Promise.resolve(false);
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return false;
   } catch {
-    return Promise.resolve(false);
+    return false;
   }
 }
 

@@ -61,13 +61,7 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
         <div className="sheets-header">
           <p className="sheets-title">设定卡</p>
           <div className="sheets-actions">
-            <button
-              type="button"
-              className="icon-btn"
-              title="刷新"
-              data-testid="sheets-refresh"
-              onClick={() => void reload({ silent: true })}
-            >
+            <button type="button" className="icon-btn" title="刷新" data-testid="sheets-refresh" onClick={() => void reload({ silent: true })}>
               <RefreshCw size={16} className={cn(refreshing && 'spin')} />
             </button>
             <button type="button" className="primary-btn sheets-new" data-testid="sheets-new" onClick={() => onOpenEditor()}>

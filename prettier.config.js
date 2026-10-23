@@ -4,4 +4,4 @@ export default {
   useTabs: false,
   singleQuote: true,
   semi: true,
-}
+};

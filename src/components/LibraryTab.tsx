@@ -1,13 +1,11 @@
 // 候选库：筛选面板 + 谱页列表 + 详情抽屉 + 增删改查与备注
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, Download, FilterX, RefreshCw, Search, Sparkles, Star, Trash2, UserPlus } from 'lucide-react';
-import Markdown from 'react-markdown';
-import { deleteCandidate, fetchCandidates, updateCandidate } from '@/lib/db';
+import { Copy, Download, Filter, FilterX, RefreshCw, Search, Sparkles, Star, Trash2, UserPlus, X } from 'lucide-react';
+import { deleteCandidate, fetchCandidates, getCandidateReferences, updateCandidate } from '@/lib/db';
 import type { Candidate, CandidateFilters, NameTypeKey, RaceKey, SortKey, StatusFilterKey } from '@/lib/types';
-import { DEFAULT_FILTERS, FILTER_MAX_CHARS, RACE_LABELS, TYPE_LABELS, candidateToSheetFields, raceLabel } from '@/lib/types';
-import { Chip, ConfirmDialog, EmptyState, Seal, StructureTags, copyText, formatTime, useAppToast } from '@/components/common';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DEFAULT_FILTERS, FILTER_MAX_CHARS, RACE_LABELS, TYPE_LABELS, candidateToSheetFields } from '@/lib/types';
+import { BottomSheet, Chip, ConfirmDialog, EmptyState, Seal, StructureTags, copyText, formatTime, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 import { exportNameListTxt } from '@/lib/export';
 import type { EditorPrefill } from '@/components/GenerateTab';
@@ -18,44 +16,10 @@ interface LibraryTabProps {
   onGoGenerate: () => void;
 }
 
-const FILTERS_KEY = 'mingpu_library_filters_v1';
-
-// AI 详细设定：系统提示词（世界观命名规则）与单条候选的参数组装
-const AI_SYSTEM_PROMPT = [
-  '你是一位严谨的世界观设定写手，擅长为虚构族群撰写鲜活、自洽的人物详细设定。',
-  '必须遵循以下世界观命名规则：',
-  '1. 书写：全部禁用间隔点，正式全名连写或身份词前置。',
-  '2. 音系：同一族群只用同一套短音节，不混现实国家姓名。',
-  '3. 地名：用地形、方位、自然词加后缀，不用国、王国、帝国等称呼。',
-  '4. 官职：用地点或部落加职权加层级后缀构成。',
-  '5. 绰号：来自职业、外貌、事迹、地形、契约，控制在 2 到 8 字。',
-  '6. 场景：正式文书用全名，口头用短名，行会用绰号，任职用官职加短名。',
-  '输出要求：用中文与 markdown 结构（小节标题用 ##），总篇幅约 350 字，',
-  '分「身份背景」「外貌气质」「职业专长」「特殊能力表现与代价」「性格与传闻」「名号由来」等小节。',
-  '不要编造与给定名称构成相冲突的内容，不要使用现实国名、现代词汇或现实人名。',
-].join('\n');
-
-function buildLibraryAiPrompt(c: Candidate): string {
-  const parts = (c.structure ?? []).map((p) => `${p.label}：${p.word}`).join('；') || '（无）';
-  const prof = (c.structure ?? []).find((p) => p.label === '营生' || p.label === '职业')?.word;
-  const ability = (c.structure ?? []).find((p) => p.label === '特殊能力')?.word;
-  return [
-    '请为以下角色撰写详细文字设定：',
-    `族群：${raceLabel(c.race)}`,
-    `名称：${c.nameText}`,
-    `名称构成：${parts}`,
-    `类型：${TYPE_LABELS[c.nameType] ?? '组合设定'}`,
-    `职业：${prof ?? '未指定'}`,
-    `特殊能力：${ability ?? '未指定'}`,
-  ].join('\n');
-}
-
-function loadFilters(): CandidateFilters {
+function normalizeFilters(parsed: Partial<CandidateFilters> | null | undefined): CandidateFilters {
   const fallback = { ...DEFAULT_FILTERS };
   try {
-    const raw = window.localStorage.getItem(FILTERS_KEY);
-    if (!raw) return fallback;
-    const p = JSON.parse(raw) as Partial<CandidateFilters>;
+    const p = parsed ?? {};
     const result: CandidateFilters = {
       race: p.race === 'human' || p.race === 'demon' ? p.race : 'all',
       nameType: ['person', 'place', 'office', 'nickname'].includes(p.nameType ?? '') ? (p.nameType as NameTypeKey) : 'all',
@@ -70,18 +34,6 @@ function loadFilters(): CandidateFilters {
       result.minChars = 1;
       result.maxChars = FILTER_MAX_CHARS;
     }
-    // 旧版本默认筛选（1-12 字）会漏掉长名与组合设定句，等同未设置，升级为新默认
-    if (
-      result.race === 'all' &&
-      result.nameType === 'all' &&
-      result.minChars === 1 &&
-      result.maxChars === 12 &&
-      result.status === 'all' &&
-      result.keyword === '' &&
-      result.sort === 'latest'
-    ) {
-      return { ...DEFAULT_FILTERS };
-    }
     return result;
   } catch {
     return fallback;
@@ -90,8 +42,9 @@ function loadFilters(): CandidateFilters {
 
 export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTabProps) {
   const toast = useAppToast();
-  const [filters, setFilters] = useState<CandidateFilters>(loadFilters);
-  const [kwDraft, setKwDraft] = useState(loadFilters().keyword);
+  const [filters, setFilters] = useState<CandidateFilters>({ ...DEFAULT_FILTERS });
+  const [filtersReady, setFiltersReady] = useState(false);
+  const [kwDraft, setKwDraft] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
   const [items, setItems] = useState<Candidate[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -100,10 +53,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [drawerNote, setDrawerNote] = useState('');
-  const [aiText, setAiText] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState('');
-  const aiControllerRef = useRef<AbortController | null>(null);
+  const [aiUnavailableOpen, setAiUnavailableOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Candidate | null>(null);
   const [blockedRefs, setBlockedRefs] = useState<{ asCharacter: boolean; asHometown: boolean; asPlace: boolean } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -111,12 +61,22 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
   const loadSeq = useRef(0);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
-    } catch {
-      // 忽略
-    }
-  }, [filters]);
+    void window.workshop.preferences
+      .get('libraryFilters')
+      .then((raw) => {
+        if (!raw || typeof raw !== 'object') return;
+        const restored = normalizeFilters(raw as Partial<CandidateFilters>);
+        setFilters(restored);
+        setKwDraft(restored.keyword);
+      })
+      .catch(() => undefined)
+      .finally(() => setFiltersReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!filtersReady) return;
+    void window.workshop.preferences.set('libraryFilters', filters).catch(() => undefined);
+  }, [filters, filtersReady]);
 
   const reload = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -199,77 +159,10 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
   const openDetail = (c: Candidate) => {
     setSelected(c);
     setDrawerNote(c.note);
-    setAiText('');
-    setAiError('');
-    setAiLoading(false);
   };
 
   const closeDetail = () => {
-    aiControllerRef.current?.abort();
-    aiControllerRef.current = null;
     setSelected(null);
-    setAiText('');
-    setAiError('');
-    setAiLoading(false);
-  };
-
-  // AI 详细设定：流式生成，自动写入备注并保存到候选库
-  const runAi = async () => {
-    const c = selected;
-    if (!c) return;
-    aiControllerRef.current?.abort();
-    const controller = new AbortController();
-    aiControllerRef.current = controller;
-    setAiLoading(true);
-    setAiError('');
-    setAiText('');
-    try {
-      const api = window.lingguang?.ai?.streamChat;
-      if (!api) throw new Error('当前环境暂不支持 AI 生成，请稍后重试');
-      const result = await api({
-        messages: [
-          { role: 'system', content: AI_SYSTEM_PROMPT },
-          { role: 'user', content: buildLibraryAiPrompt(c) },
-        ],
-        responseFormat: { type: 'text' },
-        signal: controller.signal,
-        onEvent: (event) => {
-          if (event.type === 'text_delta') {
-            setAiText(event.text);
-            setDrawerNote(event.text);
-          }
-          if (event.type === 'error') setAiError(event.message || 'AI 生成失败，请重试');
-        },
-      });
-      const finalText = result && typeof result.content === 'string' && result.content ? result.content : '';
-      if (finalText) {
-        setAiText(finalText);
-        setDrawerNote(finalText);
-        const res = await updateCandidate(c.id, { note: finalText });
-        if (res.ok) {
-          setItems((prev) => prev.map((x) => (x.id === c.id ? { ...x, note: finalText } : x)));
-          toast.show('AI 设定已写入备注并保存', 'success');
-        } else {
-          toast.show(res.message || 'AI 设定已生成，但备注保存失败，请手动保存', 'error');
-        }
-      }
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      setAiError(err instanceof Error ? err.message : 'AI 生成失败，请重试');
-    } finally {
-      if (!controller.signal.aborted) setAiLoading(false);
-    }
-  };
-
-  const retryAi = () => {
-    if (!selected) return;
-    void runAi();
-  };
-
-  const copyAiText = async () => {
-    if (!aiText) return;
-    const ok = await copyText(aiText);
-    toast.show(ok ? 'AI 设定已复制' : '复制失败，请长按文本手动复制', ok ? 'success' : 'error');
   };
 
   const saveNote = async () => {
@@ -284,18 +177,12 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
   };
 
   const startDelete = async (c: Candidate) => {
-    setDeleteTarget(c);
-    setBlockedRefs(null);
-    const res = await deleteCandidate(c.id, false);
-    if (res.ok) {
-      setDeleteTarget(null);
-      toast.show('已删除', 'success');
-      void reload({ silent: true });
-    } else if (res.refs) {
-      setBlockedRefs(res.refs);
-    } else {
-      setDeleteTarget(null);
-      toast.show(res.message || '删除失败，请重试', 'error');
+    try {
+      const refs = await getCandidateReferences(c.id);
+      setDeleteTarget(c);
+      setBlockedRefs(refs.asCharacter || refs.asHometown || refs.asPlace ? refs : null);
+    } catch (err) {
+      toast.show((err as Error)?.message || '检查名称引用失败，请重试', 'error');
     }
   };
 
@@ -334,7 +221,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
         {/* 筛选入口条 */}
         <div className="filter-bar">
           <button type="button" className="filter-toggle" onClick={() => setPanelOpen((v) => !v)} data-testid="filter-toggle">
-            <span className="material-icons">filter_list</span>
+            <Filter size={14} />
             筛选
             {filterSummary.length > 0 ? <span className="filter-count">{filterSummary.length}</span> : null}
           </button>
@@ -351,7 +238,14 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
             <button type="button" className="icon-btn" title="刷新" data-testid="library-refresh" onClick={() => void reload({ silent: true })}>
               <RefreshCw size={16} className={cn(isRefreshing && 'spin')} />
             </button>
-            <button type="button" className="icon-btn" title="导出当前清单" data-testid="library-export" disabled={exportingTxt || items.length === 0} onClick={() => void handleExportTxt()}>
+            <button
+              type="button"
+              className="icon-btn"
+              title="导出当前清单"
+              data-testid="library-export"
+              disabled={exportingTxt || items.length === 0}
+              onClick={() => void handleExportTxt()}
+            >
               <Download size={16} />
             </button>
           </div>
@@ -451,7 +345,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
             <div className="filter-group">
               <span className="filter-group-label">名称搜索</span>
               <div className="keyword-row">
-                <span className="material-icons search-icon">search</span>
+                <Search size={15} className="search-icon" />
                 <input
                   type="text"
                   className="keyword-input"
@@ -462,7 +356,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
                 />
                 {kwDraft ? (
                   <button type="button" className="keyword-clear" data-testid="filter-keyword-clear" onClick={() => setKwDraft('')}>
-                    <span className="material-icons">close</span>
+                    <X size={15} />
                   </button>
                 ) : null}
               </div>
@@ -568,106 +462,87 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
         )}
       </div>
 
-      {/* 详情抽屉 */}
-      <Sheet open={!!selected} onOpenChange={(open) => !open && closeDetail()}>
-        <SheetContent side="bottom" className="detail-sheet" data-testid="detail-sheet">
-          <SheetHeader>
-            <SheetTitle className="detail-sheet-title">命名详情</SheetTitle>
-          </SheetHeader>
-          {selected ? (
-            <div className="detail-body">
-              <div className="detail-top">
-                <Seal race={selected.race} size={30} />
-                <div className="detail-name-wrap">
-                  <p className="detail-name">{selected.nameText}</p>
-                  <p className="detail-meta">
-                    {RACE_LABELS[selected.race]} · {TYPE_LABELS[selected.nameType]} · {selected.charCount}字 · {formatTime(selected.createdAt)}
-                  </p>
-                </div>
-              </div>
-              <StructureTags parts={selected.structure} race={selected.race} />
-              <div className="detail-note">
-                <label className="detail-label" htmlFor="detail-note-input">
-                  备注（AI 设定生成后自动写入此处）
-                </label>
-                <textarea id="detail-note-input" className="detail-textarea" value={drawerNote} onChange={(e) => setDrawerNote(e.target.value)} data-testid="detail-note" placeholder="写下这个命名的用途或灵感，或点击下方 AI 设定自动生成" rows={3} />
-                <button type="button" className="secondary-btn detail-note-save" onClick={() => void saveNote()} data-testid="detail-note-save">
-                  保存备注
-                </button>
-              </div>
-              <div className="detail-ai">
-                <button type="button" className="ai-card-btn" data-testid="detail-ai-gen" disabled={aiLoading} onClick={() => void runAi()}>
-                  <Sparkles size={15} />
-                  {aiLoading ? '正在撰写…' : aiText ? '重新生成 AI 设定' : 'AI 详细设定'}
-                </button>
-                <p className="ai-panel-sub">整合世界观命名规则撰写详细设定，生成内容自动写入备注并保存。</p>
-                <div className="ai-panel-body">
-                  {aiLoading && !aiText ? <div className="ai-loading">正在起笔撰写…</div> : null}
-                  {aiError && !aiText ? <div className="ai-error">{aiError}</div> : null}
-                  {aiText ? (
-                    <div className="ai-content">
-                      <Markdown>{aiText}</Markdown>
-                    </div>
-                  ) : null}
-                  {aiLoading && aiText ? <div className="ai-cursor" /> : null}
-                </div>
-                {aiText ? (
-                  <div className="detail-ai-actions">
-                    <button type="button" className="secondary-btn" onClick={retryAi} disabled={aiLoading} data-testid="detail-ai-retry">
-                      <RefreshCw size={14} />
-                      重新生成
-                    </button>
-                    <button type="button" className="secondary-btn" onClick={() => void copyAiText()} disabled={!aiText} data-testid="detail-ai-copy">
-                      <Copy size={14} />
-                      复制设定
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              <div className="detail-actions">
-                <button type="button" className="secondary-btn" data-testid="detail-copy" onClick={() => void copyItem(selected)}>
-                  <Copy size={15} />
-                  复制
-                </button>
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  data-testid="detail-tosheet"
-                  onClick={() => {
-                    const c = selected;
-                    if (!c) return;
-                    const f = candidateToSheetFields(c);
-                    closeDetail();
-                    onOpenEditor({
-                      characterName: c.nameText,
-                      race: c.race,
-                      candidateId: c.id,
-                      occupation: f.occupation,
-                      office: f.office,
-                      hometown: f.hometown,
-                      nickname: f.nickname,
-                      contractTitle: f.contractTitle,
-                      note: f.note,
-                    });
-                  }}
-                >
-                  <UserPlus size={15} />
-                  加入设定
-                </button>
-                <button type="button" className="danger-btn" data-testid="detail-delete" onClick={() => void startDelete(selected)}>
-                  <Trash2 size={15} />
-                  删除
-                </button>
+      <BottomSheet open={!!selected} onClose={closeDetail} className="detail-sheet" testId="detail-sheet">
+        <h2 className="detail-sheet-title">命名详情</h2>
+        {selected ? (
+          <div className="detail-body">
+            <div className="detail-top">
+              <Seal race={selected.race} size={30} />
+              <div className="detail-name-wrap">
+                <p className="detail-name">{selected.nameText}</p>
+                <p className="detail-meta">
+                  {RACE_LABELS[selected.race]} · {TYPE_LABELS[selected.nameType]} · {selected.charCount}字 · {formatTime(selected.createdAt)}
+                </p>
               </div>
             </div>
-          ) : null}
-        </SheetContent>
-      </Sheet>
+            <StructureTags parts={selected.structure} race={selected.race} />
+            <div className="detail-note">
+              <label className="detail-label" htmlFor="detail-note-input">
+                备注
+              </label>
+              <textarea
+                id="detail-note-input"
+                className="detail-textarea"
+                value={drawerNote}
+                onChange={(e) => setDrawerNote(e.target.value)}
+                data-testid="detail-note"
+                placeholder="写下这个命名的用途或灵感"
+                rows={3}
+              />
+              <button type="button" className="secondary-btn detail-note-save" onClick={() => void saveNote()} data-testid="detail-note-save">
+                保存备注
+              </button>
+            </div>
+            <div className="detail-ai">
+              <button type="button" className="ai-card-btn" data-testid="detail-ai-gen" onClick={() => setAiUnavailableOpen(true)}>
+                <Sparkles size={15} />
+                AI 详细设定
+              </button>
+              <p className="ai-panel-sub">当前桌面版暂不提供 AI 在线生成，入口会保留以便后续恢复。</p>
+            </div>
+            <div className="detail-actions">
+              <button type="button" className="secondary-btn" data-testid="detail-copy" onClick={() => void copyItem(selected)}>
+                <Copy size={15} />
+                复制
+              </button>
+              <button
+                type="button"
+                className="secondary-btn"
+                data-testid="detail-tosheet"
+                onClick={() => {
+                  const c = selected;
+                  if (!c) return;
+                  const f = candidateToSheetFields(c);
+                  closeDetail();
+                  onOpenEditor({
+                    characterName: c.nameText,
+                    race: c.race,
+                    candidateId: c.id,
+                    occupation: f.occupation,
+                    office: f.office,
+                    hometown: f.hometown,
+                    nickname: f.nickname,
+                    contractTitle: f.contractTitle,
+                    note: f.note,
+                  });
+                }}
+              >
+                <UserPlus size={15} />
+                加入设定
+              </button>
+              <button type="button" className="danger-btn" data-testid="detail-delete" onClick={() => void startDelete(selected)}>
+                <Trash2 size={15} />
+                删除
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </BottomSheet>
 
       {/* 删除确认（被引用时提示） */}
       <ConfirmDialog
         open={!!deleteTarget && !blockedRefs}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onOpenChange={(open) => !open && (setDeleteTarget(null), setBlockedRefs(null))}
         title="删除这条命名？"
         description={`删除后将从候选库移除「${deleteTarget?.nameText ?? ''}」，此操作不可撤销。`}
         confirmText="删除"
@@ -694,6 +569,16 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
         destructive
         testId="delete-blocked-confirm"
         onConfirm={() => void forceDelete()}
+      />
+      <ConfirmDialog
+        open={aiUnavailableOpen}
+        onOpenChange={setAiUnavailableOpen}
+        title="AI 详细设定暂不可用"
+        description="当前桌面版不接入 AI 服务。入口已保留，你可以继续手动填写备注与设定卡。"
+        confirmText="知道了"
+        showCancel={false}
+        testId="ai-unavailable"
+        onConfirm={() => setAiUnavailableOpen(false)}
       />
     </div>
   );

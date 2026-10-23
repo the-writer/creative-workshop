@@ -1,3 +1,7 @@
 /dist
+/dist-electron
+/release
 /node_modules
 /.idea
+*.log
+.DS_Store

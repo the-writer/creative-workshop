@@ -2,17 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Download, Home, Minus, Plus, RefreshCw, X } from 'lucide-react';
 import { fetchCandidates, fetchRelations, fetchSheets } from '@/lib/db';
-import {
-  buildGraphData,
-  computeLayout,
-  type GraphEdge,
-  type GraphNode,
-  type GraphViewMode,
-  type NodeTypeFilter,
-  type Position,
-} from '@/lib/graph';
+import { buildGraphData, computeLayout, type GraphEdge, type GraphNode, type GraphViewMode, type NodeTypeFilter, type Position } from '@/lib/graph';
 import type { Candidate, RaceKey, Relation, Sheet } from '@/lib/types';
-import { RACE_LABELS } from '@/lib/types';
+import { FILTER_MAX_CHARS, RACE_LABELS } from '@/lib/types';
 import { Chip, EmptyState, Seal, useAppToast } from '@/components/common';
 import { exportGraphPng } from '@/lib/export';
 import { cn } from '@/lib/utils';
@@ -53,7 +45,7 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
       const [s, r, p] = await Promise.all([
         fetchSheets(),
         fetchRelations(),
-        fetchCandidates({ race: 'all', nameType: 'place', minChars: 1, maxChars: 12, status: 'all', keyword: '', sort: 'latest' }),
+        fetchCandidates({ race: 'all', nameType: 'place', minChars: 1, maxChars: FILTER_MAX_CHARS, status: 'all', keyword: '', sort: 'latest' }),
       ]);
       setSheets(s);
       setRelations(r);
@@ -182,7 +174,13 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
                 ['panorama', '全景图谱'],
               ] as Array<[GraphViewMode, string]>
             ).map(([k, label]) => (
-              <button key={k} type="button" className={cn('seg-btn', viewMode === k && 'seg-btn-active')} data-testid={`graph-view-${k}`} onClick={() => setViewMode(k)}>
+              <button
+                key={k}
+                type="button"
+                className={cn('seg-btn', viewMode === k && 'seg-btn-active')}
+                data-testid={`graph-view-${k}`}
+                onClick={() => setViewMode(k)}
+              >
                 {label}
               </button>
             ))}

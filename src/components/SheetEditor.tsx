@@ -188,12 +188,18 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
       if (tab === 'sheet') {
         const sheets = await fetchSheets();
         setRelTargets(
-          sheets
-            .filter((s) => s.id !== savedId)
-            .map((s) => ({ id: s.id, name: s.characterName || '未命名人物', type: 'sheet' as const, race: s.race })),
+          sheets.filter((s) => s.id !== savedId).map((s) => ({ id: s.id, name: s.characterName || '未命名人物', type: 'sheet' as const, race: s.race })),
         );
       } else {
-        const list = await fetchCandidates({ race: 'all', nameType: 'place', minChars: 1, maxChars: FILTER_MAX_CHARS, status: 'all', keyword: '', sort: 'latest' });
+        const list = await fetchCandidates({
+          race: 'all',
+          nameType: 'place',
+          minChars: 1,
+          maxChars: FILTER_MAX_CHARS,
+          status: 'all',
+          keyword: '',
+          sort: 'latest',
+        });
         setRelTargets(list.slice(0, 200).map((c) => ({ id: c.id, name: c.nameText, type: 'place' as const, race: c.race })));
       }
     } catch {
@@ -306,7 +312,13 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
           <ArrowLeft size={20} />
         </button>
         <p className="editor-title">{sheetId ? '编辑设定卡' : '新建设定卡'}</p>
-        <button type="button" className="editor-save-btn" data-testid="editor-save" disabled={saving || !!loadError || !loaded} onClick={() => void handleSave()}>
+        <button
+          type="button"
+          className="editor-save-btn"
+          data-testid="editor-save"
+          disabled={saving || !!loadError || !loaded}
+          onClick={() => void handleSave()}
+        >
           {saving ? '保存中…' : '保存'}
         </button>
       </div>
@@ -355,7 +367,13 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
                 ['quick', '现场生成'],
               ] as Array<[SourceMode, string]>
             ).map(([k, label]) => (
-              <button key={k} type="button" className={cn('seg-btn', sourceMode === k && 'seg-btn-active')} data-testid={`editor-source-${k}`} onClick={() => setSourceMode(k)}>
+              <button
+                key={k}
+                type="button"
+                className={cn('seg-btn', sourceMode === k && 'seg-btn-active')}
+                data-testid={`editor-source-${k}`}
+                onClick={() => setSourceMode(k)}
+              >
                 {label}
               </button>
             ))}
@@ -599,7 +617,13 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
                       ['place', '关联地名'],
                     ] as Array<['sheet' | 'place', string]>
                   ).map(([k, label]) => (
-                    <button key={k} type="button" className={cn('seg-btn', relTab === k && 'seg-btn-active')} data-testid={`rel-tab-${k}`} onClick={() => switchRelTab(k)}>
+                    <button
+                      key={k}
+                      type="button"
+                      className={cn('seg-btn', relTab === k && 'seg-btn-active')}
+                      data-testid={`rel-tab-${k}`}
+                      onClick={() => switchRelTab(k)}
+                    >
                       {label}
                     </button>
                   ))}
@@ -637,7 +661,13 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
                   data-testid="rel-note"
                   onChange={(e) => setRelNote(e.target.value)}
                 />
-                <button type="button" className="secondary-btn relation-add-btn" data-testid="rel-add" disabled={addingRel} onClick={() => void handleAddRelation()}>
+                <button
+                  type="button"
+                  className="secondary-btn relation-add-btn"
+                  data-testid="rel-add"
+                  disabled={addingRel}
+                  onClick={() => void handleAddRelation()}
+                >
                   {addingRel ? '添加中…' : '添加关系'}
                 </button>
               </div>
@@ -647,7 +677,13 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
       </div>
 
       <div className="editor-footer">
-        <button type="button" className="generate-btn" data-testid="editor-save-bottom" disabled={saving || !!loadError || !loaded} onClick={() => void handleSave()}>
+        <button
+          type="button"
+          className="generate-btn"
+          data-testid="editor-save-bottom"
+          disabled={saving || !!loadError || !loaded}
+          onClick={() => void handleSave()}
+        >
           {saving ? '正在保存…' : '保存设定'}
         </button>
       </div>

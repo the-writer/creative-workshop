@@ -36,10 +36,7 @@ function BarChart({
         <div key={e.key} className="bar-col">
           <span className="bar-value">{e.value > 0 ? e.value : ''}</span>
           <div className="bar-track">
-            <div
-              className="bar-fill"
-              style={{ height: `${e.value > 0 ? Math.max(10, (e.value / max) * 100) : 0}%`, background: colorMap?.[e.key] ?? color }}
-            />
+            <div className="bar-fill" style={{ height: `${e.value > 0 ? Math.max(10, (e.value / max) * 100) : 0}%`, background: colorMap?.[e.key] ?? color }} />
           </div>
           <span className="bar-label">{e.label}</span>
         </div>
@@ -146,7 +143,13 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
             {/* 分布 */}
             <div className="stat-chart-card">
               <SectionTitle>族群分布</SectionTitle>
-              <BarChart data={stats.raceDist} order={['human', 'demon']} labels={RACE_LABELS} color="#B23A2E" colorMap={{ human: '#B23A2E', demon: '#3E4A5A' }} />
+              <BarChart
+                data={stats.raceDist}
+                order={['human', 'demon']}
+                labels={RACE_LABELS}
+                color="#B23A2E"
+                colorMap={{ human: '#B23A2E', demon: '#3E4A5A' }}
+              />
             </div>
             <div className="stat-chart-card">
               <SectionTitle>类型分布</SectionTitle>
@@ -185,7 +188,7 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
                 <span>理论组合总量</span>
                 <strong>{formatCombination(combo.grandTotal)}</strong>
               </div>
-              <p className="lexicon-badge">已达设计目标 ≥ 30 万组合</p>
+              <p className="lexicon-badge">按本地资料库实时估算，理论组合已超过安全整数，采用精确大整数计数</p>
               <p className="lexicon-detail">
                 人名 {formatCombination(combo.detail.person)} · 地名 {formatCombination(combo.detail.place)} · 官职 {formatCombination(combo.detail.office)} ·
                 绰号 {formatCombination(combo.detail.nickname)}
@@ -196,11 +199,23 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
             <div className="stat-chart-card export-area">
               <SectionTitle>数据导出</SectionTitle>
               <div className="export-btn-row">
-                <button type="button" className="secondary-btn" data-testid="stats-export-json" disabled={jsonBusy || !hasData} onClick={() => void handleJson()}>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  data-testid="stats-export-json"
+                  disabled={jsonBusy || !hasData}
+                  onClick={() => void handleJson()}
+                >
                   <FileJson size={15} />
                   {jsonBusy ? '导出中…' : '导出全量 JSON'}
                 </button>
-                <button type="button" className="secondary-btn" data-testid="stats-export-txt" disabled={txtBusy || (stats.totalCandidates ?? 0) === 0} onClick={() => void handleTxt()}>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  data-testid="stats-export-txt"
+                  disabled={txtBusy || (stats.totalCandidates ?? 0) === 0}
+                  onClick={() => void handleTxt()}
+                >
                   <FileText size={15} />
                   {txtBusy ? '导出中…' : '导出名称清单 TXT'}
                 </button>

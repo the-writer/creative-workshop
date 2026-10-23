@@ -1,4 +1,4 @@
-// 导出边界适配层：JSON/TXT/PNG/Markdown 统一经 FS 能力落盘
+// 导出边界适配层：JSON/TXT/PNG/Markdown 统一经 Electron 保存对话框落盘
 
 import { fetchAllData, type ExportBundle } from '@/lib/db';
 import { RACE_LABELS, TYPE_LABELS, type Candidate, type Sheet, type Relation } from '@/lib/types';
@@ -19,6 +19,16 @@ function stamp(): string {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
+async function saveBase64(dataBase64: string, fileName: string): Promise<{ ok: boolean; fileName: string; message?: string }> {
+  try {
+    const result = await window.workshop.files.save({ fileName, dataBase64 });
+    if (result.success) return { ok: true, fileName };
+    return { ok: false, fileName: '', message: result.canceled ? '已取消保存' : result.message || '导出失败，请重试' };
+  } catch (err) {
+    return { ok: false, fileName: '', message: (err as Error)?.message || '导出失败，请重试' };
+  }
+}
+
 export async function exportAllDataJson(): Promise<{ ok: boolean; fileName: string; message?: string }> {
   const bundle = await fetchAllData();
   if (bundle.candidates.length === 0 && bundle.sheets.length === 0 && bundle.relations.length === 0) {
@@ -26,7 +36,7 @@ export async function exportAllDataJson(): Promise<{ ok: boolean; fileName: stri
   }
   const payload = JSON.stringify(
     {
-      app: '命名谱',
+      app: '创作工坊',
       exportedAt: bundle.exportedAt,
       candidates: bundle.candidates,
       sheets: bundle.sheets,
@@ -35,41 +45,37 @@ export async function exportAllDataJson(): Promise<{ ok: boolean; fileName: stri
     null,
     2,
   );
-  const fileName = `命名谱-全量数据-${stamp()}.json`;
-  try {
-    await window.lingguang.saveFile({ data: utf8ToBase64(payload), fileName });
-    return { ok: true, fileName };
-  } catch (err) {
-    return { ok: false, fileName: '', message: (err as Error)?.message || '导出失败，请重试' };
-  }
+  const fileName = `创作工坊-全量数据-${stamp()}.json`;
+  return saveBase64(utf8ToBase64(payload), fileName);
 }
 
 export async function exportNameListTxt(items: Candidate[]): Promise<{ ok: boolean; fileName: string; message?: string }> {
   if (!items || items.length === 0) {
     return { ok: false, fileName: '', message: '暂无可导出的名称' };
   }
-  const lines: string[] = ['命名谱 · 名称清单', `导出时间：${new Date().toLocaleString('zh-CN')}`, `条目数：${items.length}`, ''];
+  const lines: string[] = ['创作工坊 · 名称清单', `导出时间：${new Date().toLocaleString('zh-CN')}`, `条目数：${items.length}`, ''];
   items.forEach((c, idx) => {
     const structureText = (c.structure ?? []).map((p) => `${p.label}·${p.word}`).join('，');
-    lines.push(`${idx + 1}. [${RACE_LABELS[c.race]}][${TYPE_LABELS[c.nameType]}] ${c.nameText}（${c.charCount}字）${structureText ? `｜${structureText}` : ''}`);
+    lines.push(
+      `${idx + 1}. [${RACE_LABELS[c.race]}][${TYPE_LABELS[c.nameType]}] ${c.nameText}（${c.charCount}字）${structureText ? `｜${structureText}` : ''}`,
+    );
   });
-  const fileName = `命名谱-名称清单-${stamp()}.txt`;
-  try {
-    await window.lingguang.saveFile({ data: utf8ToBase64(lines.join('\n')), fileName });
-    return { ok: true, fileName };
-  } catch (err) {
-    return { ok: false, fileName: '', message: (err as Error)?.message || '导出失败，请重试' };
-  }
+  const fileName = `创作工坊-名称清单-${stamp()}.txt`;
+  return saveBase64(utf8ToBase64(lines.join('\n')), fileName);
 }
 
 /* ---------------- Markdown 导出（已保存设定 + 全局图谱） ---------------- */
 
 function mdEscape(text: string): string {
-  return String(text ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+  return String(text ?? '')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, '<br>');
 }
 
 function mdQuote(text: string): string {
-  return String(text ?? '').replace(/"/g, '#quot;').replace(/\r?\n/g, ' ');
+  return String(text ?? '')
+    .replace(/"/g, '#quot;')
+    .replace(/\r?\n/g, ' ');
 }
 
 function relationLines(sheetId: string, relations: Relation[]): string[] {
@@ -111,10 +117,17 @@ export function buildSettingsMarkdown(bundle: ExportBundle): string {
   const candidates = bundle.candidates ?? [];
   const relations = bundle.relations ?? [];
   const favCount = candidates.filter((c) => c.favorite).length;
-  const graph = buildGraphData(sheets, relations, candidates.filter((c) => c.nameType === 'place'), 'panorama', 'all', 'all');
+  const graph = buildGraphData(
+    sheets,
+    relations,
+    candidates.filter((c) => c.nameType === 'place'),
+    'panorama',
+    'all',
+    'all',
+  );
 
   const out: string[] = [];
-  out.push('# 命名谱 · 已保存设定导出');
+  out.push('# 创作工坊 · 已保存设定导出');
   out.push('');
   out.push(`- 导出时间：${new Date().toLocaleString('zh-CN')}`);
   out.push(`- 设定卡：${sheets.length} 张`);
@@ -158,7 +171,9 @@ export function buildSettingsMarkdown(bundle: ExportBundle): string {
     out.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
     candidates.forEach((c: Candidate, i: number) => {
       const structure = (c.structure ?? []).map((p) => `${p.label}·${p.word}`).join('，');
-      out.push(`| ${i + 1} | ${RACE_LABELS[c.race]} | ${TYPE_LABELS[c.nameType]} | ${mdEscape(c.nameText)} | ${c.charCount} | ${mdEscape(structure)} | ${c.favorite ? '✓' : ''} | ${mdEscape(c.note)} |`);
+      out.push(
+        `| ${i + 1} | ${RACE_LABELS[c.race]} | ${TYPE_LABELS[c.nameType]} | ${mdEscape(c.nameText)} | ${c.charCount} | ${mdEscape(structure)} | ${c.favorite ? '✓' : ''} | ${mdEscape(c.note)} |`,
+      );
     });
     out.push('');
   }
@@ -196,7 +211,7 @@ export function buildSettingsMarkdown(bundle: ExportBundle): string {
   }
 
   out.push('---');
-  out.push('由「世界观命名工坊」生成');
+  out.push('由「创作工坊」生成');
   return out.join('\n');
 }
 
@@ -206,21 +221,11 @@ export async function exportSettingsMarkdown(): Promise<{ ok: boolean; fileName:
     return { ok: false, fileName: '', message: '暂无可导出的设定' };
   }
   const md = buildSettingsMarkdown(bundle);
-  const fileName = `命名谱-已保存设定-${stamp()}.md`;
-  try {
-    await window.lingguang.saveFile({ data: utf8ToBase64(md), fileName });
-    return { ok: true, fileName };
-  } catch (err) {
-    return { ok: false, fileName: '', message: (err as Error)?.message || '导出失败，请重试' };
-  }
+  const fileName = `创作工坊-已保存设定-${stamp()}.md`;
+  return saveBase64(utf8ToBase64(md), fileName);
 }
 
-export function drawGraphToCanvas(
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  positions: Map<string, Position>,
-  title: string,
-): HTMLCanvasElement {
+export function drawGraphToCanvas(nodes: GraphNode[], edges: GraphEdge[], positions: Map<string, Position>, title: string): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
   canvas.height = 720;
@@ -238,7 +243,7 @@ export function drawGraphToCanvas(
   ctx.font = '600 34px "Kaiti SC", "STKaiti", serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(`命名谱 · ${title}`, 44, 36);
+  ctx.fillText(`创作工坊 · ${title}`, 44, 36);
 
   if (nodes.length === 0) {
     ctx.fillStyle = '#9A9184';
@@ -329,9 +334,8 @@ export async function exportGraphPng(
     const dataUrl = canvas.toDataURL('image/png');
     const b64 = dataUrl.split(',')[1] ?? '';
     if (!b64) return { ok: false, fileName: '', message: '图谱生成失败，请重试' };
-    const fileName = `命名谱-${title}-${stamp()}.png`;
-    await window.lingguang.saveFile({ data: b64, fileName });
-    return { ok: true, fileName };
+    const fileName = `创作工坊-${title}-${stamp()}.png`;
+    return saveBase64(b64, fileName);
   } catch (err) {
     return { ok: false, fileName: '', message: (err as Error)?.message || '导出失败，请重试' };
   }

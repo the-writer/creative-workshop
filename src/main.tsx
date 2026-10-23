@@ -1,120 +1,46 @@
-// 拦截 console.error 和 console.warn，用 console.log 替代
-(function () {
-  console.error = function (...args: unknown[]) {
-    console.log('[console.error]', ...args);
-  };
-
-  console.warn = function (...args: unknown[]) {
-    console.log('[console.warn]', ...args);
-  };
-})();
-
 import { Component, StrictMode, type ErrorInfo, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import App from './App.tsx';
+import App from './App';
 
-type FlashAppErrorPayload = {
-  type?: string;
-  message?: string;
-  stack?: string;
-  componentStack?: string;
-  errorType?: string;
-  artifactId?: string;
-  artifactVersion?: string;
-  traceId?: string;
-  sessionId?: string;
-  timestamp?: number;
-  buildTime?: string;
-  [key: string]: unknown;
-};
+interface ErrorBoundaryState {
+  message: string;
+}
 
-const BUILD_TIME_META_SELECTOR = 'meta[name="asap-build-time"]';
+class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  override state: ErrorBoundaryState = { message: '' };
 
-const getNonEmptyValue = (value: string | undefined, fallback: string): string => {
-  return value !== undefined && value !== '' ? value : fallback;
-};
-
-const getBuildTime = (): string => {
-  return document.querySelector<HTMLMetaElement>(BUILD_TIME_META_SELECTOR)?.content ?? '';
-};
-
-const reportFlashAppError = (payload: FlashAppErrorPayload): void => {
-  const reportPayload: FlashAppErrorPayload = {
-    type: 'flash-app-error',
-    ...payload,
-    message: getNonEmptyValue(payload.message, 'Unknown react error'),
-    artifactId: getNonEmptyValue(payload.artifactId, window.lingguang._getArtifactId()),
-    artifactVersion: getNonEmptyValue(payload.artifactVersion, window.lingguang._getArtifactVersion()),
-    traceId: getNonEmptyValue(payload.traceId, window.trace_id ?? ''),
-    sessionId: getNonEmptyValue(payload.sessionId, window._flashAppSessionId ?? ''),
-    timestamp: payload.timestamp ?? Date.now(),
-    buildTime: getNonEmptyValue(payload.buildTime, getBuildTime()),
-  };
-
-  if (window.parent !== window) {
-    window.parent.postMessage(
-      {
-        type: 'flash-app-error',
-        payload: reportPayload,
-      },
-      '*',
-    );
-  }
-};
-
-type FlashAppErrorBoundaryProps = {
-  children: ReactNode;
-};
-
-type FlashAppErrorBoundaryState = {
-  hasError: boolean;
-};
-
-class FlashAppErrorBoundary extends Component<FlashAppErrorBoundaryProps, FlashAppErrorBoundaryState> {
-  override state: FlashAppErrorBoundaryState = {
-    hasError: false,
-  };
-
-  static getDerivedStateFromError(): FlashAppErrorBoundaryState {
-    return {
-      hasError: true,
-    };
+  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
+    return { message: error instanceof Error ? error.message : '未知错误' };
   }
 
-  override componentDidCatch(error: Error, info: ErrorInfo) {
-    const componentStack = info.componentStack ?? '';
-
-    reportFlashAppError({
-      message: getNonEmptyValue(error.message, 'Unknown react error'),
-      ...(error.stack !== undefined ? { stack: error.stack } : {}),
-      ...(componentStack !== '' ? { componentStack } : {}),
-      errorType: 'react-error-boundary',
-    });
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
+    if (import.meta.env.DEV) console.error('应用渲染失败', error, info.componentStack);
   }
 
   override render() {
-    if (this.state.hasError) {
-      return null;
+    if (this.state.message) {
+      return (
+        <main className="fatal-error">
+          <h1>创作工坊暂时无法显示</h1>
+          <p>{this.state.message}</p>
+          <button type="button" onClick={() => window.location.reload()}>
+            重新载入
+          </button>
+        </main>
+      );
     }
     return this.props.children;
   }
 }
 
-const rootElement = document.getElementById('root');
+const root = document.getElementById('root');
+if (!root) throw new Error('缺少应用挂载节点');
 
-if (!rootElement) {
-  throw new Error('Root element #root not found');
-}
-
-createRoot(rootElement).render(
+createRoot(root).render(
   <StrictMode>
-    {import.meta.env.PROD ? (
-      <FlashAppErrorBoundary>
-        <App />
-      </FlashAppErrorBoundary>
-    ) : (
+    <AppErrorBoundary>
       <App />
-    )}
+    </AppErrorBoundary>
   </StrictMode>,
 );

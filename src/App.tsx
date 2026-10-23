@@ -43,6 +43,10 @@ function App() {
 
   return (
     <div id="container" className="app-root">
+      <header className="desktop-titlebar" aria-label="窗口标题栏">
+        <span className="desktop-titlebar-mark">创</span>
+        <span>创作工坊</span>
+      </header>
       <ToastProvider>
         {editor ? (
           <SheetEditor
