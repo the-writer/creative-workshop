@@ -59,6 +59,9 @@
     },
     "storage": {
       "fileName": "workshop.json"
+    },
+    "tray": {
+      "iconFile": "assets/imgs/trayTemplate.png"
     }
   },
   "build": {
@@ -72,6 +75,7 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "assets/imgs/trayTemplate*.png",
       "package.json"
     ],
     "mac": {

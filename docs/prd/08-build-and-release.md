@@ -26,6 +26,7 @@
 - `asar`: 启用
 - `afterPack`: `scripts/after-pack.cjs`
 - macOS `identity`: `null`，跳过不可用的自动钥匙串身份，由后处理执行 ad-hoc 签名
+- `files` 明确包含 `assets/imgs/trayTemplate*.png`，保证打包后托盘图标可加载
 - 产物名：`creation-workshop-v<version>-<arch>.<ext>`
 
 `dist:mac` 先执行 `scripts/clean-dist.sh`，删除 `dist`、`dist-electron` 与 `release`，确保不复用旧构建。
@@ -54,4 +55,4 @@ pnpm test
 pnpm run build
 ```
 
-涉及桌面窗口或 IPC 的改动还需进行一次 Electron 启动验证，并在同一轮检查 JSON 文件路径、主界面与关键弹窗。
+涉及桌面窗口、托盘或 IPC 的改动还需进行一次 Electron 启动验证，并在同一轮检查 JSON 文件路径、主界面、托盘图标加载与关键弹窗。

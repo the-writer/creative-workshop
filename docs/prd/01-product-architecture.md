@@ -10,7 +10,7 @@
 
 | 层              | 目录                                     | 职责                                              |
 | --------------- | ---------------------------------------- | ------------------------------------------------- |
-| Electron 主进程 | `electron/main.cts`                      | 创建窗口、应用菜单、安全策略与 IPC 注册           |
+| Electron 主进程 | `electron/main.cts`                      | 创建窗口、托盘、应用菜单、安全策略与 IPC 注册     |
 | 预加载桥        | `electron/preload.cts`                   | 通过 `contextBridge` 暴露白名单 `window.workshop` |
 | IPC 边界        | `electron/ipc/workshop-ipc.cts`          | 校验调用来源、处理数据与文件请求                  |
 | 数据服务        | `electron/services/workshop-storage.cts` | JSON 读取、规范化、串行写入与级联规则             |
@@ -34,9 +34,13 @@
 
 应用加载 `dist/index.html`；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务。
 
-主进程在 macOS 把窗口固定为 `screen-saver` 置顶层，并通过
-`setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })` 使其在其他应用的全屏空间中继续可见和操作。窗口不主动
-切换 Space，关闭后按常规 Electron 生命周期处理。
+主进程在 macOS 把窗口固定为 `screen-saver` 置顶层，并以
+`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })` 将其绑定到打开时所在的桌面。窗口可以覆盖同一桌面上的
+全屏应用，但用户切换桌面时不会跟随，始终留在原桌面。
+
+从隐藏状态点击托盘重新打开时，主进程先临时启用“所有工作区可见”，随后调用 `show()`、`focus()`、`moveTop()`，
+并在 60ms 后重新绑定当前桌面。因此窗口会在点击托盘时所在的桌面打开，而不是被系统拉回旧桌面。主窗口系统关闭按钮
+只隐藏窗口，应用继续由托盘驻留；托盘右键菜单提供“打开主界面”和“退出创作工坊”。
 
 ### 1.4 安全与导航
 
@@ -49,5 +53,6 @@
 ### 1.5 资源与目录
 
 - 应用图标：`assets/imgs/app-icon.png`、`assets/imgs/app-icon.icns`。
+- 托盘模板图标：`assets/imgs/trayTemplate.png`、`trayTemplate@2x.png`、`trayTemplate@3x.png`。
 - 应用内 SVG 图标通过 `lucide-react` 组件使用，不新增手写 SVG 标签。
 - README 只包含应用图标与一句概述，功能细节以本 PRD 为准。

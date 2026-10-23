@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, BrowserWindow, Menu, session, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, Menu, Tray, nativeImage, session, type MenuItemConstructorOptions } from 'electron';
 import { registerWorkshopIpc } from './ipc/workshop-ipc.cjs';
 import { WorkshopStorage } from './services/workshop-storage.cjs';
 
@@ -14,6 +14,9 @@ interface CreationWorkshopConfig {
   storage?: {
     fileName?: string;
   };
+  tray?: {
+    iconFile?: string;
+  };
 }
 
 const APP_NAME = '创作工坊';
@@ -26,10 +29,57 @@ const windowHeight = config.window?.height ?? 480;
 const titleBarStyle = config.window?.titleBarStyle ?? 'hiddenInset';
 const windowType = config.window?.type ?? 'panel';
 const storageFileName = config.storage?.fileName ?? 'workshop.json';
+const trayIconFile = config.tray?.iconFile ?? 'assets/imgs/trayTemplate.png';
 
 app.setName(APP_NAME);
 
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+let spaceBindTimer: NodeJS.Timeout | null = null;
+
+function setCurrentDesktopBinding(win: BrowserWindow): void {
+  if (process.platform !== 'darwin') return;
+  win.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true });
+}
+
+function showMainWindow(): void {
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
+  if (win.isMinimized()) win.restore();
+
+  if (process.platform === 'darwin') {
+    if (spaceBindTimer) clearTimeout(spaceBindTimer);
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    win.setAlwaysOnTop(true, 'screen-saver');
+  }
+
+  win.show();
+  win.focus();
+  if (typeof win.moveTop === 'function') win.moveTop();
+
+  if (process.platform === 'darwin') {
+    spaceBindTimer = setTimeout(() => {
+      spaceBindTimer = null;
+      if (!win.isDestroyed()) setCurrentDesktopBinding(win);
+    }, 60);
+  }
+}
+
+function createTray(): Tray {
+  const icon = nativeImage.createFromPath(join(app.getAppPath(), trayIconFile));
+  if (icon.isEmpty()) throw new Error(`托盘图标无法加载：${trayIconFile}`);
+  if (process.platform === 'darwin') icon.setTemplateImage(true);
+
+  const nextTray = new Tray(icon);
+  nextTray.setToolTip(APP_NAME);
+  nextTray.on('click', showMainWindow);
+  nextTray.on('right-click', () => {
+    nextTray.popUpContextMenu(
+      Menu.buildFromTemplate([{ label: '打开主界面', click: showMainWindow }, { type: 'separator' }, { label: `退出${APP_NAME}`, click: () => app.quit() }]),
+    );
+  });
+  return nextTray;
+}
 
 function createApplicationMenu(): void {
   const template: MenuItemConstructorOptions[] = [
@@ -60,6 +110,7 @@ function createApplicationMenu(): void {
     {
       label: '窗口',
       submenu: [
+        { label: '显示主界面', click: showMainWindow },
         { role: 'minimize', label: '最小化' },
         { role: 'close', label: '关闭窗口' },
       ],
@@ -68,7 +119,7 @@ function createApplicationMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
@@ -98,16 +149,23 @@ function createWindow(): void {
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   if (process.platform === 'darwin') {
     mainWindow.setAlwaysOnTop(true, 'screen-saver');
-    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    setCurrentDesktopBinding(mainWindow);
   }
 
   const devUrl = process.env.VITE_DEV_SERVER_URL;
   if (devUrl) void mainWindow.loadURL(devUrl);
   else void mainWindow.loadFile(join(app.getAppPath(), 'dist', 'index.html'));
 
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+  return mainWindow;
 }
 
 app.whenReady().then(() => {
@@ -117,10 +175,22 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   createApplicationMenu();
   createWindow();
+  tray = createTray();
+  console.info(`[${APP_NAME}] 托盘已就绪`);
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    showMainWindow();
   });
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
+  if (spaceBindTimer) {
+    clearTimeout(spaceBindTimer);
+    spaceBindTimer = null;
+  }
+  tray?.destroy();
+  tray = null;
 });
 
 app.on('web-contents-created', (_event, contents) => {
