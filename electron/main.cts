@@ -150,7 +150,6 @@ function createWindow(): BrowserWindow {
   mainWindow.webContents.on('will-attach-webview', (event) => event.preventDefault());
   mainWindow.webContents.setZoomFactor(1);
   mainWindow.webContents.on('did-finish-load', () => mainWindow?.webContents.setZoomFactor(1));
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
   if (process.platform === 'darwin') {
     setCurrentDesktopBinding(mainWindow);
   }

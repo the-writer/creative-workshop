@@ -34,12 +34,14 @@
 
 应用加载 `dist/index.html`；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务。
 
+应用启动时只创建隐藏窗口并初始化托盘，不主动显示主界面；用户点击托盘或通过应用激活事件后才打开窗口。
+
 主进程在 macOS 使用 `panel` 窗口类型，但默认不启用 `alwaysOnTop`。窗口以
 `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })` 绑定到打开时所在的桌面，用户切换桌面时不会跟随，
 始终留在原桌面。
 
-应用在 `Info.plist` 中显式声明 `NSHighResolutionCapable=true`，页面缩放固定为 1，并在界面中使用适配小字号的系统中文
-无衬线字体和字体平滑，以适配 Retina/HiDPI 显示。
+应用在 `Info.plist` 中显式声明 `NSHighResolutionCapable=true`，页面缩放固定为 1，并启用字体平滑以适配
+Retina/HiDPI 显示。默认字体依次尝试思源宋体、仿宋、宋体，均不存在时回退系统默认字体。
 
 从隐藏状态点击托盘重新打开时，主进程先临时启用“所有工作区可见”，随后调用 `show()`、`focus()`、`moveTop()`，
 并在 60ms 后重新绑定当前桌面。因此窗口会在点击托盘时所在的桌面打开，而不是被系统拉回旧桌面。主窗口系统关闭按钮

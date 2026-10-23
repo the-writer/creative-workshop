@@ -375,19 +375,13 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   return (
     <div className="page-shell generate-page">
       <div className="app-scroll">
-        {/* 族群印章 */}
-        <div className="race-seal-row">
+        <SectionTitle>族群</SectionTitle>
+        <div className="race-chip-row">
           {(Object.keys(RACE_LABELS) as RaceKey[]).map((r) => (
-            <button
-              key={r}
-              type="button"
-              data-testid={`race-select-${r}`}
-              className={cn('race-seal-card', race === r && `race-seal-selected seal-card-${r}`)}
-              onClick={() => setRace(r)}
-            >
-              <Seal race={r} size={46} />
-              <span className="race-seal-name">{RACE_LABELS[r]}</span>
-            </button>
+            <Chip key={r} selected={race === r} tone={r} dataTestId={`race-select-${r}`} onClick={() => setRace(r)}>
+              <Seal race={r} size={18} />
+              {RACE_LABELS[r]}
+            </Chip>
           ))}
         </div>
 
