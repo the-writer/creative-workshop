@@ -25,12 +25,18 @@
 | --------------- | ------------- | -------------------------------------------------------- |
 | 窗口内容尺寸    | 640 × 480     | `package.json` → `creationWorkshop.window.width/height`  |
 | 标题栏样式      | `hiddenInset` | `package.json` → `creationWorkshop.window.titleBarStyle` |
+| 窗口类型        | `panel`       | `package.json` → `creationWorkshop.window.type`          |
+| 全屏程序上层    | 始终置顶      | `electron/main.cts` 的 `screen-saver` 层级与全工作区设置 |
 | 可调整尺寸      | 否            | `electron/main.cts`                                      |
 | 可最大化 / 全屏 | 否            | `electron/main.cts`                                      |
 | 应用名          | 创作工坊      | `package.json` → `productName`                           |
 | 拖拽标题栏高度  | 32 px         | `src/App.css` → `.desktop-titlebar`                      |
 
 应用加载 `dist/index.html`；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务。
+
+主进程在 macOS 把窗口固定为 `screen-saver` 置顶层，并通过
+`setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })` 使其在其他应用的全屏空间中继续可见和操作。窗口不主动
+切换 Space，关闭后按常规 Electron 生命周期处理。
 
 ### 1.4 安全与导航
 

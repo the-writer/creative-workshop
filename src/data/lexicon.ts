@@ -1,95 +1,229 @@
 // 内置词根音系库：人族/妖族音节块、职业/地形/职权/绰号等词根、构词规则配置、组合量公式
 // 音节块为用户给定数据完整预置；词根为按用户规则扩展的代表性预置
-// v3：在资料库既有词根上系统扩充音节、营生、能力、地名、官职、契约、血统与封号
+// v4：音节扩充至四倍，并加入性别音系偏好与人口权重姓氏
 
-import type { NameTypeKey, RaceKey } from '@/lib/types';
+import type { NameGender, NameTypeKey, RaceKey } from '@/lib/types';
 
+// 每个字符串都是一个独立音节块；每行保留多个条目，避免资料表被格式化器拆成单列。
+// prettier-ignore
 export const SYLLABLES: Record<RaceKey, string[]> = {
   human: [
-    '雷',
-    '恩',
-    '托',
-    '瓦',
-    '德',
-    '罗',
-    '卡',
-    '尔',
-    '玛',
-    '伦',
-    '奥',
-    '伊',
-    '萨',
-    '维',
-    '兰',
-    '蒂',
-    '诺',
-    '琳',
-    '凯',
-    '安',
-    '塞',
-    '弥',
-    '斐',
-    '瑟',
-    '莱',
-    '赫',
-    '洛',
-    '缇',
-    '茵',
-    '珂',
-    '珞',
-    '薇',
-    '琉',
-    '鲁',
-    '祈',
-    '米',
-    '娜',
-    '涅',
-    '希',
-    '乌',
+    '雷', '恩', '托', '瓦', '德', '罗', '卡', '尔', '玛', '伦',
+    '奥', '伊', '萨', '维', '兰', '蒂', '诺', '琳', '凯', '安',
+    '塞', '弥', '斐', '瑟', '莱', '赫', '洛', '缇', '茵', '珂',
+    '珞', '薇', '琉', '鲁', '祈', '米', '娜', '涅', '希', '乌',
+    '赤', '青', '白', '黑', '金', '银', '玉', '星', '月', '日',
+    '曦', '曜', '晨', '暮', '云', '岚', '风', '雨', '雪', '霜',
+    '山', '川', '河', '海', '林', '森', '木', '花', '叶', '藤',
+    '光', '影', '音', '歌', '诗', '书', '画', '琴', '笛', '钟',
+    '允', '言', '信', '诚', '善', '真', '义', '礼', '仁', '和',
+    '君', '王', '公', '侯', '伯', '子', '士', '民', '客', '使',
+    '龙', '凤', '麟', '虎', '狼', '鹰', '鹿', '鹤', '鲤', '燕',
+    '东', '西', '南', '北', '春', '夏', '秋', '冬', '昼', '夜',
+    '灵', '元', '清', '玄', '微', '远', '近', '明', '暗', '虚',
+    '岑', '岫', '屿', '崖', '溪', '泉', '潭', '洲', '浦', '津',
+    '商', '旅', '工', '农', '医', '巫', '祭', '铸', '织', '猎',
+    '温', '柔', '刚', '毅', '慧', '敏', '静', '宁', '悦', '姬',
   ],
   demon: [
-    '赛',
-    '尔',
-    '尼',
-    '苏',
-    '希',
-    '舍',
-    '露',
-    '韦',
-    '阿',
-    '恩',
-    '莫',
-    '泽',
-    '拉',
-    '卡',
-    '弗',
-    '斯',
-    '妲',
-    '沃',
-    '因',
-    '克',
-    '兹',
-    '塔',
-    '墨',
-    '琉',
-    '祁',
-    '厄',
-    '葛',
-    '珀',
-    '桀',
-    '墟',
-    '瑟',
-    '娅',
-    '涅',
-    '鲁',
-    '蜃',
-    '褚',
-    '岚',
-    '魇',
-    '萨',
-    '刻',
+    '赛', '尔', '尼', '苏', '希', '舍', '露', '韦', '阿', '恩',
+    '莫', '泽', '拉', '卡', '弗', '斯', '妲', '沃', '因', '克',
+    '兹', '塔', '墨', '琉', '祁', '厄', '葛', '珀', '桀', '墟',
+    '瑟', '娅', '涅', '鲁', '蜃', '褚', '岚', '魇', '萨', '刻',
+    '烬', '焰', '蚀', '噬', '祟', '魅', '魑', '魍', '魃', '虬',
+    '骨', '鳞', '牙', '角', '爪', '翼', '尾', '血', '魂', '影',
+    '渊', '冥', '幽', '荒', '腐', '锈', '枯', '黑', '夜', '雾',
+    '咒', '契', '誓', '祭', '蛊', '毒', '瘴', '瘟', '疫', '焚',
+    '蛇', '蛛', '蝠', '狼', '鸦', '鹰', '蟒', '蝎', '蜈', '蝶',
+    '蜂', '蚁', '蟹', '虾', '鱼', '蛙', '蟾', '蜥', '鳄', '螭',
+    '晦', '昧', '暮', '晨', '星', '月', '日', '曜', '辰', '宿',
+    '寒', '热', '熔', '沸', '凝', '冻', '裂', '碎', '沉', '浮',
+    '怒', '悲', '惧', '狂', '煞', '傲', '孤', '寂', '贪', '痴',
+    '王', '公', '侯', '伯', '主', '君', '使', '仆', '奴', '客',
+    '术', '法', '刃', '弓', '盾', '锤', '链', '锁', '门', '碑',
+    '姬', '娘', '郎', '翁', '妪', '童', '老', '少', '幼', '长',
   ],
 };
+
+export const SYLLABLE_GENDER_BIAS: Record<RaceKey, Record<Exclude<NameGender, 'any'>, string[]>> = {
+  human: {
+    male: [
+      '雷',
+      '托',
+      '德',
+      '罗',
+      '卡',
+      '尔',
+      '伦',
+      '奥',
+      '凯',
+      '安',
+      '塞',
+      '赫',
+      '鲁',
+      '乌',
+      '山',
+      '川',
+      '林',
+      '木',
+      '光',
+      '诺',
+      '言',
+      '信',
+      '诚',
+      '善',
+      '真',
+      '义',
+      '礼',
+      '仁',
+      '和',
+      '君',
+      '王',
+      '公',
+      '侯',
+      '伯',
+      '子',
+      '士',
+      '龙',
+      '虎',
+      '狼',
+      '鹰',
+    ],
+    female: [
+      '薇',
+      '娜',
+      '琳',
+      '茵',
+      '珂',
+      '缇',
+      '珞',
+      '兰',
+      '伊',
+      '米',
+      '花',
+      '叶',
+      '诗',
+      '琴',
+      '柔',
+      '慧',
+      '静',
+      '宁',
+      '悦',
+      '雪',
+      '霜',
+      '月',
+      '星',
+      '曦',
+      '燕',
+      '凤',
+      '姬',
+    ],
+    neutral: ['云', '岚', '风', '雨', '光', '影', '音', '歌', '诗', '书', '琴', '诺', '言', '灵', '清', '微', '远', '明', '和'],
+  },
+  demon: {
+    male: [
+      '克',
+      '尔',
+      '赛',
+      '斯',
+      '兹',
+      '塔',
+      '墨',
+      '桀',
+      '墟',
+      '厄',
+      '葛',
+      '珀',
+      '沃',
+      '因',
+      '牙',
+      '角',
+      '爪',
+      '翼',
+      '骨',
+      '魂',
+      '血',
+      '焰',
+      '渊',
+      '冥',
+      '荒',
+      '王',
+      '公',
+      '君',
+      '术',
+      '法',
+      '刃',
+    ],
+    female: ['妲', '娅', '瑟', '涅', '露', '希', '苏', '尼', '姬', '娘', '蝶', '魅', '魇', '雾', '月', '星', '影'],
+    neutral: ['影', '雾', '夜', '月', '星', '日', '辰', '魂', '渊', '冥', '幽', '暮', '晨', '曜', '宿'],
+  },
+};
+
+export interface WeightedSurname {
+  name: string;
+  populationShare: number;
+  rare: boolean;
+}
+
+export const SURNAME_RARE_POPULATION_SHARE = 0.0001; // 0.01%
+export const SURNAME_NATURAL_BIAS = 0;
+export const SURNAME_BALANCED_BIAS = 50;
+export const SURNAME_MAX_BIAS = 100;
+
+// prettier-ignore
+const HUMAN_COMMON_SURNAMES = [
+  '雷恩', '托瓦', '德罗', '卡尔', '玛伦', '奥伊', '萨维', '兰蒂', '诺琳', '凯安',
+  '塞弥', '斐瑟', '莱赫', '洛缇', '茵珂', '珞薇', '琉鲁', '祈米', '娜涅', '希乌',
+  '赤青', '白金', '星月', '曦曜', '晨暮', '云岚', '风雨', '雪霜', '山川', '河海',
+  '森林', '木花', '叶藤', '光影', '音歌', '诗书', '画琴', '笛钟', '诺言', '信诚',
+  '善真', '义礼', '仁和', '君王', '公侯', '伯子', '士民', '客使', '龙凤', '麟虎',
+  '狼鹰', '鹿鹤', '鲤燕', '东西', '南北', '春夏', '秋冬', '昼夜', '灵元', '清玄',
+  '微远', '近明', '暗虚', '岑岫', '屿崖', '溪泉', '潭洲', '浦津', '商旅', '工农',
+  '医巫', '祭铸',
+];
+
+// prettier-ignore
+const DEMON_COMMON_SURNAMES = [
+  '赛尔', '尼苏', '希舍', '露韦', '阿恩', '莫泽', '拉卡', '弗斯', '妲沃', '因克',
+  '兹塔', '墨琉', '祁厄', '葛珀', '桀墟', '瑟娅', '涅鲁', '蜃褚', '岚魇', '萨刻',
+  '烬焰', '蚀噬', '魇魅', '魑魍', '虬骨', '鳞牙', '角爪', '翼尾', '血魂', '影渊',
+  '冥幽', '荒腐', '锈枯', '黑雾', '夜咒', '契誓', '祭蛊', '毒瘴', '瘟疫', '焚蛇',
+  '蛛蝠', '狼鸦', '鹰蟒', '蝎蜈', '蝶蜂', '蚁蟹', '虾鱼', '蛙蟾', '蜥鳄', '螭晦',
+  '昧暮', '晨星', '月日', '曜辰', '宿寒', '热熔', '沸凝', '冻裂', '碎沉', '浮怒',
+  '悲惧', '狂煞', '傲孤', '寂贪', '痴王', '公侯', '伯主', '君使', '仆奴', '客术',
+  '法刃', '弓盾',
+];
+
+// prettier-ignore
+const HUMAN_RARE_SURNAMES = ['烬岚', '蜃洲', '星浦', '曜津', '魇川', '琉焰', '烬薇', '骸月'];
+// prettier-ignore
+const DEMON_RARE_SURNAMES = ['墟烬', '魇渊', '蜃冥', '虬影', '骸雾', '烬骨', '冥蝶', '魑月'];
+
+function createSurnamePool(common: string[], rare: string[]): WeightedSurname[] {
+  const commonPopulation = 1 - rare.length * SURNAME_RARE_POPULATION_SHARE;
+  return [
+    ...common.map((name) => ({ name, populationShare: commonPopulation / common.length, rare: false })),
+    ...rare.map((name) => ({ name, populationShare: SURNAME_RARE_POPULATION_SHARE, rare: true })),
+  ];
+}
+
+export const SURNAMES: Record<RaceKey, WeightedSurname[]> = {
+  human: createSurnamePool(HUMAN_COMMON_SURNAMES, HUMAN_RARE_SURNAMES),
+  demon: createSurnamePool(DEMON_COMMON_SURNAMES, DEMON_RARE_SURNAMES),
+};
+
+/**
+ * 将滑块值映射到采样权重：
+ * 0 使用人口占比，50 让所有姓氏等概率，100 对最稀有姓氏施加最强倾斜。
+ */
+export function surnameSelectionWeight(populationShare: number, bias: number): number {
+  const normalized = Math.max(SURNAME_NATURAL_BIAS, Math.min(SURNAME_MAX_BIAS, Math.round(bias)));
+  const safeShare = Math.max(SURNAME_RARE_POPULATION_SHARE, populationShare);
+  if (normalized <= SURNAME_BALANCED_BIAS) {
+    return Math.pow(safeShare, 1 - normalized / SURNAME_BALANCED_BIAS);
+  }
+  return Math.pow(safeShare, -2 * ((normalized - SURNAME_BALANCED_BIAS) / (SURNAME_MAX_BIAS - SURNAME_BALANCED_BIAS)));
+}
 
 export interface LexiconRoots {
   professions: string[]; // 职业
@@ -3490,7 +3624,8 @@ export function computeRaceCombinations(race: RaceKey): TypeCombinationInfo {
     BigInt(roots.contractTitles.length) +
     BigInt(roots.bloodTitles.length) +
     BigInt(roots.titleWords.length);
-  const person = shortCount * personSuffixTotal + nickTotal * shortCount;
+  const surnameCount = BigInt(SURNAMES[race].length);
+  const person = (shortCount * personSuffixTotal + nickTotal * shortCount) * surnameCount;
   const place = placeVariants;
   const office = BigInt(roots.officeTerritories.length) * BigInt(roots.officePowers.length) * BigInt(roots.officeLevels.length);
   const nickname = nickTotal;

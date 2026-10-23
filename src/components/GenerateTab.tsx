@@ -20,10 +20,11 @@ import {
   X,
 } from 'lucide-react';
 import { DEFAULT_GEN_PARAMS, generateBatch, rerollCombo, rerollOne, type GenParams, type PersonSuffix, type ShortMode } from '@/lib/generator';
-import { computeCombinationTotals, formatCombination, LEXICON } from '@/data/lexicon';
+import { SURNAME_BALANCED_BIAS, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS, computeCombinationTotals, formatCombination, LEXICON } from '@/data/lexicon';
+import { SURNAME_BIAS_STEP } from '@/lib/generator-rules';
 import { insertCandidate } from '@/lib/db';
-import type { Candidate, NameTypeKey, RaceKey } from '@/lib/types';
-import { RACE_LABELS, TYPE_LABELS, candidateToSheetFields, raceLabel } from '@/lib/types';
+import type { Candidate, NameGender, NameTypeKey, RaceKey } from '@/lib/types';
+import { GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS, candidateToSheetFields, raceLabel } from '@/lib/types';
 import { Chip, EmptyState, Seal, SectionTitle, StructureTags, copyText, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 
@@ -54,6 +55,8 @@ function normalizePrefs(raw: unknown): GenPrefs {
   try {
     if (!raw || typeof raw !== 'object') return fallback;
     const parsed = raw as Partial<GenPrefs>;
+    const legacyParams = parsed.params as Partial<GenParams> | undefined;
+    const isLegacy = !legacyParams || !('gender' in legacyParams) || !('surnameBias' in legacyParams);
     const params = { ...DEFAULT_GEN_PARAMS, ...(parsed.params ?? {}) };
     params.professions = Array.isArray(params.professions) ? params.professions.filter((s) => typeof s === 'string') : [];
     params.abilities = Array.isArray(params.abilities) ? params.abilities.filter((s) => typeof s === 'string') : [];
@@ -62,6 +65,12 @@ function normalizePrefs(raw: unknown): GenPrefs {
       typeof params.nicknameChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.nicknameChars))) : DEFAULT_GEN_PARAMS.nicknameChars;
     params.minChars = typeof params.minChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.minChars))) : DEFAULT_GEN_PARAMS.minChars;
     params.maxChars = typeof params.maxChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.maxChars))) : DEFAULT_GEN_PARAMS.maxChars;
+    params.gender = GENDER_KEYS.includes(params.gender) ? params.gender : DEFAULT_GEN_PARAMS.gender;
+    params.surnameBias =
+      typeof params.surnameBias === 'number'
+        ? Math.max(SURNAME_NATURAL_BIAS, Math.min(SURNAME_MAX_BIAS, Math.round(params.surnameBias)))
+        : DEFAULT_GEN_PARAMS.surnameBias;
+    if (isLegacy && params.minChars === 4 && params.maxChars === 6) params.maxChars = DEFAULT_GEN_PARAMS.maxChars;
     return {
       race: parsed.race === 'demon' ? 'demon' : 'human',
       types:
@@ -208,10 +217,11 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
     if (params.count < 5 || params.count > 100) return '生成数量需在 5 到 100 之间';
     if (!comboMode) {
       if (params.minChars > params.maxChars) return '全名字数范围冲突：最少字数不能大于最多字数';
-      if (params.nicknamePrefix && types.includes('person') && params.nicknameChars + 2 > params.maxChars) {
-        return '绰号前置时绰号加至少 2 字短名已超出全名字数上限，请调低绰号字数或放宽上限';
+      if (params.nicknamePrefix && types.includes('person') && params.nicknameChars + 3 > params.maxChars) {
+        return '绰号前置时，绰号加至少 1 字姓氏和 2 字短名已超出全名字数上限，请调低绰号字数或放宽上限';
       }
     }
+    if (params.surnameBias < SURNAME_NATURAL_BIAS || params.surnameBias > SURNAME_MAX_BIAS) return '姓氏权重需在 0 到 100 之间';
     return '';
   };
 
@@ -328,7 +338,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   };
 
   const addToSheet = (c: Candidate) => {
-    const anchor = c.combo ? (c.structure[0]?.word ?? c.nameText) : c.nameText;
+    const anchor = c.combo ? (c.structure.find((part) => part.label.endsWith('人名'))?.word ?? c.structure[1]?.word ?? c.nameText) : c.nameText;
     const f = candidateToSheetFields(c);
     onOpenEditor({
       characterName: anchor,
@@ -348,7 +358,19 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   };
 
   const hasPerson = types.includes('person');
+  const usesPerson = hasPerson || comboMode;
   const showNickRules = types.includes('nickname') || (hasPerson && params.nicknamePrefix);
+  const genderLabel = GENDER_LABELS[params.gender];
+  const surnameBiasLabel =
+    params.surnameBias === SURNAME_NATURAL_BIAS
+      ? '按人口'
+      : params.surnameBias < SURNAME_BALANCED_BIAS
+        ? '偏常见'
+        : params.surnameBias === SURNAME_BALANCED_BIAS
+          ? '均衡'
+          : params.surnameBias < SURNAME_MAX_BIAS
+            ? '偏稀有'
+            : '极稀有';
 
   return (
     <div className="page-shell generate-page">
@@ -447,7 +469,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             <SlidersHorizontal size={15} />
             <span>规则设置</span>
             <span className="rules-summary">
-              {params.count}条 · 短名{params.shortMode === 'two' ? '2字' : params.shortMode === 'three' ? '3字' : '2-3字'}
+              {params.count}条 · {genderLabel} · {surnameBiasLabel}姓氏
             </span>
             <ChevronDown size={15} className={cn('rules-chevron', rulesOpen && 'rules-chevron-open')} />
           </button>
@@ -502,6 +524,52 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                 </div>
               </div>
 
+              {usesPerson ? (
+                <>
+                  <div className="rule-row">
+                    <span className="rule-label">性别倾向</span>
+                    <div className="segmented">
+                      {GENDER_KEYS.map((gender) => (
+                        <button
+                          key={gender}
+                          type="button"
+                          className={cn('seg-btn', params.gender === gender && 'seg-btn-active')}
+                          data-testid={`gender-${gender}`}
+                          onClick={() => setParams({ gender })}
+                        >
+                          {GENDER_LABELS[gender]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rule-row rule-row-vertical">
+                    <div className="weight-row-head">
+                      <span className="rule-label">姓氏人口权重</span>
+                      <span className="weight-value" data-testid="surname-bias-value">
+                        {params.surnameBias} · {surnameBiasLabel}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      className="weight-slider"
+                      min={SURNAME_NATURAL_BIAS}
+                      max={SURNAME_MAX_BIAS}
+                      step={SURNAME_BIAS_STEP}
+                      value={params.surnameBias}
+                      data-testid="surname-bias"
+                      onChange={(event) => setParams({ surnameBias: Number(event.target.value) })}
+                    />
+                    <div className="weight-scale">
+                      <span>按人口</span>
+                      <span>均衡</span>
+                      <span>极稀有</span>
+                    </div>
+                    <p className="weight-hint">稀有姓氏占姓氏池 10%，最低人口占比 0.01%。例如：女性 + 贵族封号 + 调高稀有倾向，可生成低人口姓氏的贵族姓名。</p>
+                  </div>
+                </>
+              ) : null}
+
               {hasPerson && !comboMode ? (
                 <>
                   {/* 人名后缀 */}
@@ -515,7 +583,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                           ['profession', '职业'],
                           ['contract', '契约称号'],
                           ['blood', '血统'],
-                          ['title', '封号'],
+                          ['title', '贵族封号'],
                         ] as Array<[PersonSuffix, string]>
                       ).map(([k, label]) => (
                         <button

@@ -54,7 +54,8 @@
     "window": {
       "width": 640,
       "height": 480,
-      "titleBarStyle": "hiddenInset"
+      "titleBarStyle": "hiddenInset",
+      "type": "panel"
     },
     "storage": {
       "fileName": "workshop.json"

@@ -2,6 +2,7 @@
 
 export type RaceKey = 'human' | 'demon';
 export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
+export type NameGender = 'any' | 'male' | 'female' | 'neutral';
 export type SourceKey = 'generated' | 'manual';
 export type EntityType = 'sheet' | 'place';
 export type SortKey = 'latest' | 'charCount' | 'nameText';
@@ -72,6 +73,14 @@ export interface CandidateFilters {
 export const RACE_LABELS: Record<RaceKey, string> = { human: '人族', demon: '妖族' };
 export const RACE_KEYS: RaceKey[] = ['human', 'demon'];
 
+export const GENDER_LABELS: Record<NameGender, string> = {
+  any: '不限',
+  male: '男性',
+  female: '女性',
+  neutral: '中性',
+};
+export const GENDER_KEYS: NameGender[] = ['any', 'male', 'female', 'neutral'];
+
 export const TYPE_LABELS: Record<NameTypeKey, string> = {
   person: '人名',
   place: '地名',
@@ -118,6 +127,8 @@ export function candidateToSheetFields(c: Candidate): CandidateSheetFields {
   const parts = Array.isArray(c.structure) ? c.structure : [];
   const pick = (...labels: string[]): string => parts.find((p) => labels.includes(p.label ?? ''))?.word ?? '';
   const extras: string[] = [];
+  const surname = parts.find((part) => part.label.startsWith('姓氏') || part.label.startsWith('稀有姓氏'))?.word ?? '';
+  if (surname) extras.push(`姓氏：${surname}`);
   const ability = pick('特殊能力');
   if (ability) extras.push(`特殊能力：${ability}`);
   const blood = pick('血统称号');

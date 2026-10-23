@@ -9,6 +9,7 @@ interface CreationWorkshopConfig {
     width?: number;
     height?: number;
     titleBarStyle?: 'hiddenInset';
+    type?: 'panel';
   };
   storage?: {
     fileName?: string;
@@ -23,6 +24,7 @@ const config = packageJson.creationWorkshop ?? {};
 const windowWidth = config.window?.width ?? 640;
 const windowHeight = config.window?.height ?? 480;
 const titleBarStyle = config.window?.titleBarStyle ?? 'hiddenInset';
+const windowType = config.window?.type ?? 'panel';
 const storageFileName = config.storage?.fileName ?? 'workshop.json';
 
 app.setName(APP_NAME);
@@ -75,6 +77,8 @@ function createWindow(): void {
     maximizable: false,
     fullscreenable: false,
     show: false,
+    type: windowType,
+    alwaysOnTop: true,
     title: APP_NAME,
     titleBarStyle,
     trafficLightPosition: { x: 12, y: 12 },
@@ -92,6 +96,10 @@ function createWindow(): void {
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
   mainWindow.webContents.on('will-attach-webview', (event) => event.preventDefault());
   mainWindow.once('ready-to-show', () => mainWindow?.show());
+  if (process.platform === 'darwin') {
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  }
 
   const devUrl = process.env.VITE_DEV_SERVER_URL;
   if (devUrl) void mainWindow.loadURL(devUrl);
