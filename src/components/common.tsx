@@ -1,0 +1,234 @@
+// 共享 UI 组件：提示条、印章、印框 chip、空态、结构标签等
+
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
+import type { RaceKey, StructurePart } from '@/lib/types';
+import { raceLabel } from '@/lib/types';
+import demonSeal from '@/assets/demon_seal.png';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+/* ---------------- Toast ---------------- */
+
+type ToastType = 'success' | 'error' | 'info';
+interface ToastItem {
+  id: number;
+  type: ToastType;
+  text: string;
+}
+
+interface ToastContextValue {
+  show: (text: string, type?: ToastType) => void;
+}
+
+const ToastContext = createContext<ToastContextValue>({ show: () => undefined });
+
+export function useAppToast(): ToastContextValue {
+  return useContext(ToastContext);
+}
+
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [items, setItems] = useState<ToastItem[]>([]);
+  const counter = useRef(0);
+
+  const show = useCallback((text: string, type: ToastType = 'info') => {
+    const id = ++counter.current;
+    setItems((prev) => [...prev.slice(-2), { id, type, text }]);
+    window.setTimeout(() => {
+      setItems((prev) => prev.filter((t) => t.id !== id));
+    }, 2600);
+  }, []);
+
+  const value = useMemo(() => ({ show }), [show]);
+
+  return (
+    <ToastContext.Provider value={value}>
+      {children}
+      <div className="toast-layer">
+        {items.map((t) => (
+          <div key={t.id} className={cn('toast-item', `toast-${t.type}`)} role="status">
+            {t.text}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+/* ---------------- 族群印章 ---------------- */
+
+export function Seal({ race, size = 28, className }: { race: RaceKey; size?: number; className?: string }) {
+  if (race === 'demon') {
+    return <img src={demonSeal} alt="妖族" className={cn('seal-img', className)} style={{ width: size, height: size }} data-testid={`seal-demon-${size}`} />;
+  }
+  return (
+    <span className={cn('seal-fallback', className)} style={{ width: size, height: size, fontSize: Math.max(12, size * 0.5) }} data-testid={`seal-human-${size}`}>
+      人
+    </span>
+  );
+}
+
+export function SealBadge({ race, size = 20 }: { race: RaceKey; size?: number }) {
+  return <Seal race={race} size={size} />;
+}
+
+/* ---------------- Chip ---------------- */
+
+export function Chip({
+  selected,
+  onClick,
+  children,
+  tone = 'human',
+  className,
+  dataTestId,
+}: {
+  selected?: boolean;
+  onClick?: () => void;
+  children: React.ReactNode;
+  tone?: 'human' | 'demon' | 'neutral';
+  className?: string;
+  dataTestId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={dataTestId}
+      onClick={onClick}
+      className={cn('app-chip', selected && `app-chip-selected chip-tone-${tone}`, className)}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* ---------------- 结构标签 ---------------- */
+
+export function StructureTags({ parts, race }: { parts: StructurePart[]; race: RaceKey }) {
+  if (!parts || parts.length === 0) return null;
+  return (
+    <div className="structure-tags">
+      {parts.map((p, i) => (
+        <span key={`${p.label}-${i}`} className={cn('structure-tag', `tag-race-${race}`)}>
+          {p.label}·{p.word}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------- 空态 ---------------- */
+
+export function EmptyState({
+  title,
+  desc,
+  actions,
+  testId,
+}: {
+  title: string;
+  desc?: string;
+  actions?: React.ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div className="empty-state" data-testid={testId}>
+      <div className="empty-seal-row">
+        <Seal race="human" size={34} />
+        <Seal race="demon" size={34} />
+      </div>
+      <p className="empty-title">{title}</p>
+      {desc ? <p className="empty-desc">{desc}</p> : null}
+      {actions ? <div className="empty-actions">{actions}</div> : null}
+    </div>
+  );
+}
+
+/* ---------------- 区块标题 ---------------- */
+
+export function SectionTitle({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div className="section-title-row">
+      <h3 className="section-title">{children}</h3>
+      {right ? <div className="section-title-right">{right}</div> : null}
+    </div>
+  );
+}
+
+/* ---------------- 确认弹窗（复用 AlertDialog 原语） ---------------- */
+
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmText = '确认',
+  cancelText = '取消',
+  destructive,
+  onConfirm,
+  testId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: React.ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  testId?: string;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="confirm-dialog" data-testid={testId}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{cancelText}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => onConfirm()}
+            className={destructive ? 'bg-[#B23A2E] hover:bg-[#9c2f25]' : ''}
+            data-testid={testId ? `${testId}-confirm` : undefined}
+          >
+            {confirmText}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/* ---------------- 通用辅助 ---------------- */
+
+export function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      return navigator.clipboard.writeText(text).then(
+        () => true,
+        () => false,
+      );
+    }
+    return Promise.resolve(false);
+  } catch {
+    return Promise.resolve(false);
+  }
+}
+
+export function formatTime(ts: number): string {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function raceName(race: RaceKey): string {
+  return raceLabel(race);
+}
