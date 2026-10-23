@@ -401,63 +401,59 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             </Chip>
           ))}
         </div>
-        {comboMode ? (
-          <p className="combo-hint" data-testid="combo-hint">
-            已选多种类型：将组合成一句设定，如「人名，任官职，居某地，以营生为业，擅特殊能力，绰号…」
-          </p>
-        ) : null}
-
         {/* 职业与特殊能力 */}
         <SectionTitle>职业与特殊能力</SectionTitle>
         <div className="param-panel">
-          <div className="param-group">
-            <div className="param-group-head">
-              <span className="param-group-label">职业</span>
-              <span className="param-group-count">{params.professions.length > 0 ? `已选 ${params.professions.length}` : '未设定'}</span>
-              {params.professions.length > 0 ? (
-                <button type="button" className="param-clear-btn" data-testid="clear-professions" onClick={() => setParams({ professions: [] })}>
-                  清空
-                </button>
-              ) : null}
+          <div className="param-columns">
+            <div className="param-group param-column">
+              <div className="param-group-head">
+                <span className="param-group-label">职业</span>
+                <span className="param-group-count">{params.professions.length > 0 ? `已选 ${params.professions.length}` : '未设定'}</span>
+                {params.professions.length > 0 ? (
+                  <button type="button" className="param-clear-btn" data-testid="clear-professions" onClick={() => setParams({ professions: [] })}>
+                    清空
+                  </button>
+                ) : null}
+              </div>
+              <div className="param-chip-wrap">
+                {LEXICON[race].professions.map((p) => (
+                  <Chip
+                    key={p}
+                    selected={params.professions.includes(p)}
+                    tone={race}
+                    className="param-chip"
+                    dataTestId={`prof-${p}`}
+                    onClick={() => toggleProfession(p)}
+                  >
+                    {p}
+                  </Chip>
+                ))}
+              </div>
             </div>
-            <div className="param-chip-wrap">
-              {LEXICON[race].professions.map((p) => (
-                <Chip
-                  key={p}
-                  selected={params.professions.includes(p)}
-                  tone={race}
-                  className="param-chip"
-                  dataTestId={`prof-${p}`}
-                  onClick={() => toggleProfession(p)}
-                >
-                  {p}
-                </Chip>
-              ))}
-            </div>
-          </div>
-          <div className="param-group">
-            <div className="param-group-head">
-              <span className="param-group-label">特殊能力</span>
-              <span className="param-group-count">{params.abilities.length > 0 ? `已选 ${params.abilities.length}` : '未设定'}</span>
-              {params.abilities.length > 0 ? (
-                <button type="button" className="param-clear-btn" data-testid="clear-abilities" onClick={() => setParams({ abilities: [] })}>
-                  清空
-                </button>
-              ) : null}
-            </div>
-            <div className="param-chip-wrap">
-              {LEXICON[race].abilities.map((a) => (
-                <Chip
-                  key={a}
-                  selected={params.abilities.includes(a)}
-                  tone={race}
-                  className="param-chip"
-                  dataTestId={`ability-${a}`}
-                  onClick={() => toggleAbility(a)}
-                >
-                  {a}
-                </Chip>
-              ))}
+            <div className="param-group param-column">
+              <div className="param-group-head">
+                <span className="param-group-label">特殊能力</span>
+                <span className="param-group-count">{params.abilities.length > 0 ? `已选 ${params.abilities.length}` : '未设定'}</span>
+                {params.abilities.length > 0 ? (
+                  <button type="button" className="param-clear-btn" data-testid="clear-abilities" onClick={() => setParams({ abilities: [] })}>
+                    清空
+                  </button>
+                ) : null}
+              </div>
+              <div className="param-chip-wrap">
+                {LEXICON[race].abilities.map((a) => (
+                  <Chip
+                    key={a}
+                    selected={params.abilities.includes(a)}
+                    tone={race}
+                    className="param-chip"
+                    dataTestId={`ability-${a}`}
+                    onClick={() => toggleAbility(a)}
+                  >
+                    {a}
+                  </Chip>
+                ))}
+              </div>
             </div>
           </div>
           <p className="param-hint">不勾选时生成会随机抽取；所选职业与能力会融入组合设定。</p>

@@ -10,6 +10,7 @@ interface CreationWorkshopConfig {
     height?: number;
     titleBarStyle?: 'hiddenInset';
     type?: 'panel';
+    alwaysOnTop?: boolean;
   };
   storage?: {
     fileName?: string;
@@ -28,6 +29,7 @@ const windowWidth = config.window?.width ?? 640;
 const windowHeight = config.window?.height ?? 480;
 const titleBarStyle = config.window?.titleBarStyle ?? 'hiddenInset';
 const windowType = config.window?.type ?? 'panel';
+const windowAlwaysOnTop = config.window?.alwaysOnTop ?? false;
 const storageFileName = config.storage?.fileName ?? 'workshop.json';
 const trayIconFile = config.tray?.iconFile ?? 'assets/imgs/trayTemplate.png';
 
@@ -50,8 +52,8 @@ function showMainWindow(): void {
   if (process.platform === 'darwin') {
     if (spaceBindTimer) clearTimeout(spaceBindTimer);
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    win.setAlwaysOnTop(true, 'screen-saver');
   }
+  win.setAlwaysOnTop(windowAlwaysOnTop);
 
   win.show();
   win.focus();
@@ -129,7 +131,7 @@ function createWindow(): BrowserWindow {
     fullscreenable: false,
     show: false,
     type: windowType,
-    alwaysOnTop: true,
+    alwaysOnTop: windowAlwaysOnTop,
     title: APP_NAME,
     titleBarStyle,
     trafficLightPosition: { x: 12, y: 12 },
@@ -146,9 +148,10 @@ function createWindow(): BrowserWindow {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
   mainWindow.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  mainWindow.webContents.setZoomFactor(1);
+  mainWindow.webContents.on('did-finish-load', () => mainWindow?.webContents.setZoomFactor(1));
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   if (process.platform === 'darwin') {
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
     setCurrentDesktopBinding(mainWindow);
   }
 

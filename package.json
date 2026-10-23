@@ -55,7 +55,8 @@
       "width": 640,
       "height": 480,
       "titleBarStyle": "hiddenInset",
-      "type": "panel"
+      "type": "panel",
+      "alwaysOnTop": false
     },
     "storage": {
       "fileName": "workshop.json"
@@ -80,6 +81,9 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSHighResolutionCapable": true
+      },
       "target": [
         {
           "target": "pkg",

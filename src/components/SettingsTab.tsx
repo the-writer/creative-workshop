@@ -1,15 +1,13 @@
 // 设置页：应用信息、数据导出，以及暂不可用能力的保留入口
 
 import { useState } from 'react';
-import { FileCode, FileText, Loader2, Share2 } from 'lucide-react';
+import { FileText, Loader2, Share2 } from 'lucide-react';
 import { ConfirmDialog, SectionTitle, useAppToast } from '@/components/common';
 import { exportSettingsMarkdown } from '@/lib/export';
 
-type UnavailableFeature = 'source' | 'share';
-
 export function SettingsTab() {
   const toast = useAppToast();
-  const [unavailable, setUnavailable] = useState<UnavailableFeature | null>(null);
+  const [shareUnavailable, setShareUnavailable] = useState(false);
   const [exportingMd, setExportingMd] = useState(false);
 
   const handleExportMd = async () => {
@@ -28,19 +26,15 @@ export function SettingsTab() {
           <p className="sheets-title">设置</p>
         </div>
 
-        <SectionTitle>项目源码</SectionTitle>
+        <SectionTitle>分享</SectionTitle>
         <div className="settings-card">
           <div className="settings-card-title">
-            <FileCode size={18} className="settings-card-icon" />
-            项目源码打包
+            <Share2 size={18} className="settings-card-icon" />
+            分享当前数据
           </div>
-          <p className="settings-desc">当前桌面版暂不提供源码打包与分享，入口保留以便后续恢复。</p>
+          <p className="settings-desc">当前桌面版暂未接入系统分享服务，入口保留以便后续恢复。</p>
           <div className="settings-actions">
-            <button type="button" className="primary-btn" data-testid="settings-pack-btn" onClick={() => setUnavailable('source')}>
-              <FileCode size={16} />
-              打包源代码
-            </button>
-            <button type="button" className="secondary-btn" data-testid="settings-share-btn" onClick={() => setUnavailable('share')}>
+            <button type="button" className="secondary-btn" data-testid="settings-share-btn" onClick={() => setShareUnavailable(true)}>
               <Share2 size={16} />
               分享
             </button>
@@ -70,18 +64,14 @@ export function SettingsTab() {
       </div>
 
       <ConfirmDialog
-        open={unavailable !== null}
-        onOpenChange={(open) => !open && setUnavailable(null)}
-        title={unavailable === 'source' ? '源码打包暂不可用' : '分享暂不可用'}
-        description={
-          unavailable === 'source'
-            ? '当前桌面版未提供源码打包能力。入口已保留，不影响本地命名与设定数据。'
-            : '当前桌面版未接入系统分享服务。入口已保留，可通过设置页的数据导出功能保存文件。'
-        }
+        open={shareUnavailable}
+        onOpenChange={setShareUnavailable}
+        title="分享暂不可用"
+        description="当前桌面版未接入系统分享服务。入口已保留，可通过设置页的数据导出功能保存文件。"
         confirmText="知道了"
         showCancel={false}
         testId="settings-unavailable"
-        onConfirm={() => setUnavailable(null)}
+        onConfirm={() => setShareUnavailable(false)}
       />
     </div>
   );

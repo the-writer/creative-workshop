@@ -26,7 +26,7 @@
 | 窗口内容尺寸    | 640 × 480     | `package.json` → `creationWorkshop.window.width/height`  |
 | 标题栏样式      | `hiddenInset` | `package.json` → `creationWorkshop.window.titleBarStyle` |
 | 窗口类型        | `panel`       | `package.json` → `creationWorkshop.window.type`          |
-| 全屏程序上层    | 始终置顶      | `electron/main.cts` 的 `screen-saver` 层级与全工作区设置 |
+| 默认置顶        | 否            | `creationWorkshop.window.alwaysOnTop`                    |
 | 可调整尺寸      | 否            | `electron/main.cts`                                      |
 | 可最大化 / 全屏 | 否            | `electron/main.cts`                                      |
 | 应用名          | 创作工坊      | `package.json` → `productName`                           |
@@ -34,9 +34,12 @@
 
 应用加载 `dist/index.html`；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务。
 
-主进程在 macOS 把窗口固定为 `screen-saver` 置顶层，并以
-`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })` 将其绑定到打开时所在的桌面。窗口可以覆盖同一桌面上的
-全屏应用，但用户切换桌面时不会跟随，始终留在原桌面。
+主进程在 macOS 使用 `panel` 窗口类型，但默认不启用 `alwaysOnTop`。窗口以
+`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })` 绑定到打开时所在的桌面，用户切换桌面时不会跟随，
+始终留在原桌面。
+
+应用在 `Info.plist` 中显式声明 `NSHighResolutionCapable=true`，页面缩放固定为 1，并在界面中使用适配小字号的系统中文
+无衬线字体和字体平滑，以适配 Retina/HiDPI 显示。
 
 从隐藏状态点击托盘重新打开时，主进程先临时启用“所有工作区可见”，随后调用 `show()`、`focus()`、`moveTop()`，
 并在 60ms 后重新绑定当前桌面。因此窗口会在点击托盘时所在的桌面打开，而不是被系统拉回旧桌面。主窗口系统关闭按钮
