@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Download, Filter, FilterX, RefreshCw, Search, Sparkles, Star, Trash2, UserPlus, X } from 'lucide-react';
 import { deleteCandidate, fetchCandidates, getCandidateReferences, updateCandidate } from '@/lib/db';
 import type { Candidate, CandidateFilters, NameTypeKey, RaceKey, SortKey, StatusFilterKey } from '@/lib/types';
-import { DEFAULT_FILTERS, FILTER_MAX_CHARS, RACE_LABELS, TYPE_LABELS, candidateToSheetFields } from '@/lib/types';
-import { BottomSheet, Chip, ConfirmDialog, EmptyState, Seal, StructureTags, copyText, formatTime, useAppToast } from '@/components/common';
+import { candidateToSheetFields, DEFAULT_FILTERS, FILTER_MAX_CHARS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
+import { BottomSheet, Chip, ConfirmDialog, copyText, EmptyState, formatTime, Seal, StructureTags, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 import { exportNameListTxt } from '@/lib/export';
 import type { EditorPrefill } from '@/components/GenerateTab';
@@ -423,41 +423,29 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
             />
           )
         ) : (
-          <div className="library-list">
-            <p className="list-count" data-testid="library-count">
+          <div>
+            <div className="list-count" data-testid="library-count">
               共 {items.length} 条
-            </p>
-            {items.map((c) => (
-              <button key={c.id} type="button" className="library-row" onClick={() => openDetail(c)} data-testid={`row-${c.id}`}>
-                <Seal race={c.race} size={20} />
-                <div className="row-main">
-                  <p className="row-name">
-                    {c.nameText}
-                    {c.referenced ? <span className="row-referenced">已关联</span> : null}
-                  </p>
-                  <div className="row-meta">
-                    <span className="row-type">{TYPE_LABELS[c.nameType]}</span>
-                    <span>{c.charCount}字</span>
-                    <span>{formatTime(c.createdAt)}</span>
+            </div>
+            <div className="library-list">
+              {items.map((c) => (
+                <button key={c.id} type="button" className="library-row" onClick={() => openDetail(c)} data-testid={`row-${c.id}`}>
+                  <Seal race={c.race} size={20} />
+                  <div className="row-main">
+                    <p className="row-name">
+                      {c.nameText}
+                      {c.referenced ? <span className="row-referenced">已关联</span> : null}
+                    </p>
+                    <div className="row-meta">
+                      <span className="row-type">{TYPE_LABELS[c.nameType]}</span>
+                      <span>{c.charCount}字</span>
+                      <span>{formatTime(c.createdAt)}</span>
+                    </div>
+                    {c.note ? <p className="row-note">{c.note}</p> : null}
                   </div>
-                  {c.note ? <p className="row-note">{c.note}</p> : null}
-                </div>
-                <div className="row-actions" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className={cn('icon-btn', c.favorite && 'faved')}
-                    title={c.favorite ? '取消收藏' : '收藏'}
-                    data-testid={`row-fav-${c.id}`}
-                    onClick={() => void toggleFavorite(c)}
-                  >
-                    <Star size={16} fill={c.favorite ? 'currentColor' : 'none'} />
-                  </button>
-                  <button type="button" className="icon-btn" title="删除" data-testid={`row-del-${c.id}`} onClick={() => void startDelete(c)}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

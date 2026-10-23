@@ -311,36 +311,29 @@ export interface GenerateResult {
 export function genCombo(race: RaceKey, types: NameTypeKey[], params: GenParams): { name: string; structure: StructurePart[] } | null {
   const surname = pickSurname(race, params.surnameBias);
   const short = genShortName(race, params.shortMode, params.gender);
-  const clauses: string[] = [];
   const personLabel = params.gender === 'any' ? '人名' : `${GENDER_LABELS[params.gender]}人名`;
   const parts: StructurePart[] = [surnamePart(surname), { label: personLabel, word: short }];
   if (types.includes('office')) {
     const office = genOffice(race);
-    clauses.push(`任${office.name}`);
     parts.push({ label: '官职', word: office.name });
   }
   if (types.includes('place')) {
     const place = genPlace(race);
-    clauses.push(`居${place.name}`);
     parts.push({ label: '居地', word: place.name });
   }
   {
     const prof = pickProfession(race, params.professions);
-    clauses.push(`以${prof}为营生`);
     parts.push({ label: '营生', word: prof });
   }
   {
     const abilities = pickAbilities(race, params.abilities);
-    clauses.push(`擅${abilities.join('、')}`);
     parts.push({ label: '特殊能力', word: abilities.join('、') });
   }
   if (types.includes('nickname')) {
     const nick = genNickname(race, params.nicknameChars, params.nicknameSources);
-    clauses.push(`绰号${nick.name}`);
     parts.push({ label: '绰号', word: nick.name });
   }
-  if (clauses.length === 0) return null;
-  return { name: `${surname.name}${short}${clauses.map((c) => `，${c}`).join('')}`, structure: parts };
+  return { name: `${surname.name}·${short}`, structure: parts };
 }
 
 export function generateBatch(race: RaceKey, types: NameTypeKey[], params: GenParams): GenerateResult {

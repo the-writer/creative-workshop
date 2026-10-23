@@ -154,6 +154,8 @@ function createWindow(): BrowserWindow {
     setCurrentDesktopBinding(mainWindow);
   }
 
+  mainWindow.webContents.toggleDevTools()
+
   const devUrl = process.env.VITE_DEV_SERVER_URL;
   if (devUrl) void mainWindow.loadURL(devUrl);
   else void mainWindow.loadFile(join(app.getAppPath(), 'dist', 'index.html'));

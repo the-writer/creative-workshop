@@ -1,31 +1,14 @@
 // 生成页：族群/类型/规则选择 + 批量生成引擎 + 名称笺结果区 + 单条保存/收藏/复制/换一批
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import {
-  Badge,
-  ChevronDown,
-  Copy,
-  Info,
-  MapPin,
-  Minus,
-  PenLine,
-  Plus,
-  RefreshCw,
-  Save,
-  ScrollText,
-  SlidersHorizontal,
-  Star,
-  UserPlus,
-  UserRound,
-  X,
-} from 'lucide-react';
-import { DEFAULT_GEN_PARAMS, generateBatch, rerollCombo, rerollOne, type GenParams, type PersonSuffix, type ShortMode } from '@/lib/generator';
-import { SURNAME_BALANCED_BIAS, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS, computeCombinationTotals, formatCombination, LEXICON } from '@/data/lexicon';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { Badge, ChevronDown, Copy, Info, MapPin, Minus, PenLine, Plus, Save, ScrollText, SlidersHorizontal, UserPlus, UserRound, X } from 'lucide-react';
+import { DEFAULT_GEN_PARAMS, generateBatch, type GenParams, type PersonSuffix, rerollCombo, rerollOne, type ShortMode } from '@/lib/generator';
+import { computeCombinationTotals, LEXICON, SURNAME_BALANCED_BIAS, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
 import { SURNAME_BIAS_STEP } from '@/lib/generator-rules';
 import { insertCandidate } from '@/lib/db';
-import type { Candidate, NameGender, NameTypeKey, RaceKey } from '@/lib/types';
-import { GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS, candidateToSheetFields, raceLabel } from '@/lib/types';
-import { Chip, EmptyState, Seal, SectionTitle, StructureTags, copyText, useAppToast } from '@/components/common';
+import type { Candidate, NameTypeKey, RaceKey } from '@/lib/types';
+import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
+import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 
 export interface EditorPrefill {
@@ -375,7 +358,9 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   return (
     <div className="page-shell generate-page">
       <div className="app-scroll">
-        <SectionTitle>族群</SectionTitle>
+        <div style={{ marginTop: '-16px' }}>
+          <SectionTitle>族群</SectionTitle>
+        </div>
         <div className="race-chip-row">
           {(Object.keys(RACE_LABELS) as RaceKey[]).map((r) => (
             <Chip key={r} selected={race === r} tone={r} dataTestId={`race-select-${r}`} onClick={() => setRace(r)}>
@@ -402,7 +387,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             <div className="param-group param-column">
               <div className="param-group-head">
                 <span className="param-group-label">职业</span>
-                <span className="param-group-count">{params.professions.length > 0 ? `已选 ${params.professions.length}` : '未设定'}</span>
+                <span className="param-group-count">{params.professions.length > 0 ? `已选 ${params.professions.length}` : '不勾选时会随机抽取'}</span>
                 {params.professions.length > 0 ? (
                   <button type="button" className="param-clear-btn" data-testid="clear-professions" onClick={() => setParams({ professions: [] })}>
                     清空
@@ -427,7 +412,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             <div className="param-group param-column">
               <div className="param-group-head">
                 <span className="param-group-label">特殊能力</span>
-                <span className="param-group-count">{params.abilities.length > 0 ? `已选 ${params.abilities.length}` : '未设定'}</span>
+                <span className="param-group-count">{params.abilities.length > 0 ? `已选 ${params.abilities.length}` : '不勾选时会随机抽取'}</span>
                 {params.abilities.length > 0 ? (
                   <button type="button" className="param-clear-btn" data-testid="clear-abilities" onClick={() => setParams({ abilities: [] })}>
                     清空
@@ -450,7 +435,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
               </div>
             </div>
           </div>
-          <p className="param-hint">不勾选时生成会随机抽取；所选职业与能力会融入组合设定。</p>
         </div>
 
         {/* 规则设置 */}
@@ -704,10 +688,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             </>
           )}
         </button>
-        <p className="combo-foot" data-testid="combo-foot">
-          当前词库理论组合量 <strong>{formatCombination(combination.grandTotal)}</strong>
-          {comboFoot > 0n ? `；所选类型理论组合 ${formatCombination(comboFoot)}` : ''}
-        </p>
 
         {/* 结果区 */}
         <div className="result-section">
@@ -729,7 +709,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                   const isSaved = savedKeys.has(key);
                   const isSaving = savingKeys.has(key);
                   return (
-                    <div key={`${c.id}-${c.nameText}`} className={cn('name-card', `name-card-race-${c.race}`)} data-testid={`name-card-${idx}`}>
+                    <div key={`${c.id}-${c.nameText}`} className={cn('name-card')} data-testid={`name-card-${idx}`}>
                       <div className="name-card-top">
                         <Seal race={c.race} size={22} />
                         <div className="name-main">
@@ -756,14 +736,8 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                               <Save size={17} />
                             </button>
                           )}
-                          <button type="button" className="icon-btn" title="收藏" data-testid={`fav-${idx}`} onClick={() => saveOne(c, true)}>
-                            <Star size={17} />
-                          </button>
                           <button type="button" className="icon-btn" title="复制" data-testid={`copy-${idx}`} onClick={() => copyItem(c)}>
                             <Copy size={16} />
-                          </button>
-                          <button type="button" className="icon-btn" title="换一批" data-testid={`reroll-${idx}`} onClick={() => rerollItem(idx)}>
-                            <RefreshCw size={16} />
                           </button>
                           <button type="button" className="icon-btn" title="加入设定" data-testid={`tosheet-${idx}`} onClick={() => addToSheet(c)}>
                             <UserPlus size={17} />
@@ -781,9 +755,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
               </div>
             </>
           ) : (
-            <div className="result-empty">
-              <EmptyState title="等待落笔" desc={`选择${raceLabel(race)}与名称类型，点击「落笔生成」开始成稿`} testId="generate-empty" />
-            </div>
+            <></>
           )}
         </div>
         {/* 候选详情面板：结构 + 备注编辑 + 保存入谱（AI 设定请到候选库详情页） */}
@@ -829,7 +801,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                   disabled={savingKeys.has(batchKey(results[detailIdx])) || savedKeys.has(batchKey(results[detailIdx]))}
                   onClick={() => {
                     const c = results[detailIdx];
-                    if (c) void saveOne(c, false);
+                    if (c) void saveOne(c, false).then(closeDetail);
                   }}
                 >
                   <Save size={14} />

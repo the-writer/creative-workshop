@@ -44,7 +44,6 @@ body {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding-left: 78px;
   border-bottom: 1px solid var(--app-line);
   background: var(--app-paper);
   color: var(--app-ink-2);
@@ -123,6 +122,10 @@ body {
   flex-shrink: 0;
 }
 
+.nav-label {
+  font-weight: bold;
+}
+
 .bottom-nav-btn {
   flex: 1;
   display: flex;
@@ -162,7 +165,7 @@ body {
   background: var(--app-ink);
   color: var(--app-paper);
   padding: 9px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 13px;
   box-shadow: 0 4px 14px rgba(46, 38, 32, 0.25);
   max-width: 84%;
@@ -179,7 +182,7 @@ body {
 /* ============ 印章 ============ */
 
 .seal-img {
-  border-radius: 6px;
+  border-radius: 10px;
   display: inline-block;
   flex-shrink: 0;
 }
@@ -190,7 +193,7 @@ body {
   justify-content: center;
   background: var(--app-cinnabar);
   color: var(--app-paper);
-  border-radius: 6px;
+  border-radius: 10px;
   font-family: var(--app-font-default);
   flex-shrink: 0;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
@@ -209,7 +212,7 @@ body {
   border: 1px solid var(--app-line);
   background: var(--app-paper);
   color: var(--app-ink-2);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 6px 13px;
   font-size: 13px;
   font-family: inherit;
@@ -243,7 +246,7 @@ body {
   border: none;
   background: transparent;
   color: var(--app-ink-2);
-  border-radius: 8px;
+  border-radius: 10px;
   font-family: inherit;
   flex-shrink: 0;
 }
@@ -388,7 +391,7 @@ body {
 .structure-tag {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 1px solid var(--app-line);
   color: var(--app-ink-2);
   background: var(--app-paper);
@@ -454,7 +457,7 @@ body {
 .rules-panel {
   margin-top: 14px;
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   overflow: hidden;
 }
@@ -532,7 +535,7 @@ body {
 
 .weight-slider::-webkit-slider-runnable-track {
   height: 5px;
-  border-radius: 999px;
+  border-radius: 12px;
   background: linear-gradient(90deg, var(--app-ink-2), var(--app-gold), var(--app-cinnabar));
 }
 
@@ -550,7 +553,7 @@ body {
 .weight-slider:focus-visible {
   outline: 2px solid var(--app-gold);
   outline-offset: 3px;
-  border-radius: 999px;
+  border-radius: 12px;
 }
 
 .weight-scale {
@@ -578,7 +581,7 @@ body {
   height: 30px;
   border: 1px solid var(--app-line);
   background: var(--app-paper);
-  border-radius: 8px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -589,7 +592,7 @@ body {
   width: 58px;
   text-align: center;
   border: 1px solid var(--app-line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 6px 4px;
   font-family: inherit;
@@ -610,7 +613,7 @@ body {
   border: none;
   background: transparent;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 13px;
   color: var(--app-ink-2);
   font-family: inherit;
@@ -627,7 +630,7 @@ body {
 .switch-btn {
   width: 44px;
   height: 26px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 1px solid var(--app-line);
   background: rgba(46, 38, 32, 0.08);
   position: relative;
@@ -664,7 +667,7 @@ body {
   width: 58px;
   text-align: center;
   border: 1px solid var(--app-line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 6px 4px;
   font-family: inherit;
@@ -698,7 +701,7 @@ body {
   margin-top: 16px;
   padding: 13px;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-cinnabar);
   color: var(--app-paper);
   font-family: inherit;
@@ -745,7 +748,7 @@ body {
   background: none;
   border: 1px solid var(--app-pine);
   color: var(--app-pine);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 6px 12px;
   font-family: inherit;
   font-size: 12px;
@@ -756,24 +759,19 @@ body {
 
 .name-card-list {
   display: flex;
-  flex-direction: column;
   gap: 10px;
   margin-top: 10px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-around;
 }
 
 .name-card {
+  max-width: 49%;
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 12px 14px;
-}
-
-.name-card-race-human {
-  border-left: 3px solid var(--app-cinnabar);
-}
-
-.name-card-race-demon {
-  border-left: 3px solid var(--app-indigo);
 }
 
 .name-card-top {
@@ -790,7 +788,7 @@ body {
 .name-text {
   margin: 0;
   font-size: 17px;
-  font-weight: 600;
+  font-weight: bold;
   letter-spacing: 1px;
 }
 
@@ -816,14 +814,10 @@ body {
   height: 32px;
   border: 1px solid var(--app-cinnabar);
   color: var(--app-cinnabar);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 12px;
   writing-mode: vertical-rl;
   letter-spacing: 2px;
-}
-
-.result-empty {
-  margin-top: 20px;
 }
 
 /* ============ 候选库 ============ */
@@ -851,7 +845,7 @@ body {
 .filter-count {
   background: var(--app-cinnabar);
   color: var(--app-paper);
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 11px;
   padding: 0 7px;
   line-height: 16px;
@@ -866,7 +860,7 @@ body {
 .filter-summary-chip {
   font-size: 11px;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(178, 58, 46, 0.1);
   color: var(--app-cinnabar);
   border: 1px solid rgba(178, 58, 46, 0.25);
@@ -887,7 +881,7 @@ body {
 .filter-panel {
   margin-top: 12px;
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 4px 14px 14px;
 }
@@ -977,8 +971,9 @@ body {
 
 .library-list {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .library-row {
@@ -986,9 +981,9 @@ body {
   align-items: flex-start;
   gap: 10px;
   text-align: left;
-  width: 100%;
+  width: 49%;
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 11px 12px;
   font-family: inherit;
@@ -1011,7 +1006,7 @@ body {
   font-size: 10px;
   color: var(--app-pine);
   border: 1px solid rgba(74, 124, 89, 0.4);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 1px 6px;
   vertical-align: 2px;
   font-weight: 400;
@@ -1150,7 +1145,7 @@ body {
 
 .sheet-card {
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 12px 14px;
 }
@@ -1193,7 +1188,7 @@ body {
 .sheet-tag {
   font-size: 11px;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: 12px;
   border: 1px solid var(--app-line);
   color: var(--app-ink-2);
   background: var(--app-paper);
@@ -1239,7 +1234,7 @@ body {
   border: none;
   background: var(--app-cinnabar);
   color: var(--app-paper);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 7px 15px;
   font-family: inherit;
   font-size: 13px;
@@ -1354,7 +1349,7 @@ body {
 .picker-panel {
   margin-top: 10px;
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   overflow: hidden;
 }
@@ -1384,7 +1379,7 @@ body {
   border: none;
   background: none;
   padding: 9px 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-family: inherit;
   color: var(--app-ink);
 }
@@ -1437,7 +1432,7 @@ body {
   font-size: 11px;
   color: var(--app-indigo);
   border: 1px solid rgba(62, 74, 90, 0.35);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 1px 7px;
 }
 
@@ -1470,7 +1465,7 @@ body {
   gap: 6px;
   border: 1px solid var(--app-line);
   background: var(--app-paper);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 6px 12px;
   font-family: inherit;
   font-size: 13px;
@@ -1641,7 +1636,7 @@ body {
   transform: translateX(-50%);
   background: rgba(251, 246, 234, 0.95);
   border: 1px solid var(--app-line);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 6px 12px;
   font-size: 12px;
   color: var(--app-ink-2);
@@ -1657,7 +1652,7 @@ body {
   width: calc(100% - 24px);
   background: var(--app-paper);
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 12px;
   box-shadow: 0 6px 20px rgba(46, 38, 32, 0.14);
   z-index: 3;
@@ -1690,7 +1685,7 @@ body {
 .graph-detail-kind {
   color: var(--app-cinnabar);
   border: 1px solid rgba(178, 58, 46, 0.35);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 1px 8px;
 }
 
@@ -1723,7 +1718,7 @@ body {
 
 .stat-card {
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 14px 16px;
   text-align: center;
@@ -1745,7 +1740,7 @@ body {
 
 .stat-chart-card {
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 4px 14px 14px;
   margin-bottom: 12px;
@@ -1838,7 +1833,7 @@ body {
   font-size: 12px;
   color: var(--app-pine);
   border: 1px solid rgba(74, 124, 89, 0.4);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 4px 12px;
 }
 
@@ -1870,7 +1865,7 @@ body {
   width: min(440px, calc(100vw - 32px));
   max-width: 88vw;
   padding: 20px;
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--app-paper);
   font-family: var(--app-font-default);
   box-shadow: 0 18px 60px rgba(30, 24, 18, 0.28);
@@ -1916,10 +1911,10 @@ body {
 .bottom-sheet {
   position: relative;
   width: 100%;
-  max-height: min(82vh, 430px);
+  max-height: 80%;
   overflow-y: auto;
   padding: 18px 18px 16px;
-  border-radius: 18px 18px 0 0;
+  border-radius: 10px 10px 0 0;
   background: var(--app-paper);
   box-shadow: 0 -12px 44px rgba(30, 24, 18, 0.2);
   animation: sheet-rise-in 180ms ease-out;
@@ -1935,7 +1930,7 @@ body {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
   color: var(--app-ink-2);
 }
@@ -1965,7 +1960,7 @@ body {
   justify-self: center;
   margin-top: 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 8px 18px;
   background: var(--app-cinnabar);
   color: var(--app-paper);
@@ -1997,7 +1992,7 @@ body {
 .param-panel {
   margin-top: 12px;
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--app-paper);
   padding: 12px 14px;
 }
@@ -2050,7 +2045,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-height: 176px;
+  max-height: 65px;
   overflow-y: auto;
   padding-right: 2px;
   -webkit-overflow-scrolling: touch;
@@ -2059,13 +2054,6 @@ body {
 .param-chip {
   padding: 4px 10px;
   font-size: 12px;
-}
-
-.param-hint {
-  margin: 10px 2px 0;
-  font-size: 11px;
-  color: var(--app-ink-2);
-  line-height: 1.6;
 }
 
 /* ============ AI 详细设定 ============ */
@@ -2094,10 +2082,12 @@ body {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(30, 24, 18, 0.45);
+  background: #1e181273;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  align-content: space-around;
 }
 
 .ai-panel {
@@ -2105,7 +2095,7 @@ body {
   max-width: 480px;
   max-height: 86vh;
   background: var(--app-paper);
-  border-radius: 18px 18px 0 0;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
@@ -2150,7 +2140,7 @@ body {
   font-size: 11px;
   color: var(--app-pine);
   border: 1px solid var(--app-pine);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 1px 8px;
   flex-shrink: 0;
 }
@@ -2166,7 +2156,7 @@ body {
   overflow-y: auto;
   min-height: 120px;
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 12px;
   background: #fbf8f0;
   -webkit-overflow-scrolling: touch;
@@ -2273,7 +2263,7 @@ body {
 
 .ai-content code {
   background: rgba(46, 38, 32, 0.06);
-  border-radius: 4px;
+  border-radius: 10px;
   padding: 1px 5px;
   font-size: 12px;
 }
@@ -2306,7 +2296,7 @@ body {
 .settings-card {
   background: var(--app-paper);
   border: 1px solid var(--app-line);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 14px 14px 16px;
   margin-bottom: 12px;
 }
