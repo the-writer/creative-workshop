@@ -12,7 +12,7 @@
     "dev:renderer": "vite",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build": "pnpm run typecheck && vite build && tsc -p tsconfig.electron.json",
-    "dist:mac": "sh scripts/clean-dist.sh && pnpm run build && electron-builder --mac dmg zip --arm64",
+    "dist:mac": "sh scripts/dist-mac.sh",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test": "vitest run && pnpm run build:electron && node --test tests/storage.test.mjs",
     "format": "prettier --write \"{src,electron,tests,scripts}/**/*.{ts,tsx,cts,cjs,mjs,json,css,md}\" \"docs/**/*.md\" \"package.json\" \"*.config.js\"",
@@ -80,22 +80,24 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "identity": null,
       "target": [
         {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
+          "target": "pkg",
           "arch": [
             "arm64"
           ]
         }
       ],
       "icon": "assets/imgs/app-icon.icns"
+    },
+    "pkg": {
+      "scripts": "../scripts/pkg-scripts",
+      "installLocation": "/Applications",
+      "allowAnywhere": false,
+      "allowCurrentUserHome": false,
+      "allowRootDirectory": true,
+      "isRelocatable": false,
+      "artifactName": "creation-workshop-v${version}-${arch}.${ext}"
     },
     "artifactName": "creation-workshop-v${version}-${arch}.${ext}"
   },
