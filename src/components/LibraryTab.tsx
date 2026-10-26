@@ -443,7 +443,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
                 </p>
               </div>
             </div>
-            <StructureTags parts={selected.structure} race={selected.race} gender={selected.gender} />
+            <StructureTags parts={selected.structure} race={selected.race} gender={selected.gender} rarity={selected.rarity} />
             <div className="detail-note">
               <label className="detail-label" htmlFor="detail-note-input">
                 备注

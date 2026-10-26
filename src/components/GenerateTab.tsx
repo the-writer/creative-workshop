@@ -1,7 +1,7 @@
 // 生成页：族群/类型/规则选择 + 批量生成引擎 + 名称笺结果区 + 单条保存/收藏/复制/换一批
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { Badge, Check, ChevronDown, Copy, MapPin, Minus, PenLine, Plus, Save, ScrollText, SlidersHorizontal, UserPlus, UserRound } from 'lucide-react';
+import { Badge, Check, Copy, MapPin, PenLine, Save, ScrollText, SlidersHorizontal, UserPlus, UserRound } from 'lucide-react';
 import {
   DEFAULT_GEN_PARAMS,
   GEN_PREFS_SCHEMA_VERSION,
@@ -10,17 +10,14 @@ import {
   normalizeGenPrefs,
   type GenParams,
   type GenPrefs,
-  type PersonSuffix,
   rerollCombo,
   rerollOne,
-  type ShortMode,
 } from '@/lib/generator';
-import { computeCombinationTotals, LEXICON, SURNAME_BALANCED_BIAS, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
-import { SURNAME_BIAS_STEP } from '@/lib/generator-rules';
-import { insertCandidate } from '@/lib/db';
+import { computeCombinationTotals, LEXICON, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
+import { insertCandidate, onRulesChanged, openRulesWindow } from '@/lib/db';
 import type { Candidate, NameTypeKey, RaceKey } from '@/lib/types';
 import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
-import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast } from '@/components/common';
+import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast, visibleStructureParts } from '@/components/common';
 import { cn } from '@/lib/utils';
 
 export interface EditorPrefill {
@@ -50,19 +47,10 @@ const TYPE_ICONS: Record<NameTypeKey, ReactNode> = {
   nickname: <Badge size={15} />,
 };
 
-const NICK_SOURCE_OPTIONS: Array<[string, string]> = [
-  ['profession', '职业'],
-  ['appearance', '外貌'],
-  ['deed', '事迹'],
-  ['terrain', '地形'],
-  ['contract', '契约'],
-];
-
 export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   const toast = useAppToast();
   const [prefs, setPrefs] = useState<GenPrefs>(defaultPrefs);
   const [prefsReady, setPrefsReady] = useState(false);
-  const [rulesOpen, setRulesOpen] = useState(false);
   const [results, setResults] = useState<Candidate[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [batchStats, setBatchStats] = useState<{ total: number; deduped: number } | null>(null);
@@ -84,6 +72,8 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
     if (!prefsReady) return;
     void window.workshop.preferences.set('generator', prefs).catch(() => undefined);
   }, [prefs, prefsReady]);
+
+  useEffect(() => onRulesChanged((raw) => setPrefs(normalizeGenPrefs(raw))), []);
 
   const combination = useMemo(() => computeCombinationTotals(), []);
   const comboFoot = useMemo(() => {
@@ -195,6 +185,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
       nameText: c.nameText,
       structure: c.structure,
       gender: c.gender,
+      rarity: c.rarity,
       source: 'generated',
       favorite,
       note: c.note,
@@ -237,7 +228,8 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
         nameText: got.name,
         charCount: nameCharCount(got.name),
         structure: got.structure,
-        gender: item.combo || item.nameType === 'person' ? params.gender : item.gender,
+        gender: item.combo || item.nameType === 'person' ? got.gender : item.gender,
+        rarity: item.combo || item.nameType === 'person' ? got.rarity : item.rarity,
         note: '',
         id: `tmp_${Date.now()}_${index}`,
       };
@@ -266,24 +258,15 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
     });
   };
 
-  const restoreDefaults = () => {
-    setParams({ ...DEFAULT_GEN_PARAMS, count: params.count });
-  };
+  const usesPerson = types.includes('person') || comboMode;
 
-  const hasPerson = types.includes('person');
-  const usesPerson = hasPerson || comboMode;
-  const showNickRules = types.includes('nickname') || (hasPerson && params.nicknamePrefix);
-  const genderLabel = GENDER_LABELS[params.gender];
-  const surnameBiasLabel =
-    params.surnameBias === SURNAME_NATURAL_BIAS
-      ? '按人口'
-      : params.surnameBias < SURNAME_BALANCED_BIAS
-        ? '偏常见'
-        : params.surnameBias === SURNAME_BALANCED_BIAS
-          ? '均衡'
-          : params.surnameBias < SURNAME_MAX_BIAS
-            ? '偏稀有'
-            : '极稀有';
+  const openRules = async () => {
+    try {
+      await openRulesWindow();
+    } catch (err) {
+      toast.show((err as Error)?.message || '无法打开规则设置', 'error');
+    }
+  };
 
   return (
     <div className="page-shell generate-page">
@@ -310,294 +293,19 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             </Chip>
           ))}
         </div>
-        {/* 性别倾向：从规则设置移到主界面，仅在含人名/组合设定时展示 */}
+        {/* 性别倾向：标题与名称类型使用同一 SectionTitle，选项与族群 / 类型使用同一 Chip 组件 */}
         {usesPerson ? (
-          <div className="gender-row" data-testid="gender-row">
-            <span className="rule-label">性别倾向</span>
-            <div className="segmented">
+          <>
+            <SectionTitle>性别倾向</SectionTitle>
+            <div className="choice-chip-row" data-testid="gender-row">
               {GENDER_KEYS.map((gender) => (
-                <button
-                  key={gender}
-                  type="button"
-                  className={cn('seg-btn', params.gender === gender && 'seg-btn-active')}
-                  data-testid={`gender-${gender}`}
-                  onClick={() => setParams({ gender })}
-                >
+                <Chip key={gender} selected={params.gender === gender} tone={race} dataTestId={`gender-${gender}`} onClick={() => setParams({ gender })}>
                   {GENDER_LABELS[gender]}
-                </button>
+                </Chip>
               ))}
             </div>
-          </div>
+          </>
         ) : null}
-        {/* 规则设置 */}
-        <div className="rules-panel">
-          <button type="button" className="rules-toggle" onClick={() => setRulesOpen((v) => !v)} data-testid="rules-toggle">
-            <SlidersHorizontal size={15} />
-            <span>规则设置</span>
-            <span className="rules-summary">
-              {params.count}条 · {genderLabel} · {surnameBiasLabel}姓氏 · 职业{params.professions.length} · 能力{params.abilities.length}
-            </span>
-            <ChevronDown size={15} className={cn('rules-chevron', rulesOpen && 'rules-chevron-open')} />
-          </button>
-          {rulesOpen ? (
-            <div className="rules-body">
-              {/* 职业与特殊能力 */}
-              <div className="param-panel">
-                <div className="param-columns">
-                  <div className="param-group param-column">
-                    <div className="param-group-head">
-                      <span className="param-group-label">职业</span>
-                      <span className="param-group-count">{params.professions.length > 0 ? `已选 ${params.professions.length}` : '不勾选时会随机抽取'}</span>
-                      {params.professions.length > 0 ? (
-                        <button type="button" className="param-clear-btn" data-testid="clear-professions" onClick={() => setParams({ professions: [] })}>
-                          清空
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="param-chip-wrap">
-                      {LEXICON[race].professions.map((p) => (
-                        <Chip
-                          key={p}
-                          selected={params.professions.includes(p)}
-                          tone={race}
-                          className="param-chip"
-                          dataTestId={`prof-${p}`}
-                          onClick={() => toggleProfession(p)}
-                        >
-                          {p}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="param-group param-column">
-                    <div className="param-group-head">
-                      <span className="param-group-label">特殊能力</span>
-                      <span className="param-group-count">{params.abilities.length > 0 ? `已选 ${params.abilities.length}` : '不勾选时会随机抽取'}</span>
-                      {params.abilities.length > 0 ? (
-                        <button type="button" className="param-clear-btn" data-testid="clear-abilities" onClick={() => setParams({ abilities: [] })}>
-                          清空
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="param-chip-wrap">
-                      {LEXICON[race].abilities.map((a) => (
-                        <Chip
-                          key={a}
-                          selected={params.abilities.includes(a)}
-                          tone={race}
-                          className="param-chip"
-                          dataTestId={`ability-${a}`}
-                          onClick={() => toggleAbility(a)}
-                        >
-                          {a}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 数量 */}
-              <div className="rule-row">
-                <span className="rule-label">生成数量</span>
-                <div className="stepper">
-                  <button type="button" className="stepper-btn" data-testid="count-minus" onClick={() => setParams({ count: Math.max(5, params.count - 5) })}>
-                    <Minus size={16} />
-                  </button>
-                  <input
-                    type="number"
-                    className="stepper-input"
-                    value={params.count}
-                    min={5}
-                    max={100}
-                    data-testid="count-input"
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (!Number.isNaN(v)) setParams({ count: Math.max(5, Math.min(100, Math.round(v))) });
-                    }}
-                  />
-                  <button type="button" className="stepper-btn" data-testid="count-plus" onClick={() => setParams({ count: Math.min(100, params.count + 5) })}>
-                    <Plus size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* 短名块数 */}
-              <div className="rule-row">
-                <span className="rule-label">短名块数</span>
-                <div className="segmented">
-                  {(
-                    [
-                      ['two', '2字'],
-                      ['three', '3字'],
-                      ['mix', '2-3字'],
-                    ] as Array<[ShortMode, string]>
-                  ).map(([k, label]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      className={cn('seg-btn', params.shortMode === k && 'seg-btn-active')}
-                      data-testid={`shortmode-${k}`}
-                      onClick={() => setParams({ shortMode: k })}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {usesPerson ? (
-                <>
-                  <div className="rule-row rule-row-vertical">
-                    <div className="weight-row-head">
-                      <span className="rule-label">姓氏人口权重</span>
-                      <span className="weight-value" data-testid="surname-bias-value">
-                        {params.surnameBias} · {surnameBiasLabel}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      className="weight-slider"
-                      min={SURNAME_NATURAL_BIAS}
-                      max={SURNAME_MAX_BIAS}
-                      step={SURNAME_BIAS_STEP}
-                      value={params.surnameBias}
-                      data-testid="surname-bias"
-                      onChange={(event) => setParams({ surnameBias: Number(event.target.value) })}
-                    />
-                    <div className="weight-scale">
-                      <span>按人口</span>
-                      <span>均衡</span>
-                      <span>极稀有</span>
-                    </div>
-                    <p className="weight-hint">稀有姓氏占姓氏池 10%，最低人口占比 0.01%。例如：女性 + 贵族封号 + 调高稀有倾向，可生成低人口姓氏的贵族姓名。</p>
-                  </div>
-                </>
-              ) : null}
-
-              {hasPerson && !comboMode ? (
-                <>
-                  {/* 人名后缀 */}
-                  <div className="rule-row">
-                    <span className="rule-label">人名后缀</span>
-                    <div className="segmented">
-                      {(
-                        [
-                          ['father', '父名'],
-                          ['place', '地名'],
-                          ['profession', '职业'],
-                          ['contract', '契约称号'],
-                          ['blood', '血统'],
-                          ['title', '贵族封号'],
-                        ] as Array<[PersonSuffix, string]>
-                      ).map(([k, label]) => (
-                        <button
-                          key={k}
-                          type="button"
-                          className={cn('seg-btn', params.personSuffix === k && 'seg-btn-active')}
-                          data-testid={`personsuffix-${k}`}
-                          onClick={() => setParams({ personSuffix: k })}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 绰号前置 */}
-                  <div className="rule-row">
-                    <span className="rule-label">绰号前置</span>
-                    <button
-                      type="button"
-                      className={cn('switch-btn', params.nicknamePrefix && 'switch-btn-on')}
-                      data-testid="nickname-prefix"
-                      onClick={() => setParams({ nicknamePrefix: !params.nicknamePrefix })}
-                    >
-                      <span className="switch-knob" />
-                    </button>
-                  </div>
-                </>
-              ) : null}
-
-              {showNickRules ? (
-                <div className="rule-row">
-                  <span className="rule-label">绰号字数</span>
-                  <div className="segmented">
-                    {([2, 3, 4, 5, 6, 7, 8] as const).map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        className={cn('seg-btn', params.nicknameChars === k && 'seg-btn-active')}
-                        data-testid={`nickchars-${k}`}
-                        onClick={() => setParams({ nicknameChars: k })}
-                      >
-                        {k}字
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {showNickRules ? (
-                <div className="rule-row">
-                  <span className="rule-label">绰号来源</span>
-                  <div className="segmented">
-                    {NICK_SOURCE_OPTIONS.map(([k, label]) => (
-                      <button
-                        key={k}
-                        type="button"
-                        className={cn('seg-btn', params.nicknameSources.includes(k) && 'seg-btn-active')}
-                        data-testid={`nicksrc-${k}`}
-                        onClick={() => toggleNickSource(k)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {/* 全名字数范围（组合模式不限制，仅单类型人名时生效） */}
-              {!comboMode ? (
-                <div className="rule-row">
-                  <span className="rule-label">人名全名字数</span>
-                  <div className="range-inputs">
-                    <input
-                      type="number"
-                      className="range-input"
-                      value={params.minChars}
-                      min={2}
-                      max={8}
-                      data-testid="chars-min"
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (!Number.isNaN(v)) setParams({ minChars: Math.max(2, Math.min(8, Math.round(v))) });
-                      }}
-                    />
-                    <span className="range-sep">至</span>
-                    <input
-                      type="number"
-                      className="range-input"
-                      value={params.maxChars}
-                      min={2}
-                      max={8}
-                      data-testid="chars-max"
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (!Number.isNaN(v)) setParams({ maxChars: Math.max(2, Math.min(8, Math.round(v))) });
-                      }}
-                    />
-                    <span className="range-note">字（名字与外号最大均 8 字）</span>
-                  </div>
-                </div>
-              ) : null}
-
-              <button type="button" className="reset-rules" onClick={restoreDefaults} data-testid="reset-rules">
-                恢复默认规则
-              </button>
-            </div>
-          ) : null}
-        </div>
 
         {validateError ? (
           <div className="error-bar" data-testid="generate-error">
@@ -605,20 +313,25 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
           </div>
         ) : null}
 
-        {/* 生成主按钮 */}
-        <button type="button" className="generate-btn" data-testid="generate-btn" onClick={handleGenerate} disabled={isGenerating}>
-          {isGenerating ? (
-            <>
-              <PenLine size={17} className="ink-icon" />
-              正在落笔…
-            </>
-          ) : (
-            <>
-              <PenLine size={17} className="ink-icon" />
-              落笔生成
-            </>
-          )}
-        </button>
+        <div className="generate-action-row">
+          <button type="button" className="rules-open-btn" data-testid="rules-open" onClick={() => void openRules()}>
+            <SlidersHorizontal size={16} />
+            规则设置
+          </button>
+          <button type="button" className="generate-btn" data-testid="generate-btn" onClick={handleGenerate} disabled={isGenerating}>
+            {isGenerating ? (
+              <>
+                <PenLine size={17} className="ink-icon" />
+                正在落笔…
+              </>
+            ) : (
+              <>
+                <PenLine size={17} className="ink-icon" />
+                落笔生成
+              </>
+            )}
+          </button>
+        </div>
 
         {/* 结果区 */}
         <div className="result-section">
@@ -655,9 +368,9 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                             </div>
                           </td>
                           <td>{c.combo ? '组合设定' : TYPE_LABELS[c.nameType]}</td>
-                          <td>{c.combo ? `${c.structure.length}项` : `${c.charCount}字`}</td>
+                          <td>{c.combo ? `${visibleStructureParts(c.structure).length}项` : `${c.charCount}字`}</td>
                           <td>
-                            <StructureTags parts={c.structure} race={c.race} gender={c.gender} />
+                            <StructureTags parts={c.structure} race={c.race} gender={c.gender} rarity={c.rarity} />
                           </td>
                           <td>
                             <div className="result-actions">

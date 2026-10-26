@@ -12,7 +12,16 @@ import {
   type WeightedSurname,
 } from '@/data/lexicon';
 import { GENDER_BASE_WEIGHT, GENDER_MATCH_WEIGHT } from '@/lib/generator-rules';
-import { GENDER_KEYS, normalizeRaceKey, type Candidate, type NameGender, type NameTypeKey, type RaceKey, type StructurePart } from '@/lib/types';
+import {
+  GENDER_KEYS,
+  normalizeRaceKey,
+  type Candidate,
+  type NameGender,
+  type NameTypeKey,
+  type RaceKey,
+  type RarityTier,
+  type StructurePart,
+} from '@/lib/types';
 
 export type ShortMode = 'two' | 'three' | 'mix';
 export type PersonSuffix = 'father' | 'place' | 'profession' | 'contract' | 'blood' | 'title';
@@ -33,7 +42,7 @@ export interface GenParams {
 }
 
 export const DEFAULT_GEN_PARAMS: GenParams = {
-  count: 10,
+  count: 5,
   shortMode: 'mix',
   personSuffix: 'father',
   nicknamePrefix: false,
@@ -165,6 +174,19 @@ function pickAbilities(race: RaceKey, selected: string[]): string[] {
   return pickMany(safe, Math.random() < 0.5 ? 1 : 2);
 }
 
+const ACTUAL_GENDERS: Array<Exclude<NameGender, 'any'>> = ['male', 'female', 'neutral'];
+
+/**
+ * 把性别倾向解析为候选真实性别。
+ *
+ * 「不限」只是生成偏好，不是一个人的性别；生成时随机落到男性 / 女性 / 中性之一，
+ * 后续 TAG、保存与再次换稿都使用这个真实性别。
+ */
+export function resolveActualGender(preference: NameGender): Exclude<NameGender, 'any'> {
+  if (preference !== 'any') return preference;
+  return ACTUAL_GENDERS[Math.floor(Math.random() * ACTUAL_GENDERS.length)] as Exclude<NameGender, 'any'>;
+}
+
 export function genShortName(race: RaceKey, mode: ShortMode, gender: NameGender = 'any'): string {
   const k = mode === 'two' ? 2 : mode === 'three' ? 3 : Math.random() < 0.5 ? 2 : 3;
   const preferred = gender === 'any' ? null : new Set(SYLLABLE_GENDER_BIAS[race][gender]);
@@ -189,13 +211,6 @@ export function pickSurname(race: RaceKey, bias: number, randomValue = Math.rand
 export function formatPopulationShare(populationShare: number): string {
   const percent = populationShare * 100;
   return `${percent < 0.1 ? percent.toFixed(2) : percent.toFixed(1)}%`;
-}
-
-function surnamePart(surname: WeightedSurnameChoice): StructurePart {
-  return {
-    label: surname.rare ? `稀有姓氏（${formatPopulationShare(surname.populationShare)}人口）` : `姓氏（${formatPopulationShare(surname.populationShare)}人口）`,
-    word: surname.name,
-  };
 }
 
 export function genPlace(race: RaceKey): { name: string; structure: StructurePart[] } {
@@ -294,16 +309,34 @@ export function genNickname(race: RaceKey, chars: number, sources: string[] = []
   return { name, structure: parts, sourceLabel: labels.length > 0 ? labels.join('·') : '综合' };
 }
 
-export function genPerson(race: RaceKey, params: GenParams): { name: string; structure: StructurePart[] } | null {
+export interface GeneratedName {
+  name: string;
+  structure: StructurePart[];
+  /** 人名 / 组合设定句的实际性别；其它类型没有性别 */
+  gender?: NameGender;
+  /** 人名 / 组合设定句的姓氏稀有度；其它类型没有稀有度 */
+  rarity?: RarityTier;
+}
+
+// 名称只保留一个「·」，且姓氏固定在后：短名与后缀直接相连，再接「·姓氏」。
+// 例：姓氏「曜津」、短名「笛月」、父名「尔藤」→「笛月尔藤·曜津」。
+function personName(givenName: string, surnameName: string): string {
+  return `${givenName}·${surnameName}`;
+}
+
+export function genPerson(race: RaceKey, params: GenParams): GeneratedName | null {
   const surname = pickSurname(race, params.surnameBias);
-  const short = genShortName(race, params.shortMode, params.gender);
-  // 姓名组成块统一用「·」连接；短名/父名不再作为结构标签展示，性别改由候选的 gender 字段单独成标签。
-  const personParts: StructurePart[] = [surnamePart(surname)];
+  const gender = resolveActualGender(params.gender);
+  const short = genShortName(race, params.shortMode, gender);
+  // 姓氏不再作为结构 TAG 展示；名称里姓氏只出现在最后一个「·」之后。
+  const personParts: StructurePart[] = [];
   if (params.nicknamePrefix) {
     const nick = genNickname(race, params.nicknameChars, params.nicknameSources);
     return {
-      name: `${nick.name}·${surname.name}·${short}`,
+      name: personName(`${nick.name}${short}`, surname.name),
       structure: [...personParts, ...nick.structure],
+      gender,
+      rarity: surname.rarity,
     };
   }
   switch (params.personSuffix) {
@@ -315,43 +348,55 @@ export function genPerson(race: RaceKey, params: GenParams): { name: string; str
         guard += 1;
       }
       return {
-        name: `${surname.name}·${short}·${father}`,
+        name: personName(`${short}${father}`, surname.name),
         structure: personParts,
+        gender,
+        rarity: surname.rarity,
       };
     }
     case 'place': {
       const place = genPlace(race);
       return {
-        name: `${surname.name}·${short}·${place.name}`,
+        name: personName(`${short}${place.name}`, surname.name),
         structure: [...personParts, ...place.structure],
+        gender,
+        rarity: surname.rarity,
       };
     }
     case 'profession': {
       const prof = pickProfession(race, params.professions);
       return {
-        name: `${surname.name}·${short}·${prof}`,
+        name: personName(`${short}${prof}`, surname.name),
         structure: [...personParts, { label: '职业', word: prof }],
+        gender,
+        rarity: surname.rarity,
       };
     }
     case 'contract': {
       const contract = pick(LEXICON[race].contractTitles);
       return {
-        name: `${surname.name}·${short}·${contract}`,
+        name: personName(`${short}${contract}`, surname.name),
         structure: [...personParts, { label: '契约称号', word: contract }],
+        gender,
+        rarity: surname.rarity,
       };
     }
     case 'blood': {
       const blood = pick(LEXICON[race].bloodTitles);
       return {
-        name: `${surname.name}·${short}·${blood}`,
+        name: personName(`${short}${blood}`, surname.name),
         structure: [...personParts, { label: '血统称号', word: blood }],
+        gender,
+        rarity: surname.rarity,
       };
     }
     case 'title': {
       const title = pick(LEXICON[race].titleWords);
       return {
-        name: `${surname.name}·${short}·${title}`,
+        name: personName(`${short}${title}`, surname.name),
         structure: [...personParts, { label: '贵族封号', word: title }],
+        gender,
+        rarity: surname.rarity,
       };
     }
     default:
@@ -359,7 +404,7 @@ export function genPerson(race: RaceKey, params: GenParams): { name: string; str
   }
 }
 
-export function genOne(race: RaceKey, type: NameTypeKey, params: GenParams): { name: string; structure: StructurePart[] } | null {
+export function genOne(race: RaceKey, type: NameTypeKey, params: GenParams): GeneratedName | null {
   if (type === 'place') return genPlace(race);
   if (type === 'office') return genOffice(race);
   if (type === 'nickname') {
@@ -376,11 +421,12 @@ export interface GenerateResult {
 }
 
 // 组合设定句：多选类型时，把短名与所选类型合成一句人物设定，如“雷恩，任山岚执事，居青云城，以剑修为营生，绰号白发剑影”
-export function genCombo(race: RaceKey, types: NameTypeKey[], params: GenParams): { name: string; structure: StructurePart[] } | null {
+export function genCombo(race: RaceKey, types: NameTypeKey[], params: GenParams): GeneratedName | null {
   const surname = pickSurname(race, params.surnameBias);
-  const short = genShortName(race, params.shortMode, params.gender);
-  // 性别由候选的 gender 字段独立成标签，组合句名称保持「姓氏·短名」。
-  const parts: StructurePart[] = [surnamePart(surname), { label: '人名', word: short }];
+  const gender = resolveActualGender(params.gender);
+  const short = genShortName(race, params.shortMode, gender);
+  // 性别由候选的 gender 字段独立成标签；名称同样保持单点、姓氏在后：「短名·姓氏」。
+  const parts: StructurePart[] = [{ label: '人名', word: short }];
   if (types.includes('office')) {
     const office = genOffice(race);
     parts.push({ label: '官职', word: office.name });
@@ -401,7 +447,7 @@ export function genCombo(race: RaceKey, types: NameTypeKey[], params: GenParams)
     const nick = genNickname(race, params.nicknameChars, params.nicknameSources);
     parts.push({ label: '绰号', word: nick.name });
   }
-  return { name: `${surname.name}·${short}`, structure: parts };
+  return { name: personName(short, surname.name), structure: parts, gender, rarity: surname.rarity };
 }
 
 export function generateBatch(race: RaceKey, types: NameTypeKey[], params: GenParams): GenerateResult {
@@ -415,7 +461,7 @@ export function generateBatch(race: RaceKey, types: NameTypeKey[], params: GenPa
 
   while (out.length < params.count && guard < maxGuard) {
     guard += 1;
-    let got: { name: string; structure: StructurePart[] } | null = null;
+    let got: GeneratedName | null = null;
     let type: NameTypeKey = 'person';
     if (comboMode) {
       got = genCombo(race, types, params);
@@ -444,8 +490,8 @@ export function generateBatch(race: RaceKey, types: NameTypeKey[], params: GenPa
       nameText: got.name,
       charCount: len,
       structure: got.structure,
-      // 人名与组合设定句带性别（独立 TAG）；地名/官职/绰号无性别。
-      ...(comboMode || type === 'person' ? { gender: params.gender } : {}),
+      // 人名与组合设定句带真实性别与稀有度（独立 TAG）；地名/官职/绰号不带。
+      ...(comboMode || type === 'person' ? { gender: got.gender, rarity: got.rarity } : {}),
       source: 'generated',
       favorite: false,
       note: '',
@@ -458,12 +504,7 @@ export function generateBatch(race: RaceKey, types: NameTypeKey[], params: GenPa
   return { candidates: out, total: out.length, deduped };
 }
 
-export function rerollCombo(
-  race: RaceKey,
-  types: NameTypeKey[],
-  params: GenParams,
-  excludes: Set<string>,
-): { name: string; structure: StructurePart[] } | null {
+export function rerollCombo(race: RaceKey, types: NameTypeKey[], params: GenParams, excludes: Set<string>): GeneratedName | null {
   let guard = 0;
   while (guard < 80) {
     guard += 1;
@@ -476,7 +517,7 @@ export function rerollCombo(
   return null;
 }
 
-export function rerollOne(race: RaceKey, type: NameTypeKey, params: GenParams, excludes: Set<string>): { name: string; structure: StructurePart[] } | null {
+export function rerollOne(race: RaceKey, type: NameTypeKey, params: GenParams, excludes: Set<string>): GeneratedName | null {
   let guard = 0;
   while (guard < 80) {
     guard += 1;

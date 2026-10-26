@@ -16,6 +16,9 @@ export const IPC = {
   projectsCreate: 'workshop:projects:create',
   projectsPickDirectory: 'workshop:projects:pick-directory',
   projectsOpenInVSCode: 'workshop:projects:open-vscode',
+  rulesOpen: 'workshop:rules:open',
+  rulesClose: 'workshop:rules:close',
+  rulesChanged: 'workshop:rules:changed',
   candidateList: 'workshop:candidates:list',
   candidateGet: 'workshop:candidates:get',
   candidateCreate: 'workshop:candidates:create',
@@ -37,6 +40,12 @@ export const IPC = {
 } as const;
 
 const ALLOWED_PREFERENCES = new Set(['generator', 'libraryFilters']);
+
+export interface RulesWindowBridge {
+  openRulesWindow: () => void;
+  closeRulesWindow: () => void;
+  notifyRulesChanged: (value: unknown) => void;
+}
 
 function trustedSender(event: IpcMainInvokeEvent): void {
   const url = event.senderFrame?.url ?? '';
@@ -65,10 +74,10 @@ async function pickDirectory(
           properties: ['openDirectory', 'createDirectory'] as const,
         }
       : {
-          title: '选择创作工坊项目文件夹',
+          title: '选择或新建创作工坊项目文件夹',
           buttonLabel: '打开项目',
           defaultPath: app.getPath('documents'),
-          properties: ['openDirectory'] as const,
+          properties: ['openDirectory', 'createDirectory'] as const,
         };
   const baseOptions = {
     title: options.title,
@@ -81,7 +90,7 @@ async function pickDirectory(
   return { ok: true, path: result.filePaths[0] };
 }
 
-export function registerWorkshopIpc(storage: WorkshopStorage, projects: ProjectManager): void {
+export function registerWorkshopIpc(storage: WorkshopStorage, projects: ProjectManager, rulesBridge?: RulesWindowBridge): void {
   /* ---------------- 项目管理 ---------------- */
   registerHandler(IPC.projectsListRecent, () => projects.listRecent());
   registerHandler(IPC.projectsCurrent, () => projects.current);
@@ -89,6 +98,12 @@ export function registerWorkshopIpc(storage: WorkshopStorage, projects: ProjectM
   registerHandler(IPC.projectsCreate, (_event, input: { parentDir: string; name: string }) => projects.create(input));
   registerHandler(IPC.projectsPickDirectory, (event, kind: 'open' | 'parent') => pickDirectory(event, kind === 'parent' ? 'parent' : 'open'));
   registerHandler(IPC.projectsOpenInVSCode, () => projects.openInVSCode());
+  registerHandler(IPC.rulesOpen, () => rulesBridge?.openRulesWindow());
+  registerHandler(IPC.rulesClose, () => rulesBridge?.closeRulesWindow());
+  registerHandler(IPC.rulesChanged, (_event, value: unknown) => {
+    rulesBridge?.notifyRulesChanged(value);
+    return true;
+  });
 
   /* ---------------- 业务数据（均写入当前项目 .workshop） ---------------- */
   registerHandler(IPC.candidateList, (_event, filters: CandidateFilters) => storage.candidatesList(filters));

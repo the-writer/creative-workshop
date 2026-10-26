@@ -1,6 +1,6 @@
 // 设定工作台：设定卡列表 + 新建/编辑入口 + 删除（级联解除关系）
 import { useCallback, useEffect, useState } from 'react';
-import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { deleteSheet, fetchSheets } from '@/lib/db';
 import type { Sheet } from '@/lib/types';
 import { RACE_LABELS } from '@/lib/types';
@@ -63,10 +63,6 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
           <div className="sheets-actions">
             <button type="button" className="icon-btn" title="刷新" data-testid="sheets-refresh" onClick={() => void reload({ silent: true })}>
               <RefreshCw size={16} className={cn(refreshing && 'spin')} />
-            </button>
-            <button type="button" className="primary-btn sheets-new" data-testid="sheets-new" onClick={() => onOpenEditor()}>
-              <Plus size={15} />
-              新建设定
             </button>
           </div>
         </div>

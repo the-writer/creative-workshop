@@ -1,8 +1,8 @@
 # 7. 持久化与 IPC
 
-### 7.1 启动、项目选择与新建
+### 7.1 启动、项目选择与打开
 
-应用每次启动都先进入项目门；`projects.current()` 在启动时为 `null`（主进程不在启动时恢复上次项目），用户通过最近项目、打开已有项目或新建项目进入。
+应用启动时只驻留托盘，不打开主窗口；用户点击托盘或菜单后才显示项目门。`projects.current()` 在启动时为 `null`（主进程不在启动时恢复上次项目）。
 
 ```mermaid
 flowchart TD
@@ -10,22 +10,29 @@ flowchart TD
   B --> C{登记文件不存在且旧 workshop.json 存在}
   C -- 是 --> D[迁移旧数据为 userData/projects/默认项目 并写入登记文件]
   C -- 否 --> E[保持最近项目列表]
-  D --> F[项目门]
+  D --> F[仅创建托盘，不显示窗口]
   E --> F
-  F --> G{用户操作}
-  G -- 点击最近项目 --> H[projects.open：校验目录与 .workshop]
-  G -- 打开已有项目 --> I[系统目录选择框] --> H
-  G -- 新建项目 --> J[选择存放位置 + 输入名称] --> K[projects.create：创建目录与 .workshop]
-  H --> L{校验通过}
-  K --> L
-  L -- 否 --> M[项目门显示错误]
-  L -- 是 --> N[storage.open：补齐缺失分类文件]
-  N --> O[更新最近项目并进入主界面]
+  F --> G[用户点击托盘/菜单]
+  G --> H[显示项目门]
+  H --> I{用户操作}
+  I -- 点击最近项目 --> J[projects.open]
+  I -- 打开项目 --> K[系统目录选择框（可在框内新建目录）] --> J
+  J --> L{目录不存在?}
+  L -- 是 --> M[创建目录]
+  L -- 否 --> N{存在 .workshop?}
+  M --> O[创建 .workshop 并补齐六个分类文件]
+  N -- 否 --> O
+  N -- 是 --> P[打开已有 .workshop]
+  O --> Q[更新最近项目并进入主界面]
+  P --> Q
 ```
 
-- 打开已有项目要求所选目录已存在且包含 `.workshop` 数据目录（`isProjectDirectory`）；新建项目要求存放位置存在、目标目录不存在。
-- 项目名称校验：非空、不能为 `.`/`..`、不能以 `.` 开头、不能含 `\ / : * ? " < > |` 或控制字符 `\u0000-\u001f`，长度不超过 60 字符（`MAX_PROJECT_NAME_LENGTH`，`project-manager.cts`）；渲染层输入框 `maxLength=60`。
-- 打开/新建成功后主进程输出日志（`console.info`）：
+- 「打开项目」与最近项目点击都走 `projects.open(path)`：目录不存在时自动 `mkdir`；目录存在但缺少 `.workshop` 时自动初始化；已有 `.workshop` 时直接打开。因此项目门不再区分「新建项目」与「打开已有项目」，也不再提供刷新按钮。
+- **空目录初始化**：目录原本为空（或不存在、刚被创建）时，额外创建 `README.md`（首行 `# <目录名>`）与 `第一卷/第一章.md`；已有内容或已有 `.workshop` 的目录不会补写。
+- 项目展示名优先取 `README.md` 第一行（去掉 `#` 前缀），无 README / 首行为空时回退登记名称；`listRecent()` 与 `open()` 都会读取。
+- 项目门最近项目按 `lastOpenedAt` 倒序，第一条显示「上次」TAG（`ProjectGate.tsx`）。
+- `projects.create({ parentDir, name })` IPC 与 `ProjectManager.create` 仍保留以兼容旧调用；项目名称校验与非空目录限制仍在该路径生效，但当前 UI 不再调用。日常新建项目使用「打开项目」选择一个新目录。
+- 打开项目成功后主进程输出日志（`console.info`）：
   - `[创作工坊] 项目登记文件：<userData>/projects.json`（启动时）
   - `[创作工坊] 项目：<项目目录绝对路径>`
   - `[创作工坊] 项目数据目录：<项目目录>/.workshop`
@@ -49,18 +56,19 @@ flowchart TD
 }
 ```
 
-| 字段                            | 说明                                                     |
-| ------------------------------- | -------------------------------------------------------- |
-| `schemaVersion`                 | 固定为 `1`                                               |
-| `recentProjects[].path`         | 项目目录绝对路径                                         |
-| `recentProjects[].name`         | 项目展示名（来自 `project.md` 一级标题，缺失时用目录名） |
-| `recentProjects[].lastOpenedAt` | 最近打开时间戳（毫秒）                                   |
+| 字段                            | 说明                                                                 |
+| ------------------------------- | -------------------------------------------------------------------- |
+| `schemaVersion`                 | 固定为 `1`                                                           |
+| `recentProjects[].path`         | 项目目录绝对路径                                                     |
+| `recentProjects[].name`         | 项目展示名（优先来自 `README.md` 第一行，缺失时用登记名称 / 目录名） |
+| `recentProjects[].lastOpenedAt` | 最近打开时间戳（毫秒）                                               |
 
 行为：
 
 - 最近项目按 `lastOpenedAt` 倒序；同一路径只保留一条（重新打开时提到最前）。
+- `listRecent()` 返回前会逐个读取项目的 `README.md` 第一行作为展示名，因此外部修改 README 后重新启动即可看到新名称。
 - 最多保留 `creationWorkshop.project.maxRecentProjects` 条（默认 `10`）。
-- 查询最近项目时过滤掉目录已不存在（缺少 `.workshop`）的条目，但登记文件本身不立即重写。
+- 查询最近项目时过滤掉目录已不存在的条目；目录存在但缺少 `.workshop` 时仍保留，点击后会重新初始化。登记文件本身不立即重写。
 - 写入采用「`.tmp` + rename」原子替换；`userData` 目录不存在时先创建。
 - 登记文件不存在或 JSON 损坏时从空列表开始（不抛错）。
 - 该文件是全局的（不属于某个项目）；项目数据本身不存放在这里。
@@ -69,6 +77,9 @@ flowchart TD
 
 ```text
 <项目目录>/
+├── README.md                  # 空目录初始化时创建；首行作为项目展示名
+├── 第一卷/
+│   └── 第一章.md              # 空目录初始化时创建
 └── .workshop/                 # 目录名来自 creationWorkshop.project.dataDirName，默认 .workshop
     ├── project.md             # 项目名称、格式版本、创建时间
     ├── candidates.md          # 名称候选
@@ -141,29 +152,29 @@ flowchart TD
 - 族群: 人族
 - 类型: 人名
 - 性别: 中性
+- 稀有度: SSSR
 - 字数: 5
 - 来源: 生成
 - 收藏: 是
 - 备注:
 - 创建时间: 2026-10-26T05:57:48.000Z
 - 更新时间: 2026-10-26T05:57:48.000Z
-- 结构:
-  - 姓氏（1.0%人口）: 雷
 ```
 
-| 字段                    | 是否必读 | 说明                                        |
-| ----------------------- | -------- | ------------------------------------------- |
-| `ID`                    | 是       | 候选唯一 ID；缺失则跳过该条目               |
-| `名称`                  | 是       | 缺失时回退使用 `##` 标题；两者均空则跳过    |
-| `族群`                  | 否       | 缺省 `human`                                |
-| `类型`                  | 否       | 缺省 `person`                               |
-| `性别`                  | 否       | 仅人名/组合设定句写出；缺失则不显示性别 TAG |
-| `字数`                  | 否       | 仅供阅读，读取时按名称重算                  |
-| `来源`                  | 否       | 生成 / 手动                                 |
-| `收藏`                  | 否       | 是 / 否                                     |
-| `备注`                  | 否       | 自由文本                                    |
-| `创建时间` / `更新时间` | 否       | 缺失时回退当前时间                          |
-| `结构`                  | 否       | 子项 `标签: 词`；结构项为空时不写该字段行   |
+| 字段                    | 是否必读 | 说明                                                                               |
+| ----------------------- | -------- | ---------------------------------------------------------------------------------- |
+| `ID`                    | 是       | 候选唯一 ID；缺失则跳过该条目                                                      |
+| `名称`                  | 是       | 缺失时回退使用 `##` 标题；两者均空则跳过                                           |
+| `族群`                  | 否       | 缺省 `human`                                                                       |
+| `类型`                  | 否       | 缺省 `person`                                                                      |
+| `性别`                  | 否       | 仅人名/组合设定句写出；缺失则不显示性别 TAG                                        |
+| `稀有度`                | 否       | `S` / `SS` / `SSS` / `SSSR`；仅带姓氏的人名/组合设定句写出，缺失则不显示稀有度 TAG |
+| `字数`                  | 否       | 仅供阅读，读取时按名称重算                                                         |
+| `来源`                  | 否       | 生成 / 手动                                                                        |
+| `收藏`                  | 否       | 是 / 否                                                                            |
+| `备注`                  | 否       | 自由文本                                                                           |
+| `创建时间` / `更新时间` | 否       | 缺失时回退当前时间                                                                 |
+| `结构`                  | 否       | 子项 `标签: 词`；结构项为空时不写该字段行                                          |
 
 #### 7.4.3 `sheets.md`
 
@@ -347,32 +358,36 @@ flowchart TD
 
 接口在 Electron 渲染进程中通过 `window.workshop` 使用，浏览器单独打开时不存在。以下操作均返回 Promise；除 `projects.*` 与 `clipboard.*` 外，业务接口要求已打开项目，否则抛错「尚未打开项目，请先选择项目」。每次调用都会校验来源，非法来源抛错「不受信任的调用来源」。
 
-| 签名                                   | 通道                               | 持久性                                                                | 副作用 / 返回                                                                                 |
-| -------------------------------------- | ---------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `projects.listRecent()`                | `workshop:projects:list-recent`    | 不写盘                                                                | 返回 `ProjectSummary[]`，过滤已不存在的项目目录                                               |
-| `projects.current()`                   | `workshop:projects:current`        | 不写盘                                                                | 返回当前项目 `ProjectSummary` 或 `null`（启动时为 `null`）                                    |
-| `projects.open(path)`                  | `workshop:projects:open`           | 写 `projects.json`（重复打开同一项目时不重写）                        | 校验目录与 `.workshop`，打开项目并更新最近项目；返回 `{ ok, project?, message? }`             |
-| `projects.create({ parentDir, name })` | `workshop:projects:create`         | 写项目文件 + `projects.json`                                          | 创建项目目录与 `.workshop`、补齐分类文件、设为当前项目                                        |
-| `projects.pickDirectory(kind)`         | `workshop:projects:pick-directory` | 不写盘                                                                | `kind='open'` 选择项目目录，`kind='parent'` 选择存放位置；返回 `{ ok, canceled?, path? }`     |
-| `projects.openInVSCode()`              | `workshop:projects:open-vscode`    | 不写盘                                                                | 用 VS Code 打开当前项目目录；未安装时回退文件管理器；返回 `{ ok, message? }`                  |
-| `candidates.list(filters)`             | `workshop:candidates:list`         | 不写盘                                                                | 返回带 `referenced` 的候选列表，按筛选/排序在服务端计算                                       |
-| `candidates.get(id)`                   | `workshop:candidates:get`          | 不写盘                                                                | 返回候选或 `null`                                                                             |
-| `candidates.create(input)`             | `workshop:candidates:create`       | 写 `candidates.md` + `graph.md`                                       | 新增候选；重复名称返回 `{ ok:false, duplicate:true }`；返回 `{ ok, duplicate, id, message? }` |
-| `candidates.update(id, patch)`         | `workshop:candidates:update`       | 写 `candidates.md`                                                    | 更新 `favorite` / `note`，刷新 `updatedAt`；不刷新图谱快照                                    |
-| `candidates.references(id)`            | `workshop:candidates:references`   | 不写盘                                                                | 返回 `{ asCharacter, asHometown, asPlace }`                                                   |
-| `candidates.remove(id, force)`         | `workshop:candidates:delete`       | 写 `candidates.md`（必要时改 `sheets.md`/`relations.md`）+ `graph.md` | `force=false` 且存在引用时拒绝；`force=true` 时清空引用并删除地名关系                         |
-| `sheets.list()`                        | `workshop:sheets:list`             | 不写盘                                                                | 返回按创建时间倒序、带 `relationCount` 的设定卡                                               |
-| `sheets.save(input)`                   | `workshop:sheets:save`             | 写 `sheets.md` + `graph.md`                                           | 新建或按 `id` 更新；人物名为空拒绝；返回 `{ ok, id, message? }`                               |
-| `sheets.remove(id)`                    | `workshop:sheets:delete`           | 写 `sheets.md`、`relations.md`、`graph.md`                            | 删除设定卡并级联删除相关关系                                                                  |
-| `relations.list()`                     | `workshop:relations:list`          | 不写盘                                                                | 返回按创建时间倒序的关系列表                                                                  |
-| `relations.add(input)`                 | `workshop:relations:add`           | 写 `relations.md` + `graph.md`                                        | 自身关系/空端点/重复关系拒绝                                                                  |
-| `relations.remove(id)`                 | `workshop:relations:remove`        | 写 `relations.md` + `graph.md`                                        | 删除关系                                                                                      |
-| `data.stats()`                         | `workshop:data:stats`              | 不写盘                                                                | 返回实时统计 `StatsData`                                                                      |
-| `graph.getLayout()`                    | `workshop:graph:get-layout`        | 不写盘                                                                | 返回 `Record<节点ID, { x, y }>`                                                               |
-| `graph.saveLayout(positions)`          | `workshop:graph:save-layout`       | 写 `graph.md`                                                         | 整体覆盖节点布局并重建快照；返回 `{ ok: true }`                                               |
-| `preferences.get(key)`                 | `workshop:preferences:get`         | 不写盘                                                                | `key` 仅允许 `generator` / `libraryFilters`，否则抛错；返回对象或 `null`                      |
-| `preferences.set(key, value)`          | `workshop:preferences:set`         | 写 `preferences.md`                                                   | `key` 白名单同上；覆盖对应偏好对象，其它偏好保持不变                                          |
-| `clipboard.writeText(text)`            | `workshop:clipboard:write`         | 不写盘                                                                | 写入系统剪贴板，返回 `true`                                                                   |
+| 签名                                   | 通道                               | 持久性                                                                | 副作用 / 返回                                                                                                             |
+| -------------------------------------- | ---------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `projects.listRecent()`                | `workshop:projects:list-recent`    | 不写盘                                                                | 返回 `ProjectSummary[]`，过滤已不存在的项目目录                                                                           |
+| `projects.current()`                   | `workshop:projects:current`        | 不写盘                                                                | 返回当前项目 `ProjectSummary` 或 `null`（启动时为 `null`）                                                                |
+| `projects.open(path)`                  | `workshop:projects:open`           | 写项目文件 + `projects.json`（重复打开同一项目时不重写）              | 目录不存在时创建；缺少 `.workshop` 时自动初始化；打开项目并更新最近项目；返回 `{ ok, project?, message? }`                |
+| `projects.create({ parentDir, name })` | `workshop:projects:create`         | 写项目文件 + `projects.json`                                          | 创建项目目录与 `.workshop`、补齐分类文件、设为当前项目                                                                    |
+| `projects.pickDirectory(kind)`         | `workshop:projects:pick-directory` | 不写盘                                                                | `kind='open'` 选择项目目录（允许在对话框内新建目录），`kind='parent'` 选择存放位置；返回 `{ ok, canceled?, path? }`       |
+| `projects.openInVSCode()`              | `workshop:projects:open-vscode`    | 不写盘                                                                | 用 VS Code 打开当前项目目录；未安装时回退文件管理器；返回 `{ ok, message? }`                                              |
+| `rules.open()`                         | `workshop:rules:open`              | 不写盘                                                                | 以主窗口为 parent 打开模态规则设置子窗口；已打开则聚焦现有窗口                                                            |
+| `rules.close()`                        | `workshop:rules:close`             | 不写盘                                                                | 关闭规则设置子窗口                                                                                                        |
+| `rules.notifyChanged(prefs)`           | `workshop:rules:changed`           | 由调用方先写入 `preferences.md`                                       | 主进程把子窗口的生成偏好转发给主窗口（事件 `workshop:rules:changed`）；返回 `true`                                        |
+| `rules.onChanged(callback)`            | 事件 `workshop:rules:changed`      | 不写盘                                                                | 主窗口订阅子窗口规则变更；返回取消订阅函数                                                                                |
+| `candidates.list(filters)`             | `workshop:candidates:list`         | 不写盘                                                                | 返回带 `referenced` 的候选列表，按筛选/排序在服务端计算                                                                   |
+| `candidates.get(id)`                   | `workshop:candidates:get`          | 不写盘                                                                | 返回候选或 `null`                                                                                                         |
+| `candidates.create(input)`             | `workshop:candidates:create`       | 写 `candidates.md` + `graph.md`                                       | 新增候选（可带 `gender` / `rarity`）；重复名称返回 `{ ok:false, duplicate:true }`；返回 `{ ok, duplicate, id, message? }` |
+| `candidates.update(id, patch)`         | `workshop:candidates:update`       | 写 `candidates.md`                                                    | 更新 `favorite` / `note`，刷新 `updatedAt`；不刷新图谱快照                                                                |
+| `candidates.references(id)`            | `workshop:candidates:references`   | 不写盘                                                                | 返回 `{ asCharacter, asHometown, asPlace }`                                                                               |
+| `candidates.remove(id, force)`         | `workshop:candidates:delete`       | 写 `candidates.md`（必要时改 `sheets.md`/`relations.md`）+ `graph.md` | `force=false` 且存在引用时拒绝；`force=true` 时清空引用并删除地名关系                                                     |
+| `sheets.list()`                        | `workshop:sheets:list`             | 不写盘                                                                | 返回按创建时间倒序、带 `relationCount` 的设定卡                                                                           |
+| `sheets.save(input)`                   | `workshop:sheets:save`             | 写 `sheets.md` + `graph.md`                                           | 新建或按 `id` 更新；人物名为空拒绝；返回 `{ ok, id, message? }`                                                           |
+| `sheets.remove(id)`                    | `workshop:sheets:delete`           | 写 `sheets.md`、`relations.md`、`graph.md`                            | 删除设定卡并级联删除相关关系                                                                                              |
+| `relations.list()`                     | `workshop:relations:list`          | 不写盘                                                                | 返回按创建时间倒序的关系列表                                                                                              |
+| `relations.add(input)`                 | `workshop:relations:add`           | 写 `relations.md` + `graph.md`                                        | 自身关系/空端点/重复关系拒绝                                                                                              |
+| `relations.remove(id)`                 | `workshop:relations:remove`        | 写 `relations.md` + `graph.md`                                        | 删除关系                                                                                                                  |
+| `data.stats()`                         | `workshop:data:stats`              | 不写盘                                                                | 返回实时统计 `StatsData`                                                                                                  |
+| `graph.getLayout()`                    | `workshop:graph:get-layout`        | 不写盘                                                                | 返回 `Record<节点ID, { x, y }>`                                                                                           |
+| `graph.saveLayout(positions)`          | `workshop:graph:save-layout`       | 写 `graph.md`                                                         | 整体覆盖节点布局并重建快照；返回 `{ ok: true }`                                                                           |
+| `preferences.get(key)`                 | `workshop:preferences:get`         | 不写盘                                                                | `key` 仅允许 `generator` / `libraryFilters`，否则抛错；返回对象或 `null`                                                  |
+| `preferences.set(key, value)`          | `workshop:preferences:set`         | 写 `preferences.md`                                                   | `key` 白名单同上；覆盖对应偏好对象，其它偏好保持不变                                                                      |
+| `clipboard.writeText(text)`            | `workshop:clipboard:write`         | 不写盘                                                                | 写入系统剪贴板，返回 `true`                                                                                               |
 
 已删除的旧接口（**当前不存在**）：`data.all()`、`files.save(input)`。导出相关能力（JSON / TXT / Markdown / PNG）与设置页导出入口均已移除。
 
@@ -387,9 +402,10 @@ const result = await window.workshop.candidates.create({
   race: 'human',
   nameType: 'person',
   nameText: '雷·恩医·珂希',
-  structure: [{ label: '姓氏（1.0%人口）', word: '雷' }],
+  structure: [],
   source: 'generated',
   gender: 'neutral',
+  rarity: 'SSSR',
 });
 
 // 偏好读取/写入（写入 .workshop/preferences.md）
@@ -408,7 +424,7 @@ await window.workshop.graph.saveLayout({ [`s:${result.id}`]: { x: 120, y: 88.5 }
 | 候选、设定卡、关系           | 是       | 项目 `.workshop/*.md`，写入成功后才返回                    |
 | 生成偏好、候选库筛选         | 是       | 项目 `.workshop/preferences.md`；随项目切换                |
 | 图谱节点坐标                 | 是       | 项目 `.workshop/graph.md`（仅拖拽结束且位移 > 3px 时写入） |
-| 当前项目（主进程内存）       | 否       | 重启后回到项目门；需要重新选择项目                         |
+| 当前项目（主进程内存）       | 否       | 重启后回到项目门（启动时仅托盘）；需要重新选择项目         |
 | 当前批次生成结果             | 否       | 仅页面内存，刷新/重启后丢失                                |
 | 表单草稿、当前页签、选中节点 | 否       | 仅页面内存                                                 |
 | 统计数据                     | 否       | 每次实时计算                                               |

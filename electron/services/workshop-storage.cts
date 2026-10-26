@@ -26,6 +26,7 @@ import {
   type GraphPoint,
   type NameGender,
   type NameTypeKey,
+  type RarityTier,
   type Preferences,
   type RaceKey,
   type Relation,
@@ -33,7 +34,7 @@ import {
   type StructurePart,
 } from './workshop-markdown.cjs';
 
-export type { Candidate, CandidateFilters, EntityType, GraphLayout, GraphPoint, NameGender, NameTypeKey, RaceKey, Relation, Sheet, StructurePart };
+export type { Candidate, CandidateFilters, EntityType, GraphLayout, GraphPoint, NameGender, NameTypeKey, RaceKey, RarityTier, Relation, Sheet, StructurePart };
 
 /** .workshop 目录内的固定文件名（项目数据分类保存） */
 export const PROJECT_FILES = {
@@ -57,6 +58,7 @@ export interface CandidateInput {
   structure: StructurePart[];
   source: 'generated' | 'manual';
   gender?: NameGender;
+  rarity?: RarityTier;
   favorite?: boolean;
   note?: string;
 }
@@ -131,6 +133,10 @@ function asNameType(value: unknown): NameTypeKey {
 
 function asGender(value: unknown): NameGender | undefined {
   return value === 'any' || value === 'male' || value === 'female' || value === 'neutral' ? value : undefined;
+}
+
+function asRarity(value: unknown): RarityTier | undefined {
+  return value === 'S' || value === 'SS' || value === 'SSS' || value === 'SSSR' ? value : undefined;
 }
 
 function asEntityType(value: unknown): EntityType {
@@ -372,6 +378,8 @@ export class WorkshopStorage {
       };
       const gender = asGender(input.gender);
       if (gender) candidate.gender = gender;
+      const rarity = asRarity(input.rarity);
+      if (rarity) candidate.rarity = rarity;
       candidates.unshift(candidate);
       await this.writeCandidates(candidates);
       await this.refreshGraph();

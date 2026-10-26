@@ -1,6 +1,6 @@
 // 桌面数据边界：业务组件只依赖此层，所有持久化请求由 Electron 主进程完成。
 
-import type { Candidate, CandidateFilters, NameGender, NameTypeKey, RaceKey, Relation, Sheet, SourceKey } from '@/lib/types';
+import type { Candidate, CandidateFilters, NameGender, NameTypeKey, RaceKey, RarityTier, Relation, Sheet, SourceKey } from '@/lib/types';
 
 export interface SheetInput {
   id?: string;
@@ -88,6 +88,22 @@ export async function openProjectInVSCode(): Promise<{ ok: boolean; message?: st
   return api().projects.openInVSCode();
 }
 
+export async function openRulesWindow(): Promise<void> {
+  await api().rules.open();
+}
+
+export async function closeRulesWindow(): Promise<void> {
+  await api().rules.close();
+}
+
+export async function notifyRulesChanged(value: unknown): Promise<boolean> {
+  return api().rules.notifyChanged(value);
+}
+
+export function onRulesChanged(callback: (value: unknown) => void): () => void {
+  return api().rules.onChanged(callback);
+}
+
 /* ---------------- 候选库 ---------------- */
 
 export async function fetchCandidates(filters: CandidateFilters): Promise<Candidate[]> {
@@ -106,6 +122,7 @@ export async function insertCandidate(input: {
   structure: { label: string; word: string }[];
   source: SourceKey;
   gender?: NameGender;
+  rarity?: RarityTier;
   favorite?: boolean;
   note?: string;
 }): Promise<{ ok: boolean; duplicate: boolean; id: string; message?: string }> {

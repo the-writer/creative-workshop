@@ -27,7 +27,7 @@
 
 ### 3.3 详情与加入设定
 
-详情面板展示名称结构、性别 TAG、备注与操作。性别 TAG 由 `StructureTags` 在结构标签末尾追加（`tag-gender`，样式见 `src/App.css`），文本为「不限 / 男性 / 女性 / 中性」；无 `gender` 字段的候选不显示该 TAG。
+详情面板展示名称结构、稀有度 TAG、性别 TAG、备注与操作。稀有度 TAG 显示 `S` / `SS` / `SSS` / `SSSR`，分别使用灰、松绿、金、朱红四种颜色。性别 TAG 由 `StructureTags` 在结构标签末尾追加（`tag-gender` + `tag-gender-male` / `tag-gender-female` / `tag-gender-neutral`，样式见 `src/App.css`），文本为「男性 / 女性 / 中性」，并用三种不同颜色区分（男性靛蓝、女性朱红、中性松绿）；生成偏好为「不限」时保存的是每条候选实际解析出的真实性别，不会显示「不限」。无 `gender` 字段的候选不显示该 TAG。
 
 点击“加入设定”会打开设定编辑器并带入职业、官职、居地、绰号、契约和能力备注（`candidateToSheetFields`）。性别不参与设定卡字段映射。
 

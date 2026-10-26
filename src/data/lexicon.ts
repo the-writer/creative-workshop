@@ -2,7 +2,7 @@
 // 音节块为用户给定数据完整预置；词根为按用户规则扩展的代表性预置
 // v4：音节扩充至四倍，并加入性别音系偏好与人口权重姓氏
 
-import type { NameGender, NameTypeKey, RaceKey } from '@/lib/types';
+import type { NameGender, NameTypeKey, RaceKey, RarityTier } from '@/lib/types';
 import { ELF_COMMON_SURNAMES, ELF_LEXICON, ELF_RARE_SURNAMES, ELF_SYLLABLE_GENDER_BIAS, ELF_SYLLABLES } from './lexicon-elf';
 
 // 每个字符串都是一个独立音节块；每行保留多个条目，避免资料表被格式化器拆成单列。
@@ -111,6 +111,7 @@ export interface WeightedSurname {
   name: string;
   populationShare: number;
   rare: boolean;
+  rarity: RarityTier;
 }
 
 export const SURNAME_RARE_POPULATION_SHARE = 0.0001; // 0.01%
@@ -135,10 +136,19 @@ const HUMAN_RARE_SURNAMES = ['烬岚', '蜃洲', '星浦', '曜津', '魇川', '
 
 function createSurnamePool(common: string[], rare: string[]): WeightedSurname[] {
   const commonPopulation = 1 - rare.length * SURNAME_RARE_POPULATION_SHARE;
-  return [
+  const pool = [
     ...common.map((name) => ({ name, populationShare: commonPopulation / common.length, rare: false })),
     ...rare.map((name) => ({ name, populationShare: SURNAME_RARE_POPULATION_SHARE, rare: true })),
   ];
+  // 稀有度按姓氏池的相对人口排名分档：最稀有 10% = SSSR，其后 10% = SSS，
+  // 再后 20% = SS，其余 = S。人口占比相同的姓氏按名称稳定排序，保证每次生成一致。
+  const ranked = [...pool].sort((a, b) => a.populationShare - b.populationShare || a.name.localeCompare(b.name, 'zh-CN'));
+  const rarityByName = new Map<string, RarityTier>();
+  ranked.forEach((surname, index) => {
+    const ratio = ranked.length <= 1 ? 0 : index / (ranked.length - 1);
+    rarityByName.set(surname.name, ratio < 0.1 ? 'SSSR' : ratio < 0.2 ? 'SSS' : ratio < 0.4 ? 'SS' : 'S');
+  });
+  return pool.map((surname) => ({ ...surname, rarity: rarityByName.get(surname.name) ?? 'S' }));
 }
 
 export const SURNAMES: Record<RaceKey, WeightedSurname[]> = {

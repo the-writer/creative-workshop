@@ -8,22 +8,22 @@
 
 ### 1.2 进程结构
 
-| 层              | 目录 / 文件                               | 职责                                                                       |
-| --------------- | ----------------------------------------- | -------------------------------------------------------------------------- |
-| Electron 主进程 | `electron/main.cts`                       | 创建窗口、托盘、应用菜单、安全策略、读取 `creationWorkshop` 配置并注册 IPC |
-| 项目管理        | `electron/services/project-manager.cts`   | `userData/projects.json` 最近项目、打开/新建项目、VS Code 打开、旧数据迁移 |
-| 项目数据服务    | `electron/services/workshop-storage.cts`  | 打开项目、读写 `.workshop` 分类文件、串行队列、级联规则、统计              |
-| Markdown 读写   | `electron/services/workshop-markdown.cts` | 各类 Markdown 的解析与序列化、字段转义、容错读取、图谱快照                 |
-| 预加载桥        | `electron/preload.cts`                    | 通过 `contextBridge` 暴露白名单 `window.workshop`                          |
-| IPC 边界        | `electron/ipc/workshop-ipc.cts`           | 校验调用来源、处理项目/数据/剪贴板请求                                     |
-| 渲染层          | `src/`                                    | React 界面、项目门与纯本地命名生成                                         |
-| 打包脚本        | `scripts/`                                | 清理旧产物、打包后处理与安装脚本                                           |
+| 层              | 目录 / 文件                               | 职责                                                                                |
+| --------------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| Electron 主进程 | `electron/main.cts`                       | 创建窗口、托盘、应用菜单、安全策略、读取 `creationWorkshop` 配置并注册 IPC          |
+| 项目管理        | `electron/services/project-manager.cts`   | `userData/projects.json` 最近项目、打开项目（自动初始化）、VS Code 打开、旧数据迁移 |
+| 项目数据服务    | `electron/services/workshop-storage.cts`  | 打开项目、读写 `.workshop` 分类文件、串行队列、级联规则、统计                       |
+| Markdown 读写   | `electron/services/workshop-markdown.cts` | 各类 Markdown 的解析与序列化、字段转义、容错读取、图谱快照                          |
+| 预加载桥        | `electron/preload.cts`                    | 通过 `contextBridge` 暴露白名单 `window.workshop`                                   |
+| IPC 边界        | `electron/ipc/workshop-ipc.cts`           | 校验调用来源、处理项目/数据/剪贴板请求                                              |
+| 渲染层          | `src/`                                    | React 界面、项目门与纯本地命名生成                                                  |
+| 打包脚本        | `scripts/`                                | 清理旧产物、打包后处理与安装脚本                                                    |
 
 渲染进程禁止直接访问 Node.js、文件系统与子进程；`nodeIntegration=false`、`contextIsolation=true`、`sandbox=true`（`electron/main.cts`）。
 
 ### 1.3 启动流程与项目门
 
-应用启动后不自动打开上次项目：主进程初始化项目登记后创建窗口与托盘，窗口在 `ready-to-show` 时立即显示；渲染层查询「当前项目」，为空时展示项目门，由用户选择最近项目、打开已有项目或新建项目。
+应用启动时**只驻留系统托盘，不创建也不显示主窗口**。主进程初始化项目登记、注册 IPC、菜单与托盘后结束启动流程；用户点击托盘图标、托盘菜单「打开主界面」或应用菜单「窗口 → 显示主界面」时才创建主窗口并显示项目门。
 
 ```mermaid
 flowchart TD
@@ -32,76 +32,80 @@ flowchart TD
   C --> D{projects.json 不存在且旧 workshop.json 存在}
   D -- 是 --> E[迁移旧数据为 userData/projects/默认项目]
   D -- 否 --> F[跳过迁移]
-  E --> G[注册 IPC、菜单、窗口、托盘]
+  E --> G[注册 IPC、菜单、托盘]
   F --> G
-  G --> H[窗口 ready-to-show 显示]
-  H --> I[渲染层 getCurrentProject]
-  I --> J{是否已有当前项目}
-  J -- 否 --> K[项目门：最近项目 / 打开已有项目 / 新建项目]
-  K --> L[open/create 成功]
-  J -- 是 --> L
-  L --> M[进入主界面并加载 .workshop 数据]
+  G --> H[启动完成：仅托盘，不显示窗口]
+  H --> I[用户点击托盘/菜单]
+  I --> J[createWindow 并显示项目门]
+  J --> K[渲染层 getCurrentProject 为 null]
+  K --> L{最近项目 / 打开项目}
+  L --> M[projects.open：自动创建目录并初始化 .workshop]
+  M --> N[进入主界面并加载 .workshop 数据]
 ```
 
 项目门行为（`src/components/ProjectGate.tsx`）：
 
-- 最近项目列表来自 `userData/projects.json`，按 `lastOpenedAt` 倒序；不存在的项目目录在列表查询时被过滤（`ProjectManager.listRecent`）。
-- 「打开已有项目…」调用系统目录选择框，只列目录；所选目录必须包含 `.workshop` 数据目录，否则提示「该目录不是创作工坊项目（缺少 .workshop 数据目录）」。
-- 「新建项目」先选择存放位置，再输入项目名称；名称不能为空、不能以 `.` 开头、不能包含 `\ / : * ? " < > |` 或控制字符，长度不超过 **60** 字符（`MAX_PROJECT_NAME_LENGTH`，渲染层输入框同为 `maxLength=60`）。
-- 新建时目标目录不能已存在；成功后创建 `<parentDir>/<name>/.workshop` 并写入各分类文件。
+- 项目门不提供「新建项目」「刷新」按钮；顶部「打开项目」按钮调用系统目录选择框（允许在对话框内新建目录）。
+- 最近项目列表来自 `userData/projects.json`，按 `lastOpenedAt` 倒序，因此**上次打开（含上次启动后打开）的项目固定排第一**，并显示「上次」TAG；目录已不存在的条目在列表查询时被过滤（`ProjectManager.listRecent`）。
+- **项目展示名优先读取项目根目录 `README.md` 的第一行**（去掉 `#` 前缀）；没有 README 或首行为空时回退登记名称 / 目录名。启动查询最近项目与打开项目时都会重新读取。
+- 「打开项目」与点击最近项目都调用 `projects.open(path)`：目录不存在时自动创建；目录存在但没有 `.workshop` 时自动初始化；已有 `.workshop` 时直接打开（`electron/services/project-manager.cts`）。
+- **空目录初始化**：目录原本为空（或不存在、刚被创建）时，除 `.workshop` 外还自动创建 `README.md`（首行 `# <目录名>`）与 `第一卷/第一章.md`；已有内容或已有 `.workshop` 的目录不会补写这两个文件。
+- `projects.create({ parentDir, name })` IPC 仍保留以兼容旧调用，但项目门不再提供新建入口；日常新建项目通过「打开项目」选择一个新目录完成。
 - 设置页「切换项目」只回到项目门（渲染层将当前项目置空），不关闭主进程内的数据服务；再次打开项目时替换当前项目。
 
 ### 1.4 窗口行为
 
-| 项目           | 值                 | 来源                                                                                      |
-| -------------- | ------------------ | ----------------------------------------------------------------------------------------- |
-| 窗口内容尺寸   | 800 × 600          | `package.json` → `creationWorkshop.window.width/height`                                   |
-| 尺寸缺省回退   | 640 × 480          | `electron/main.cts`（配置缺省时）                                                         |
-| 标题栏样式     | `hiddenInset`      | `package.json` → `creationWorkshop.window.titleBarStyle`                                  |
-| 红绿灯位置     | `{ x: 12, y: 12 }` | `electron/main.cts` → `trafficLightPosition`                                              |
-| 窗口类型       | `panel` 面板窗口   | `package.json` → `creationWorkshop.window.type`（非 darwin 不传）                         |
-| 默认置顶       | 否                 | `creationWorkshop.window.alwaysOnTop`                                                     |
-| 置顶层级       | `floating`         | `creationWorkshop.window.alwaysOnTopLevel`（仅置顶为真时生效）                            |
-| Dock 图标      | 不显示             | `package.json` → `build.mac.extendInfo.LSUIElement`；`electron/main.cts` → `hideDockIcon` |
-| 可调整尺寸     | 否                 | `electron/main.cts` → `resizable/maximizable/fullscreenable`                              |
-| 使用内容尺寸   | 是                 | `electron/main.cts` → `useContentSize: true`                                              |
-| 窗口背景色     | `#f5efe2`          | `electron/main.cts` → `backgroundColor`                                                   |
-| 应用名         | 创作工坊           | `package.json` → `productName`；`app.setName`                                             |
-| 拖拽标题栏高度 | 32 px              | `src/App.css` → `.desktop-titlebar`                                                       |
+| 项目           | 值                         | 来源                                                                                      |
+| -------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
+| 窗口内容尺寸   | 1024 × 768                 | `package.json` → `creationWorkshop.window.width/height`                                   |
+| 尺寸缺省回退   | 1024 × 768                 | `electron/main.cts`（配置缺省时）                                                         |
+| 标题栏样式     | `hiddenInset`              | `package.json` → `creationWorkshop.window.titleBarStyle`                                  |
+| 红绿灯位置     | `{ x: 12, y: 12 }`         | `electron/main.cts` → `trafficLightPosition`                                              |
+| 窗口类型       | 普通独立窗口（非 panel）   | `electron/main.cts` 不传 `type`                                                           |
+| 默认置顶       | 否                         | `creationWorkshop.window.alwaysOnTop`                                                     |
+| 置顶层级       | `floating`                 | `creationWorkshop.window.alwaysOnTopLevel`（仅置顶为真时生效）                            |
+| 桌面归属       | 打开时所在桌面；切换不跟随 | `electron/main.cts` → `bindWindowToCurrentDesktop`                                        |
+| Dock 图标      | 不显示                     | `package.json` → `build.mac.extendInfo.LSUIElement`；`electron/main.cts` → `hideDockIcon` |
+| 可调整尺寸     | 否                         | `electron/main.cts` → `resizable/maximizable/fullscreenable`                              |
+| 使用内容尺寸   | 是                         | `electron/main.cts` → `useContentSize: true`                                              |
+| 窗口背景色     | `#f5efe2`                  | `electron/main.cts` → `backgroundColor`                                                   |
+| 应用名         | 创作工坊                   | `package.json` → `productName`；`app.setName`                                             |
+| 拖拽标题栏高度 | 32 px                      | `src/App.css` → `.desktop-titlebar`                                                       |
 
 应用加载 `dist/index.html`；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务，并在该模式下自动打开独立 DevTools。
 
-启动时窗口由 `mainWindow.once('ready-to-show', showMainWindow)` 显示，用户首先看到项目门。主窗口系统关闭按钮只隐藏窗口（`close` 事件阻止默认并 `hide()`），应用继续由托盘驻留；托盘左键与右键菜单「打开主界面」、应用菜单「窗口 → 显示主界面」重新打开。托盘右键菜单提供「打开主界面」和「退出创作工坊」。应用无 Dock 图标，因此 `activate`（点击 Dock）不是常规入口。
+启动完成后没有窗口；用户首次点击托盘时 `createWindow` 创建窗口，`ready-to-show` 后再调用 `showMainWindow()`，因此不会闪白屏。主窗口系统关闭按钮只隐藏窗口（`close` 事件阻止默认并 `hide()`），应用继续由托盘驻留；托盘左键与右键菜单「打开主界面」、应用菜单「窗口 → 显示主界面」重新打开。托盘右键菜单提供「打开主界面」和「退出创作工坊」。应用无 Dock 图标，因此 `activate`（点击 Dock）不是常规入口。
 
-主窗口是 macOS **`panel` 面板窗口**（`type: 'panel'`）：层级高于普通窗口、跟随当前活跃 Space（含全屏 Space），且 `canBecomeMainWindow = false`，
-不会把用户从其它应用的全屏界面里拉回桌面；`NSPanel` + `titled` 样式使窗口仍可成为 key window，正常接收键盘输入与中文输入法。
-窗口默认不置顶（`alwaysOnTop: false`）；置顶只在配置为真时设置，层级取 `alwaysOnTopLevel`（`floating`），且配置为假时**不调用任何 `setAlwaysOnTop`**，避免残留层级把窗口长期压在最上层。
+主窗口是**普通独立窗口**（不是 macOS `panel`）：打开后绑定在显示时所在的桌面，**切换桌面时不会自动跟随**；关闭后从另一个桌面重新打开时，先临时加入所有桌面、显示聚焦后再绑定当前桌面，因此会出现在新桌面而不是旧桌面。窗口始终不置顶（`alwaysOnTop: false` 时不会调用任何 `setAlwaysOnTop`）。
 
-`showMainWindow()`（`electron/main.cts`）是唯一的显示/抢焦点出口，流程如下：
+`showMainWindow()`（`electron/main.cts`）是唯一的显示 / 抢焦点出口：
 
 ```mermaid
 flowchart TD
-  A[托盘/菜单/激活 触发 showMainWindow] --> B{窗口存在?}
+  A[托盘/菜单 触发 showMainWindow] --> B{窗口存在?}
   B -- 否 --> C[createWindow]
-  B -- 是 --> D{isVisible 或 距上次 hide 小于 1000ms}
-  C --> D
-  D -- 是（窗口已在前台）--> E[applyNormalWindowLevel → show → moveTop]
-  D -- 否（关闭后重新打开）--> F[applyNormalWindowLevel → setVisibleOnAllWorkspaces true,visibleOnFullScreen → 若置顶则临时 screen-saver 层]
-  F --> G[show → app.focus steal → win.focus]
-  G --> H[300ms 兜底定时器到点 releaseFullscreenOverlay]
-  G --> I[focus 事件 → releaseFullscreenOverlay]
-  E --> J[用户关闭：close 阻止默认 → hide]
-  I --> J
-  H --> J
-  J --> K[hide 事件：记录 lastHiddenAt → 释放临时层级 → 60ms 后撤销所有工作区可见]
+  B -- 是 --> D{已经可见?}
+  C --> E{ready-to-show 就绪?}
+  D -- 是 --> F[applyNormalWindowLevel → show → moveTop → focus]
+  D -- 否 --> G[临时 setVisibleOnAllWorkspaces true]
+  E -- 否 --> H[等待 ready-to-show 再次调用]
+  E -- 是 --> G
+  G --> I[show → app.focus steal → win.focus]
+  I --> J[60ms 后 setVisibleOnAllWorkspaces false + FullScreenAuxiliary]
+  J --> K[窗口绑定当前桌面，之后切换桌面不跟随]
+  F --> L[用户关闭：close 阻止默认 → hide]
+  K --> L
 ```
 
 要点：
 
-- **在当前桌面打开**：窗口隐藏后于 `SPACE_SETTLE_DELAY_MS = 60ms` 撤销「所有工作区可见」（`releaseFromAllSpaces`），撤销发生在窗口不可见之后，不会闪动；由于是 panel，下一次打开按当前活跃 Space 落位，不会被系统拉回上次/首次打开的桌面。旧版「60ms 后重新绑定桌面 + `spaceBindTimer`」逻辑已整体删除。
-- **全屏下可打开**：重新打开时启用 `setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })`；置顶开启时再临时抬到 `FULLSCREEN_OVERLAY_LEVEL = 'screen-saver'`，拿到焦点或 `LEVEL_RESTORE_TIMEOUT_MS = 300ms` 兜底后恢复（`focus` 事件、`hide`、`closed` 均会清理，`before-quit` 清理定时器）。置顶关闭时**不抬层**，不会压住状态栏/Dock。
-- **重新打开判定**：`REVEAL_MIN_INTERVAL_MS = 1000`（`electron/main.cts`）——窗口不可见，或距上次 `hide` 超过 1 秒，才视为「关闭后重新打开」并抢一次焦点；窗口已在前台再次点托盘只 `show`/`moveTop`，不抢焦点、不叠加层级。
+- **独立窗口模式**：窗口创建、获得焦点与重新显示后都调用
+  `setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })`
+  （`electron/main.cts` → `WINDOW_COLLECTION_BEHAVIOR` / `bindWindowToCurrentDesktop`），即「带全屏辅助、但不加入所有桌面」：可以浮在当前桌面的全屏应用之上，同时**不会跟随桌面切换**。
+- **重新打开落在当前桌面**：窗口原本隐藏时先临时 `setVisibleOnAllWorkspaces(true, …)`，`show()` 并聚焦后在 `SPACE_BIND_DELAY_MS = 60ms` 绑定当前桌面；窗口已可见时只 `show` / `moveTop` / `focus`，不改变桌面归属。
+- **不置顶**：配置 `alwaysOnTop` 为 `false`（默认）时不会调用 `setAlwaysOnTop`，窗口不压住其它应用，也不会长期悬浮在最上层。
 - **不显示 Dock 图标**：打包后 `Info.plist` 声明 `LSUIElement = true`（`package.json` → `build.mac.extendInfo`），系统层面即无可激活 Dock 图标；运行期 `whenReady` 最先调用 `hideDockIcon()`（`app.dock?.isVisible()` 时 `app.dock.hide()`）作为开发态兜底，且只在启动时调用一次（规避 Electron「1 秒内重复 `dock.hide()` 无效」的已知问题），窗口再次显示不会让 Dock 图标回来。因无 Dock 图标，重新打开时在 darwin 上先 `app.focus({ steal: true })` 再 `win.focus()`，确保窗口成为 key window。
+- **规则设置为模态子窗口**：主界面点击「规则设置」通过 `rules:open` 打开独立 `BrowserWindow`（`parent` 为主窗口、`modal: true`，尺寸 900 × 600、不可移动、打开后自动居中），而不是在页面内向下展开或使用 HTML 弹层；子窗口关闭不影响主窗口。
 
 应用在 `Info.plist` 中显式声明 `NSHighResolutionCapable=true` 与 `LSUIElement=true`，页面缩放固定为 1，并启用字体平滑以适配 Retina/HiDPI 显示。默认字体依次尝试思源宋体、仿宋、宋体，均不存在时回退系统默认字体。
 
@@ -124,13 +128,12 @@ flowchart TD
 | `project.maxRecentProjects`  | `10`                           | 最近项目数量上限                 | `electron/main.cts` → `ProjectManager`                     |
 | `window.width` / `height`    | `800` / `600`                  | 窗口内容尺寸                     | `electron/main.cts`                                        |
 | `window.titleBarStyle`       | `hiddenInset`                  | 标题栏样式                       | `electron/main.cts`                                        |
-| `window.type`                | `panel`                        | 窗口类型（仅 macOS 生效）        | `electron/main.cts`                                        |
 | `window.alwaysOnTopLevel`    | `floating`                     | 置顶时的窗口层级（仅置顶为真时） | `electron/main.cts`                                        |
 | `window.alwaysOnTop`         | `false`                        | 是否默认置顶                     | `electron/main.cts`                                        |
 | `tray.iconFile`              | `assets/imgs/trayTemplate.png` | 托盘模板图标                     | `electron/main.cts`                                        |
 
 四个 `project.*` 配置项缺省时回退到上表默认值；空字符串视为未配置。旧版 `creationWorkshop.storage.fileName` 已不存在。
-`window.*` 缺省时回退到 `electron/main.cts` 中集中定义的 `DEFAULT_*` 常量；`window.type` 仅 darwin 生效，其它平台不传 `type`。
+`window.*` 缺省时回退到 `electron/main.cts` 中集中定义的 `DEFAULT_*` 常量；窗口固定为普通独立窗口，不再读取 `window.type`。
 
 ### 1.7 数据位置
 

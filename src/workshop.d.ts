@@ -1,4 +1,4 @@
-import type { Candidate, CandidateFilters, NameGender, NameTypeKey, RaceKey, Relation, Sheet, SourceKey, StructurePart } from '@/lib/types';
+import type { Candidate, CandidateFilters, NameGender, NameTypeKey, RaceKey, RarityTier, Relation, Sheet, SourceKey, StructurePart } from '@/lib/types';
 import type { GraphPoint, PickDirectoryResult, ProjectOpenResult, ProjectSummary, StatsData } from '@/lib/db';
 
 export interface CandidateInput {
@@ -8,6 +8,7 @@ export interface CandidateInput {
   structure: StructurePart[];
   source: SourceKey;
   gender?: NameGender;
+  rarity?: RarityTier;
   favorite?: boolean;
   note?: string;
 }
@@ -34,6 +35,12 @@ export interface WorkshopApi {
     create: (input: { parentDir: string; name: string }) => Promise<ProjectOpenResult>;
     pickDirectory: (kind: 'open' | 'parent') => Promise<PickDirectoryResult>;
     openInVSCode: () => Promise<{ ok: boolean; message?: string }>;
+  };
+  rules: {
+    open: () => Promise<void>;
+    close: () => Promise<void>;
+    notifyChanged: (value: unknown) => Promise<boolean>;
+    onChanged: (callback: (value: unknown) => void) => () => void;
   };
   candidates: {
     list: (filters: CandidateFilters) => Promise<Candidate[]>;

@@ -2,6 +2,7 @@ import { Component, StrictMode, type ErrorInfo, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { RulesWindow } from './components/RulesWindow';
 
 interface ErrorBoundaryState {
   message: string;
@@ -37,10 +38,10 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryS
 const root = document.getElementById('root');
 if (!root) throw new Error('缺少应用挂载节点');
 
+const isRulesWindow = new URLSearchParams(window.location.search).get('window') === 'rules';
+
 createRoot(root).render(
   <StrictMode>
-    <AppErrorBoundary>
-      <App />
-    </AppErrorBoundary>
+    <AppErrorBoundary>{isRulesWindow ? <RulesWindow /> : <App />}</AppErrorBoundary>
   </StrictMode>,
 );

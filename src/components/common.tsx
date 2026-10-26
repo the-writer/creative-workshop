@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { NameGender, RaceKey, StructurePart } from '@/lib/types';
+import type { NameGender, RaceKey, RarityTier, StructurePart } from '@/lib/types';
 import { GENDER_LABELS, raceLabel } from '@/lib/types';
 
 /* ---------------- Toast ---------------- */
@@ -98,19 +98,33 @@ export function Chip({
 
 /* ---------------- 结构标签 ---------------- */
 
-export function StructureTags({ parts, race, gender }: { parts: StructurePart[]; race: RaceKey; gender?: NameGender }) {
-  const hasParts = Boolean(parts && parts.length > 0);
-  if (!hasParts && !gender) return null;
+function isSurnameStructureLabel(label: string): boolean {
+  return label === '姓氏' || label.startsWith('姓氏（') || label.startsWith('稀有姓氏');
+}
+
+export function visibleStructureParts(parts: StructurePart[]): StructurePart[] {
+  return (parts ?? []).filter((part) => !isSurnameStructureLabel(part.label));
+}
+
+export function StructureTags({ parts, race, gender, rarity }: { parts: StructurePart[]; race: RaceKey; gender?: NameGender; rarity?: RarityTier }) {
+  const visibleParts = visibleStructureParts(parts);
+  const hasParts = visibleParts.length > 0;
+  if (!hasParts && !gender && !rarity) return null;
   return (
     <div className="structure-tags">
       {hasParts
-        ? parts.map((p, i) => (
+        ? visibleParts.map((p, i) => (
             <span key={`${p.label}-${i}`} className={cn('structure-tag', `tag-race-${race}`)}>
               {p.label}·{p.word}
             </span>
           ))
         : null}
-      {gender ? <span className={cn('structure-tag', 'tag-gender')}>{GENDER_LABELS[gender]}</span> : null}
+      {rarity ? (
+        <span className={cn('structure-tag', 'tag-rarity', `tag-rarity-${rarity.toLowerCase()}`)} title={`稀有度 ${rarity}`}>
+          {rarity}
+        </span>
+      ) : null}
+      {gender ? <span className={cn('structure-tag', 'tag-gender', `tag-gender-${gender}`)}>{GENDER_LABELS[gender]}</span> : null}
     </div>
   );
 }

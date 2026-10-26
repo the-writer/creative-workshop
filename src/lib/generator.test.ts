@@ -17,7 +17,7 @@ import {
   type GenParams,
   type PersonSuffix,
 } from '@/lib/generator';
-import { GENDER_KEYS, type NameTypeKey, type RaceKey } from '@/lib/types';
+import { GENDER_KEYS, RARITY_TIERS, type NameTypeKey, type RaceKey } from '@/lib/types';
 
 const races: RaceKey[] = ['human', 'elf'];
 const types: NameTypeKey[] = ['person', 'place', 'office', 'nickname'];
@@ -45,6 +45,8 @@ describe('lexicon', () => {
       expect(rare).toHaveLength(8);
       expect(rare.every((surname) => surname.populationShare === SURNAME_RARE_POPULATION_SHARE)).toBe(true);
       expect(pool.reduce((sum, surname) => sum + surname.populationShare, 0)).toBeCloseTo(1, 10);
+      expect(new Set(pool.map((surname) => surname.rarity))).toEqual(new Set(RARITY_TIERS));
+      expect(rare.every((surname) => surname.rarity === 'SSSR')).toBe(true);
     });
   });
 
@@ -142,7 +144,7 @@ describe('generation', () => {
       expect(result.candidates).toHaveLength(20);
       result.candidates.forEach((candidate) => {
         expect(candidate.nameText.length).toBeGreaterThan(0);
-        expect(candidate.structure.length).toBeGreaterThan(0);
+        expect(Array.isArray(candidate.structure)).toBe(true);
         expect(candidate.charCount).toBe(nameCharCount(candidate.nameText));
         expect(Number.isSafeInteger(candidate.createdAt)).toBe(true);
         if (type === 'person') {
@@ -163,41 +165,43 @@ describe('generation', () => {
     });
   });
 
-  it('connects every person block with the middle dot separator', () => {
+  it('keeps exactly one middle dot and puts the surname last', () => {
     const suffixes: PersonSuffix[] = ['father', 'place', 'profession', 'contract', 'blood', 'title'];
     suffixes.forEach((personSuffix) => {
       const name = genPerson('human', { ...DEFAULT_GEN_PARAMS, personSuffix });
       expect(name).not.toBeNull();
-      expect(name!.name.split('·')).toHaveLength(3);
+      expect(name!.name.split('·')).toHaveLength(2);
       expect(name!.name).not.toContain('··');
+      expect(name!.name.endsWith(`·${name!.name.split('·').at(-1)}`)).toBe(true);
     });
 
     const prefixed = genPerson('human', { ...DEFAULT_GEN_PARAMS, nicknamePrefix: true, nicknameChars: 4 });
-    expect(prefixed!.name.split('·')).toHaveLength(3);
+    expect(prefixed!.name.split('·')).toHaveLength(2);
+    expect(prefixed!.name.endsWith(`·${prefixed!.name.split('·').at(-1)}`)).toBe(true);
   });
 
-  it('drops short-name and patronymic structure tags but keeps surnames', () => {
+  it('omits surname, short-name and patronymic structure tags', () => {
     races.forEach((race) => {
       const name = genPerson(race, { ...DEFAULT_GEN_PARAMS, personSuffix: 'father' });
-      expect(name!.structure.some((part) => part.label.includes('短名'))).toBe(false);
-      expect(name!.structure.some((part) => part.label === '父名')).toBe(false);
-      expect(name!.structure.some((part) => part.label.startsWith('姓氏') || part.label.startsWith('稀有姓氏'))).toBe(true);
+      expect(name!.structure).toEqual([]);
 
       const titled = genPerson(race, { ...DEFAULT_GEN_PARAMS, gender: 'female', surnameBias: 100, personSuffix: 'title' });
       expect(titled!.structure.some((part) => part.label === '女性短名')).toBe(false);
       expect(titled!.structure.some((part) => part.label === '贵族封号')).toBe(true);
+      expect(titled!.structure.every((part) => !part.label.startsWith('姓氏') && !part.label.startsWith('稀有姓氏'))).toBe(true);
 
       const placed = genPerson(race, { ...DEFAULT_GEN_PARAMS, personSuffix: 'place' });
-      expect(placed!.structure).toHaveLength(3);
+      expect(placed!.structure).toHaveLength(2);
     });
   });
 
-  it('keeps combo name as surname plus short name and gender as candidate field', () => {
+  it('keeps combo name as short name plus surname and gender as candidate field', () => {
     const combo = genCombo('human', ['person', 'place', 'office', 'nickname'], { ...DEFAULT_GEN_PARAMS, gender: 'female' });
     expect(combo).not.toBeNull();
     expect(combo!.name.split('·')).toHaveLength(2);
-    expect(combo!.structure[0].label.startsWith('姓氏') || combo!.structure[0].label.startsWith('稀有姓氏')).toBe(true);
-    expect(combo!.structure[1].label).toBe('人名');
+    expect(combo!.name.endsWith(`·${combo!.name.split('·').at(-1)}`)).toBe(true);
+    expect(combo!.structure[0].label).toBe('人名');
+    expect(combo!.structure.every((part) => !part.label.startsWith('姓氏') && !part.label.startsWith('稀有姓氏'))).toBe(true);
 
     const batch = generateBatch('human', ['person', 'place'], { ...DEFAULT_GEN_PARAMS, gender: 'female', count: 10 });
     expect(batch.candidates).toHaveLength(10);
@@ -205,6 +209,29 @@ describe('generation', () => {
       expect(candidate.combo).toBe(true);
       expect(candidate.gender).toBe('female');
       expect(candidate.charCount).toBe(nameCharCount(candidate.nameText));
+    });
+  });
+
+  it('puts surname rarity on person and combo candidates as an independent field', () => {
+    const personBatch = generateBatch('human', ['person'], { ...DEFAULT_GEN_PARAMS, count: 20 });
+    personBatch.candidates.forEach((candidate) => {
+      expect(RARITY_TIERS).toContain(candidate.rarity);
+    });
+
+    const combo = genCombo('human', ['person', 'place'], DEFAULT_GEN_PARAMS);
+    expect(RARITY_TIERS).toContain(combo?.rarity);
+  });
+
+  it('resolves unrestricted gender to a real gender on candidates', () => {
+    const personBatch = generateBatch('human', ['person'], { ...DEFAULT_GEN_PARAMS, gender: 'any', count: 20 });
+    personBatch.candidates.forEach((candidate) => {
+      expect(['male', 'female', 'neutral']).toContain(candidate.gender);
+    });
+
+    const comboBatch = generateBatch('human', ['person', 'place'], { ...DEFAULT_GEN_PARAMS, gender: 'any', count: 20 });
+    comboBatch.candidates.forEach((candidate) => {
+      expect(['male', 'female', 'neutral']).toContain(candidate.gender);
+      expect(candidate.nameText.split('·')).toHaveLength(2);
     });
   });
 
@@ -223,7 +250,7 @@ describe('generation', () => {
     races.forEach((race) => {
       expect(genPlace(race).structure).toHaveLength(2);
       expect(genOffice(race).structure).toHaveLength(3);
-      expect(genPerson(race, DEFAULT_GEN_PARAMS)?.name.split('·')).toHaveLength(3);
+      expect(genPerson(race, DEFAULT_GEN_PARAMS)?.name.split('·')).toHaveLength(2);
     });
   });
 });

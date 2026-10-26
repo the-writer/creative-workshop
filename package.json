@@ -52,9 +52,8 @@
   },
   "creationWorkshop": {
     "window": {
-      "width": 800,
-      "height": 600,
-      "type": "panel",
+      "width": 1024,
+      "height": 768,
       "titleBarStyle": "hiddenInset",
       "alwaysOnTop": false,
       "alwaysOnTopLevel": "floating"

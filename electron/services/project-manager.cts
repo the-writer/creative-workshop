@@ -1,8 +1,8 @@
 // 项目管理：维护最近项目列表（userData/projects.json），负责打开 / 新建项目与 VS Code 打开目录。
 
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { existsSync, statSync } from 'node:fs';
+import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { basename, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { shell } from 'electron';
 import { WorkshopStorage, type OpenedProject } from './workshop-storage.cjs';
@@ -81,18 +81,41 @@ export class ProjectManager {
     await this.migrateLegacyData();
   }
 
-  public listRecent(): ProjectSummary[] {
-    const existing = this.state.recentProjects.filter((project) => this.isProjectDirectory(project.path));
-    return clone(existing.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt));
+  public async listRecent(): Promise<ProjectSummary[]> {
+    const existing = this.state.recentProjects.filter((project) => this.isExistingDirectory(project.path)).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+    return Promise.all(
+      existing.map(async (project) => ({
+        ...clone(project),
+        name: await this.readProjectDisplayName(project.path, project.name),
+      })),
+    );
   }
 
+  /**
+   * 打开项目；目录不存在时自动创建，缺少 `.workshop` 时自动初始化为项目。
+   *
+   * 这使「打开项目」可以覆盖两种场景：选择一个新目录即新建项目；选择一个已有空目录即就地初始化。
+   */
   public async open(projectPath: string): Promise<ProjectResult> {
     const resolved = resolve(String(projectPath ?? ''));
-    if (!existsSync(resolved)) return { ok: false, message: '项目目录不存在' };
-    if (!this.isProjectDirectory(resolved)) return { ok: false, message: '该目录不是创作工坊项目（缺少 .workshop 数据目录）' };
-    if (this.currentProject?.path === resolved) return { ok: true, project: clone(this.currentProject) };
-    const opened = await this.storage.open(resolved);
-    return this.activate(opened);
+    try {
+      let isEmptyDirectory = false;
+      if (!existsSync(resolved)) {
+        await mkdir(resolved, { recursive: true });
+        isEmptyDirectory = true;
+      } else if (!statSync(resolved).isDirectory()) {
+        return { ok: false, message: '所选路径不是目录' };
+      } else {
+        const entries = await readdir(resolved);
+        isEmptyDirectory = entries.every((entry) => entry === '.DS_Store');
+      }
+      if (this.currentProject?.path === resolved) return { ok: true, project: clone(this.currentProject) };
+      if (isEmptyDirectory) await this.seedEmptyProject(resolved);
+      const opened = await this.storage.open(resolved);
+      return this.activate(opened, await this.readProjectDisplayName(resolved, opened.name));
+    } catch (error) {
+      return { ok: false, message: `无法打开项目：${error instanceof Error ? error.message : String(error)}` };
+    }
   }
 
   public async create(input: { parentDir: string; name: string }): Promise<ProjectResult> {
@@ -106,9 +129,10 @@ export class ProjectManager {
     if (!existsSync(parentDir)) return { ok: false, message: '存放位置不存在，请重新选择' };
     const target = join(parentDir, name);
     if (existsSync(target)) return { ok: false, message: '同名目录已存在，请换一个项目名称' };
-    await mkdir(join(target, this.dataDirName), { recursive: true });
+    await mkdir(target, { recursive: true });
+    await this.seedEmptyProject(target, name);
     const opened = await this.storage.open(target);
-    return this.activate(opened);
+    return this.activate(opened, await this.readProjectDisplayName(target, opened.name));
   }
 
   /** 通过 VS Code 打开当前项目目录；未安装 VS Code 时回退到文件管理器 */
@@ -126,10 +150,14 @@ export class ProjectManager {
     return { ok: true, message: '未检测到 VS Code，已在文件管理器中打开项目目录' };
   }
 
-  private activate(opened: OpenedProject): ProjectResult {
-    const project: ProjectSummary = { path: opened.path, name: opened.name, lastOpenedAt: Date.now() };
+  private async activate(opened: OpenedProject, displayName?: string): Promise<ProjectResult> {
+    const project: ProjectSummary = { path: opened.path, name: displayName || opened.name, lastOpenedAt: Date.now() };
     this.currentProject = project;
-    void this.remember(project);
+    try {
+      await this.remember(project);
+    } catch (error) {
+      console.error(`[创作工坊] 最近项目写入失败：${error instanceof Error ? error.message : String(error)}`);
+    }
     console.info(`[创作工坊] 项目：${project.path}`);
     console.info(`[创作工坊] 项目数据目录：${opened.workshopPath}`);
     return { ok: true, project: clone(project) };
@@ -142,9 +170,39 @@ export class ProjectManager {
     await this.saveState();
   }
 
-  private isProjectDirectory(projectPath: string): boolean {
+  /**
+   * 空目录初始化：写入 README.md（首行即项目名）与第一卷/第一章.md。
+   * 仅在目录原本为空时调用，已存在的文件不会被覆盖。
+   */
+  private async seedEmptyProject(projectPath: string, name = basename(projectPath)): Promise<void> {
+    await mkdir(join(projectPath, '第一卷'), { recursive: true });
+    await this.writeFileIfMissing(join(projectPath, 'README.md'), `# ${name}\n`);
+    await this.writeFileIfMissing(join(projectPath, '第一卷', '第一章.md'), '# 第一章\n');
+  }
+
+  private async writeFileIfMissing(filePath: string, content: string): Promise<void> {
     try {
-      return existsSync(join(projectPath, this.dataDirName));
+      await writeFile(filePath, content, { encoding: 'utf8', flag: 'wx' });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+
+  /** 项目展示名优先取 README.md 第一行（去掉 Markdown 标题前缀），否则回退登记名称。 */
+  private async readProjectDisplayName(projectPath: string, fallback: string): Promise<string> {
+    try {
+      const content = await readFile(join(projectPath, 'README.md'), 'utf8');
+      const firstLine = (content.split(/\r?\n/, 1)[0] ?? '').trim();
+      const name = firstLine.replace(/^#+\s*/, '').trim();
+      return name || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  private isExistingDirectory(projectPath: string): boolean {
+    try {
+      return existsSync(projectPath) && statSync(projectPath).isDirectory();
     } catch {
       return false;
     }

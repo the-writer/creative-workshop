@@ -3,6 +3,7 @@
 export type RaceKey = 'human' | 'elf';
 export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
 export type NameGender = 'any' | 'male' | 'female' | 'neutral';
+export type RarityTier = 'S' | 'SS' | 'SSS' | 'SSSR';
 export type SourceKey = 'generated' | 'manual';
 export type EntityType = 'sheet' | 'place';
 export type SortKey = 'latest' | 'charCount' | 'nameText';
@@ -22,8 +23,10 @@ export interface Candidate {
   source: SourceKey;
   favorite: boolean;
   note: string;
-  /** 人名（含组合设定）的性别倾向标签；地名/官职/绰号等类型没有性别 */
+  /** 人名（含组合设定）的真实性别标签；地名/官职/绰号等类型没有性别 */
   gender?: NameGender;
+  /** 姓氏稀有度标签；地名/官职/绰号等没有姓氏的类型不带该字段 */
+  rarity?: RarityTier;
   createdAt: number;
   updatedAt: number;
   referenced?: boolean;
@@ -100,6 +103,8 @@ export const TYPE_LABELS: Record<NameTypeKey, string> = {
   nickname: '绰号',
 };
 export const TYPE_KEYS: NameTypeKey[] = ['person', 'place', 'office', 'nickname'];
+
+export const RARITY_TIERS: RarityTier[] = ['S', 'SS', 'SSS', 'SSSR'];
 
 export const RELATION_TYPES = ['师徒', '父子', '同僚', '敌对', '隶属', '契约', '其他'] as const;
 

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { WorkshopStorage } from '../dist-electron/services/workshop-storage.cjs';
+import { ProjectManager } from '../dist-electron/services/project-manager.cjs';
 
 const tempDirs = [];
 
@@ -36,6 +38,7 @@ test('creates .workshop files and persists preferences/candidate as Markdown', a
     structure: [{ label: '姓氏（1.0%人口）', word: '雷' }],
     source: 'generated',
     gender: 'neutral',
+    rarity: 'SSSR',
     favorite: true,
   });
   assert.equal(created.ok, true);
@@ -44,6 +47,7 @@ test('creates .workshop files and persists preferences/candidate as Markdown', a
   assert.match(candidatesMd, /# 名称候选/);
   assert.match(candidatesMd, /## 雷·恩医·珂希/);
   assert.match(candidatesMd, /- 性别: 中性/);
+  assert.match(candidatesMd, /- 稀有度: SSSR/);
   assert.match(candidatesMd, /- 收藏: 是/);
   const preferencesMd = await readWorkshopFile(workshopDir, 'preferences.md');
   assert.match(preferencesMd, /## 生成规则/);
@@ -58,6 +62,7 @@ test('creates .workshop files and persists preferences/candidate as Markdown', a
   assert.equal(list[0].nameText, '雷·恩医·珂希');
   assert.equal(list[0].charCount, 5, '字数应排除「·」分隔符');
   assert.equal(list[0].gender, 'neutral');
+  assert.equal(list[0].rarity, 'SSSR');
 });
 
 test('rejects duplicate candidate names', async () => {
@@ -264,4 +269,45 @@ test('supports hand-written Markdown candidate files', async () => {
   assert.equal(candidate.source, 'manual');
   assert.equal(candidate.note, '第一行\n第二行');
   assert.equal(candidate.charCount, 4);
+});
+
+test('opens a missing directory by creating it and initializing .workshop', async () => {
+  const baseDir = await mkdtemp(join(tmpdir(), 'creation-workshop-projects-'));
+  tempDirs.push(baseDir);
+  const storage = new WorkshopStorage({ dataDirName: '.workshop' });
+  const manager = new ProjectManager(join(baseDir, 'userData'), storage, {
+    dataDirName: '.workshop',
+    registryFileName: 'projects.json',
+    legacyDataFileName: 'workshop.json',
+    maxRecentProjects: 10,
+  });
+  await manager.initialize();
+  const target = join(baseDir, '新项目');
+  const result = await manager.open(target);
+  assert.equal(result.ok, true);
+  assert.equal(result.project?.path, target);
+  assert.ok(existsSync(join(target, '.workshop', 'candidates.md')));
+  assert.equal(await readFile(join(target, 'README.md'), 'utf8'), '# 新项目\n');
+  assert.equal(await readFile(join(target, '第一卷', '第一章.md'), 'utf8'), '# 第一章\n');
+  const recent = await manager.listRecent();
+  assert.equal(recent[0]?.path, target);
+  assert.equal(recent[0]?.name, '新项目');
+});
+
+test('uses the first line of README.md as the project display name', async () => {
+  const baseDir = await mkdtemp(join(tmpdir(), 'creation-workshop-readme-'));
+  tempDirs.push(baseDir);
+  const storage = new WorkshopStorage({ dataDirName: '.workshop' });
+  const manager = new ProjectManager(join(baseDir, 'userData'), storage, {
+    dataDirName: '.workshop',
+    registryFileName: 'projects.json',
+    legacyDataFileName: 'workshop.json',
+    maxRecentProjects: 10,
+  });
+  await manager.initialize();
+  const target = join(baseDir, '目录名');
+  await manager.open(target);
+  await writeFile(join(target, 'README.md'), '# 星河纪事\n\n第二行内容\n', 'utf8');
+  const recent = await manager.listRecent();
+  assert.equal(recent[0]?.name, '星河纪事');
 });

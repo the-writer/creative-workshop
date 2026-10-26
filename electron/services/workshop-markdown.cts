@@ -4,6 +4,7 @@
 export type RaceKey = 'human' | 'elf';
 export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
 export type NameGender = 'any' | 'male' | 'female' | 'neutral';
+export type RarityTier = 'S' | 'SS' | 'SSS' | 'SSSR';
 export type EntityType = 'sheet' | 'place';
 
 export interface StructurePart {
@@ -22,6 +23,7 @@ export interface Candidate {
   favorite: boolean;
   note: string;
   gender?: NameGender;
+  rarity?: RarityTier;
   createdAt: number;
   updatedAt: number;
 }
@@ -106,6 +108,10 @@ function parseGender(value: string): NameGender | undefined {
   if (value === '女性' || value === 'female') return 'female';
   if (value === '中性' || value === 'neutral') return 'neutral';
   return undefined;
+}
+
+function parseRarity(value: string): RarityTier | undefined {
+  return value === 'S' || value === 'SS' || value === 'SSS' || value === 'SSSR' ? value : undefined;
 }
 
 function parseEntityType(value: string): EntityType {
@@ -294,6 +300,7 @@ export function parseCandidatesMarkdown(text: string): Candidate[] {
     if (!id || !nameText) continue;
     const createdAt = parseTimestamp(fieldValue(fields, '创建时间', 'createdAt'));
     const gender = parseGender(fieldValue(fields, '性别'));
+    const rarity = parseRarity(fieldValue(fields, '稀有度'));
     const structureEntry = fields.get('结构');
     result.push({
       id,
@@ -306,6 +313,7 @@ export function parseCandidatesMarkdown(text: string): Candidate[] {
       favorite: parseBoolean(fieldValue(fields, '收藏')),
       note: fieldValue(fields, '备注'),
       ...(gender ? { gender } : {}),
+      ...(rarity ? { rarity } : {}),
       createdAt,
       updatedAt: parseTimestamp(fieldValue(fields, '更新时间', 'updatedAt')) || createdAt,
     });
@@ -323,6 +331,7 @@ export function serializeCandidatesMarkdown(candidates: Candidate[]): string {
     out.push(`- 族群: ${RACE_LABELS[candidate.race]}`);
     out.push(`- 类型: ${TYPE_LABELS[candidate.nameType]}`);
     if (candidate.gender) out.push(`- 性别: ${GENDER_LABELS[candidate.gender]}`);
+    if (candidate.rarity) out.push(`- 稀有度: ${candidate.rarity}`);
     out.push(`- 字数: ${candidate.charCount}`);
     out.push(`- 来源: ${candidate.source === 'manual' ? '手动' : '生成'}`);
     out.push(`- 收藏: ${candidate.favorite ? '是' : '否'}`);

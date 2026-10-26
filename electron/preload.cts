@@ -8,6 +8,9 @@ const IPC = {
   projectsCreate: 'workshop:projects:create',
   projectsPickDirectory: 'workshop:projects:pick-directory',
   projectsOpenInVSCode: 'workshop:projects:open-vscode',
+  rulesOpen: 'workshop:rules:open',
+  rulesClose: 'workshop:rules:close',
+  rulesChanged: 'workshop:rules:changed',
   candidateList: 'workshop:candidates:list',
   candidateGet: 'workshop:candidates:get',
   candidateCreate: 'workshop:candidates:create',
@@ -36,6 +39,16 @@ contextBridge.exposeInMainWorld('workshop', {
     create: (input: { parentDir: string; name: string }) => invoke(IPC.projectsCreate, input),
     pickDirectory: (kind: 'open' | 'parent') => invoke(IPC.projectsPickDirectory, kind),
     openInVSCode: () => invoke(IPC.projectsOpenInVSCode),
+  },
+  rules: {
+    open: () => invoke(IPC.rulesOpen),
+    close: () => invoke(IPC.rulesClose),
+    notifyChanged: (value: unknown) => invoke(IPC.rulesChanged, value),
+    onChanged: (callback: (value: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: unknown) => callback(value);
+      ipcRenderer.on(IPC.rulesChanged, listener);
+      return () => ipcRenderer.removeListener(IPC.rulesChanged, listener);
+    },
   },
   candidates: {
     list: (filters: unknown) => invoke(IPC.candidateList, filters),
