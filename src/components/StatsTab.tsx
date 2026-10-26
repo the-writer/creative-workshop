@@ -1,12 +1,10 @@
-// 统计页：概览卡、多维分布柱状图、词库规模、数据导出
+// 统计页：概览卡、多维分布柱状图、词库规模
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, FileJson, FileText, RefreshCw } from 'lucide-react';
-import { exportAllDataJson, exportNameListTxt } from '@/lib/export';
-import { fetchCandidates, fetchStats, type StatsData } from '@/lib/db';
+import { RefreshCw } from 'lucide-react';
+import { fetchStats, type StatsData } from '@/lib/db';
 import { computeCombinationTotals, formatCombination } from '@/data/lexicon';
-import type { Candidate } from '@/lib/types';
 import { RELATION_TYPES, RACE_LABELS, TYPE_LABELS, TYPE_KEYS } from '@/lib/types';
-import { EmptyState, SectionTitle, useAppToast } from '@/components/common';
+import { EmptyState, SectionTitle } from '@/components/common';
 import { cn } from '@/lib/utils';
 
 interface StatsTabProps {
@@ -48,13 +46,10 @@ function BarChart({
 const OVERVIEW_COLORS = ['#B23A2E', '#B98A3A', '#3E4A5A', '#4A7C59'];
 
 export function StatsTab({ refreshKey }: StatsTabProps) {
-  const toast = useAppToast();
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [jsonBusy, setJsonBusy] = useState(false);
-  const [txtBusy, setTxtBusy] = useState(false);
 
   const combo = useMemo(() => computeCombinationTotals(), []);
 
@@ -76,27 +71,6 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
   useEffect(() => {
     void reload();
   }, [reload, refreshKey]);
-
-  const handleJson = async () => {
-    setJsonBusy(true);
-    const res = await exportAllDataJson();
-    setJsonBusy(false);
-    if (res.ok) toast.show(`已导出 ${res.fileName}`, 'success');
-    else toast.show(res.message || '导出失败', 'error');
-  };
-
-  const handleTxt = async () => {
-    setTxtBusy(true);
-    const items = await fetchCandidates({ race: 'all', nameType: 'all', minChars: 1, maxChars: 999, status: 'all', keyword: '', sort: 'latest' }).catch(
-      () => [] as Candidate[],
-    );
-    const res = await exportNameListTxt(items);
-    setTxtBusy(false);
-    if (res.ok) toast.show(`已导出 ${res.fileName}`, 'success');
-    else toast.show(res.message || '导出失败', 'error');
-  };
-
-  const hasData = (stats?.totalCandidates ?? 0) > 0 || (stats?.totalSheets ?? 0) > 0;
 
   const overviews = [
     { label: '候选命名', value: stats?.totalCandidates ?? 0 },
@@ -186,37 +160,6 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
               <p className="lexicon-detail">
                 人名 {formatCombination(combo.detail.person)} · 地名 {formatCombination(combo.detail.place)} · 官职 {formatCombination(combo.detail.office)} ·
                 绰号 {formatCombination(combo.detail.nickname)}
-              </p>
-            </div>
-
-            {/* 导出 */}
-            <div className="stat-chart-card export-area">
-              <SectionTitle>数据导出</SectionTitle>
-              <div className="export-btn-row">
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  data-testid="stats-export-json"
-                  disabled={jsonBusy || !hasData}
-                  onClick={() => void handleJson()}
-                >
-                  <FileJson size={15} />
-                  {jsonBusy ? '导出中…' : '导出全量 JSON'}
-                </button>
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  data-testid="stats-export-txt"
-                  disabled={txtBusy || (stats.totalCandidates ?? 0) === 0}
-                  onClick={() => void handleTxt()}
-                >
-                  <FileText size={15} />
-                  {txtBusy ? '导出中…' : '导出名称清单 TXT'}
-                </button>
-              </div>
-              <p className="export-note">
-                <Download size={12} />
-                JSON 含候选、设定与全部关系；TXT 为当前候选库名称清单
               </p>
             </div>
           </>

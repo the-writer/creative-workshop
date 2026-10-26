@@ -1,9 +1,21 @@
-import { basename, extname, join } from 'node:path';
-import { writeFile } from 'node:fs/promises';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
-import { WorkshopStorage, type CandidateFilters, type CandidateInput, type RelationInput, type SheetInput } from '../services/workshop-storage.cjs';
+import { ProjectManager } from '../services/project-manager.cjs';
+import {
+  WorkshopStorage,
+  type CandidateFilters,
+  type CandidateInput,
+  type GraphPoint,
+  type RelationInput,
+  type SheetInput,
+} from '../services/workshop-storage.cjs';
 
 export const IPC = {
+  projectsListRecent: 'workshop:projects:list-recent',
+  projectsCurrent: 'workshop:projects:current',
+  projectsOpen: 'workshop:projects:open',
+  projectsCreate: 'workshop:projects:create',
+  projectsPickDirectory: 'workshop:projects:pick-directory',
+  projectsOpenInVSCode: 'workshop:projects:open-vscode',
   candidateList: 'workshop:candidates:list',
   candidateGet: 'workshop:candidates:get',
   candidateCreate: 'workshop:candidates:create',
@@ -16,15 +28,14 @@ export const IPC = {
   relationList: 'workshop:relations:list',
   relationAdd: 'workshop:relations:add',
   relationRemove: 'workshop:relations:remove',
-  allData: 'workshop:data:all',
   stats: 'workshop:data:stats',
+  graphGetLayout: 'workshop:graph:get-layout',
+  graphSaveLayout: 'workshop:graph:save-layout',
   preferencesGet: 'workshop:preferences:get',
   preferencesSet: 'workshop:preferences:set',
-  fileSave: 'workshop:files:save',
   clipboardWrite: 'workshop:clipboard:write',
 } as const;
 
-const ALLOWED_SAVE_EXTENSIONS = new Set(['.json', '.txt', '.md', '.png']);
 const ALLOWED_PREFERENCES = new Set(['generator', 'libraryFilters']);
 
 function trustedSender(event: IpcMainInvokeEvent): void {
@@ -40,37 +51,46 @@ function registerHandler(channel: string, handler: (event: IpcMainInvokeEvent, .
   });
 }
 
-async function saveExportFile(
+async function pickDirectory(
   event: IpcMainInvokeEvent,
-  input: { fileName: string; dataBase64: string },
-): Promise<{
-  success: boolean;
-  canceled?: boolean;
-  filePath?: string;
-  message?: string;
-}> {
-  const safeName = basename(typeof input.fileName === 'string' ? input.fileName : '');
-  const extension = extname(safeName).toLowerCase();
-  if (!safeName || !ALLOWED_SAVE_EXTENSIONS.has(extension)) {
-    return { success: false, message: '不支持的文件类型' };
-  }
+  kind: 'open' | 'parent',
+): Promise<{ ok: boolean; canceled?: boolean; path?: string; message?: string }> {
   const owner = BrowserWindow.fromWebContents(event.sender);
-  const options = {
-    defaultPath: join(app.getPath('downloads'), safeName),
-    filters: [{ name: extension.slice(1).toUpperCase(), extensions: [extension.slice(1)] }],
+  const options =
+    kind === 'parent'
+      ? {
+          title: '选择项目存放位置',
+          buttonLabel: '选择',
+          defaultPath: app.getPath('documents'),
+          properties: ['openDirectory', 'createDirectory'] as const,
+        }
+      : {
+          title: '选择创作工坊项目文件夹',
+          buttonLabel: '打开项目',
+          defaultPath: app.getPath('documents'),
+          properties: ['openDirectory'] as const,
+        };
+  const baseOptions = {
+    title: options.title,
+    buttonLabel: options.buttonLabel,
+    defaultPath: options.defaultPath,
+    properties: [...options.properties],
   };
-  const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
-  if (result.canceled || !result.filePath) return { success: false, canceled: true };
-  try {
-    const data = Buffer.from(typeof input.dataBase64 === 'string' ? input.dataBase64 : '', 'base64');
-    await writeFile(result.filePath, data);
-    return { success: true, filePath: result.filePath };
-  } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : '保存失败' };
-  }
+  const result = owner ? await dialog.showOpenDialog(owner, baseOptions) : await dialog.showOpenDialog(baseOptions);
+  if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true };
+  return { ok: true, path: result.filePaths[0] };
 }
 
-export function registerWorkshopIpc(storage: WorkshopStorage): void {
+export function registerWorkshopIpc(storage: WorkshopStorage, projects: ProjectManager): void {
+  /* ---------------- 项目管理 ---------------- */
+  registerHandler(IPC.projectsListRecent, () => projects.listRecent());
+  registerHandler(IPC.projectsCurrent, () => projects.current);
+  registerHandler(IPC.projectsOpen, (_event, path: string) => projects.open(path));
+  registerHandler(IPC.projectsCreate, (_event, input: { parentDir: string; name: string }) => projects.create(input));
+  registerHandler(IPC.projectsPickDirectory, (event, kind: 'open' | 'parent') => pickDirectory(event, kind === 'parent' ? 'parent' : 'open'));
+  registerHandler(IPC.projectsOpenInVSCode, () => projects.openInVSCode());
+
+  /* ---------------- 业务数据（均写入当前项目 .workshop） ---------------- */
   registerHandler(IPC.candidateList, (_event, filters: CandidateFilters) => storage.candidatesList(filters));
   registerHandler(IPC.candidateGet, (_event, id: string) => storage.candidateGet(id));
   registerHandler(IPC.candidateCreate, (_event, input: CandidateInput) => storage.candidateCreate(input));
@@ -83,8 +103,9 @@ export function registerWorkshopIpc(storage: WorkshopStorage): void {
   registerHandler(IPC.relationList, () => storage.relationsList());
   registerHandler(IPC.relationAdd, (_event, input: RelationInput) => storage.relationAdd(input));
   registerHandler(IPC.relationRemove, (_event, id: string) => storage.relationRemove(id));
-  registerHandler(IPC.allData, () => storage.allData());
   registerHandler(IPC.stats, () => storage.stats());
+  registerHandler(IPC.graphGetLayout, () => storage.graphLayoutGet());
+  registerHandler(IPC.graphSaveLayout, (_event, positions: Record<string, GraphPoint>) => storage.graphLayoutSave(positions));
   registerHandler(IPC.preferencesGet, (_event, key: string) => {
     if (!ALLOWED_PREFERENCES.has(key)) throw new Error('非法偏好项');
     return storage.preferencesGet(key);
@@ -93,7 +114,6 @@ export function registerWorkshopIpc(storage: WorkshopStorage): void {
     if (!ALLOWED_PREFERENCES.has(key)) throw new Error('非法偏好项');
     return storage.preferencesSet(key, value);
   });
-  registerHandler(IPC.fileSave, (event, input: { fileName: string; dataBase64: string }) => saveExportFile(event, input));
   registerHandler(IPC.clipboardWrite, (_event, text: string) => {
     clipboard.writeText(String(text ?? ''));
     return true;

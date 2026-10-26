@@ -3,8 +3,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { RaceKey, StructurePart } from '@/lib/types';
-import { raceLabel } from '@/lib/types';
+import type { NameGender, RaceKey, StructurePart } from '@/lib/types';
+import { GENDER_LABELS, raceLabel } from '@/lib/types';
 
 /* ---------------- Toast ---------------- */
 
@@ -98,15 +98,19 @@ export function Chip({
 
 /* ---------------- 结构标签 ---------------- */
 
-export function StructureTags({ parts, race }: { parts: StructurePart[]; race: RaceKey }) {
-  if (!parts || parts.length === 0) return null;
+export function StructureTags({ parts, race, gender }: { parts: StructurePart[]; race: RaceKey; gender?: NameGender }) {
+  const hasParts = Boolean(parts && parts.length > 0);
+  if (!hasParts && !gender) return null;
   return (
     <div className="structure-tags">
-      {parts.map((p, i) => (
-        <span key={`${p.label}-${i}`} className={cn('structure-tag', `tag-race-${race}`)}>
-          {p.label}·{p.word}
-        </span>
-      ))}
+      {hasParts
+        ? parts.map((p, i) => (
+            <span key={`${p.label}-${i}`} className={cn('structure-tag', `tag-race-${race}`)}>
+              {p.label}·{p.word}
+            </span>
+          ))
+        : null}
+      {gender ? <span className={cn('structure-tag', 'tag-gender')}>{GENDER_LABELS[gender]}</span> : null}
     </div>
   );
 }

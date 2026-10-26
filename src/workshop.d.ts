@@ -1,5 +1,5 @@
-import type { Candidate, CandidateFilters, NameTypeKey, RaceKey, Relation, Sheet, SourceKey, StructurePart } from '@/lib/types';
-import type { StatsData } from '@/lib/db';
+import type { Candidate, CandidateFilters, NameGender, NameTypeKey, RaceKey, Relation, Sheet, SourceKey, StructurePart } from '@/lib/types';
+import type { GraphPoint, PickDirectoryResult, ProjectOpenResult, ProjectSummary, StatsData } from '@/lib/db';
 
 export interface CandidateInput {
   race: RaceKey;
@@ -7,6 +7,7 @@ export interface CandidateInput {
   nameText: string;
   structure: StructurePart[];
   source: SourceKey;
+  gender?: NameGender;
   favorite?: boolean;
   note?: string;
 }
@@ -25,21 +26,15 @@ export interface SheetInput {
   note: string;
 }
 
-export interface WorkshopExportBundle {
-  schemaVersion: 1;
-  candidates: Candidate[];
-  sheets: Sheet[];
-  relations: Relation[];
-}
-
-export interface SaveFileResult {
-  success: boolean;
-  canceled?: boolean;
-  filePath?: string;
-  message?: string;
-}
-
 export interface WorkshopApi {
+  projects: {
+    listRecent: () => Promise<ProjectSummary[]>;
+    current: () => Promise<ProjectSummary | null>;
+    open: (path: string) => Promise<ProjectOpenResult>;
+    create: (input: { parentDir: string; name: string }) => Promise<ProjectOpenResult>;
+    pickDirectory: (kind: 'open' | 'parent') => Promise<PickDirectoryResult>;
+    openInVSCode: () => Promise<{ ok: boolean; message?: string }>;
+  };
   candidates: {
     list: (filters: CandidateFilters) => Promise<Candidate[]>;
     get: (id: string) => Promise<Candidate | null>;
@@ -59,15 +54,15 @@ export interface WorkshopApi {
     remove: (id: string) => Promise<{ ok: boolean; message?: string }>;
   };
   data: {
-    all: () => Promise<WorkshopExportBundle>;
     stats: () => Promise<StatsData>;
+  };
+  graph: {
+    getLayout: () => Promise<Record<string, GraphPoint>>;
+    saveLayout: (positions: Record<string, GraphPoint>) => Promise<{ ok: boolean }>;
   };
   preferences: {
     get: (key: 'generator' | 'libraryFilters') => Promise<unknown>;
     set: (key: 'generator' | 'libraryFilters', value: unknown) => Promise<void>;
-  };
-  files: {
-    save: (input: { fileName: string; dataBase64: string }) => Promise<SaveFileResult>;
   };
   clipboard: {
     writeText: (text: string) => Promise<boolean>;

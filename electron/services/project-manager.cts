@@ -1,0 +1,230 @@
+// 项目管理：维护最近项目列表（userData/projects.json），负责打开 / 新建项目与 VS Code 打开目录。
+
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { spawn } from 'node:child_process';
+import { shell } from 'electron';
+import { WorkshopStorage, type OpenedProject } from './workshop-storage.cjs';
+
+export interface ProjectConfig {
+  /** 项目内数据目录名，默认 `.workshop` */
+  dataDirName?: string;
+  /** 项目登记文件名，默认 `projects.json` */
+  registryFileName?: string;
+  /** 旧版单 JSON 数据文件名，默认 `workshop.json` */
+  legacyDataFileName?: string;
+  /** 最近项目数量上限，默认 10 */
+  maxRecentProjects?: number;
+}
+
+export interface ProjectSummary {
+  path: string;
+  name: string;
+  lastOpenedAt: number;
+}
+
+export interface ProjectResult {
+  ok: boolean;
+  project?: ProjectSummary;
+  message?: string;
+}
+
+interface ProjectsState {
+  schemaVersion: 1;
+  recentProjects: ProjectSummary[];
+}
+
+const EMPTY_STATE: ProjectsState = { schemaVersion: 1, recentProjects: [] };
+const INVALID_NAME = /[\\/:*?"<>|\u0000-\u001f]/;
+const MAX_PROJECT_NAME_LENGTH = 60;
+
+function clone<T>(value: T): T {
+  return structuredClone(value);
+}
+
+export class ProjectManager {
+  private currentProject: ProjectSummary | null = null;
+  private state: ProjectsState = clone(EMPTY_STATE);
+  private initialized = false;
+
+  private readonly registryPath: string;
+  private readonly legacyDataPath: string;
+  private readonly dataDirName: string;
+  private readonly maxRecentProjects: number;
+
+  public constructor(
+    private readonly userDataDir: string,
+    private readonly storage: WorkshopStorage,
+    private readonly config: ProjectConfig = {},
+  ) {
+    this.dataDirName = config.dataDirName && config.dataDirName.trim() !== '' ? config.dataDirName : '.workshop';
+    this.registryPath = join(userDataDir, config.registryFileName && config.registryFileName.trim() !== '' ? config.registryFileName : 'projects.json');
+    this.legacyDataPath = join(userDataDir, config.legacyDataFileName && config.legacyDataFileName.trim() !== '' ? config.legacyDataFileName : 'workshop.json');
+    const maxRecent = config.maxRecentProjects;
+    this.maxRecentProjects = typeof maxRecent === 'number' && maxRecent > 0 ? Math.floor(maxRecent) : 10;
+  }
+
+  /** 项目登记文件绝对路径（用于启动日志） */
+  public get registryFilePath(): string {
+    return this.registryPath;
+  }
+
+  public get current(): ProjectSummary | null {
+    return this.currentProject ? clone(this.currentProject) : null;
+  }
+
+  public async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+    await this.loadState();
+    await this.migrateLegacyData();
+  }
+
+  public listRecent(): ProjectSummary[] {
+    const existing = this.state.recentProjects.filter((project) => this.isProjectDirectory(project.path));
+    return clone(existing.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt));
+  }
+
+  public async open(projectPath: string): Promise<ProjectResult> {
+    const resolved = resolve(String(projectPath ?? ''));
+    if (!existsSync(resolved)) return { ok: false, message: '项目目录不存在' };
+    if (!this.isProjectDirectory(resolved)) return { ok: false, message: '该目录不是创作工坊项目（缺少 .workshop 数据目录）' };
+    if (this.currentProject?.path === resolved) return { ok: true, project: clone(this.currentProject) };
+    const opened = await this.storage.open(resolved);
+    return this.activate(opened);
+  }
+
+  public async create(input: { parentDir: string; name: string }): Promise<ProjectResult> {
+    const parentDir = resolve(String(input.parentDir ?? ''));
+    const name = String(input.name ?? '').trim();
+    if (!name) return { ok: false, message: '项目名称不能为空' };
+    if (name === '.' || name === '..' || INVALID_NAME.test(name) || name.startsWith('.')) {
+      return { ok: false, message: '项目名称不能包含路径分隔符或特殊字符，也不能以 . 开头' };
+    }
+    if (Array.from(name).length > MAX_PROJECT_NAME_LENGTH) return { ok: false, message: `项目名称不能超过 ${MAX_PROJECT_NAME_LENGTH} 个字符` };
+    if (!existsSync(parentDir)) return { ok: false, message: '存放位置不存在，请重新选择' };
+    const target = join(parentDir, name);
+    if (existsSync(target)) return { ok: false, message: '同名目录已存在，请换一个项目名称' };
+    await mkdir(join(target, this.dataDirName), { recursive: true });
+    const opened = await this.storage.open(target);
+    return this.activate(opened);
+  }
+
+  /** 通过 VS Code 打开当前项目目录；未安装 VS Code 时回退到文件管理器 */
+  public async openInVSCode(): Promise<{ ok: boolean; message?: string }> {
+    const project = this.currentProject;
+    if (!project) return { ok: false, message: '尚未打开项目' };
+    const binaryCandidates = ['/usr/local/bin/code', '/opt/homebrew/bin/code'];
+    const binary = binaryCandidates.find((candidate) => existsSync(candidate)) ?? 'code';
+    if (await this.spawnDetached(binary, [project.path])) return { ok: true };
+    if (process.platform === 'darwin' && (await this.spawnDetached('/usr/bin/open', ['-a', 'Visual Studio Code', project.path]))) {
+      return { ok: true };
+    }
+    const fallbackError = await shell.openPath(project.path);
+    if (fallbackError) return { ok: false, message: `未检测到 VS Code，且无法打开项目目录：${fallbackError}` };
+    return { ok: true, message: '未检测到 VS Code，已在文件管理器中打开项目目录' };
+  }
+
+  private activate(opened: OpenedProject): ProjectResult {
+    const project: ProjectSummary = { path: opened.path, name: opened.name, lastOpenedAt: Date.now() };
+    this.currentProject = project;
+    void this.remember(project);
+    console.info(`[创作工坊] 项目：${project.path}`);
+    console.info(`[创作工坊] 项目数据目录：${opened.workshopPath}`);
+    return { ok: true, project: clone(project) };
+  }
+
+  private async remember(project: ProjectSummary): Promise<void> {
+    const recent = this.state.recentProjects.filter((item) => item.path !== project.path);
+    recent.unshift({ ...project });
+    this.state = { schemaVersion: 1, recentProjects: recent.slice(0, this.maxRecentProjects) };
+    await this.saveState();
+  }
+
+  private isProjectDirectory(projectPath: string): boolean {
+    try {
+      return existsSync(join(projectPath, this.dataDirName));
+    } catch {
+      return false;
+    }
+  }
+
+  private async loadState(): Promise<void> {
+    try {
+      const parsed: unknown = JSON.parse(await readFile(this.registryPath, 'utf8'));
+      if (!parsed || typeof parsed !== 'object') return;
+      const recentProjects = (parsed as Record<string, unknown>).recentProjects;
+      if (!Array.isArray(recentProjects)) return;
+      this.state = {
+        schemaVersion: 1,
+        recentProjects: recentProjects
+          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+          .map((item) => ({
+            path: typeof item.path === 'string' ? item.path : '',
+            name: typeof item.name === 'string' ? item.name : '',
+            lastOpenedAt: typeof item.lastOpenedAt === 'number' && Number.isFinite(item.lastOpenedAt) ? item.lastOpenedAt : 0,
+          }))
+          .filter((item) => item.path !== '')
+          .slice(0, this.maxRecentProjects),
+      };
+    } catch {
+      // 登记文件不存在或损坏时从空列表开始
+    }
+  }
+
+  private async saveState(): Promise<void> {
+    await mkdir(this.userDataDir, { recursive: true });
+    const tempPath = `${this.registryPath}.tmp`;
+    await writeFile(tempPath, `${JSON.stringify(this.state, null, 2)}\n`, 'utf8');
+    await rename(tempPath, this.registryPath);
+  }
+
+  /** 首次升级：把旧版 userData/workshop.json 迁移为一个默认项目 */
+  private async migrateLegacyData(): Promise<void> {
+    if (existsSync(this.registryPath)) return;
+    if (!existsSync(this.legacyDataPath)) return;
+    let legacy: unknown;
+    try {
+      legacy = JSON.parse(await readFile(this.legacyDataPath, 'utf8'));
+    } catch {
+      return;
+    }
+    const baseDir = join(this.userDataDir, 'projects');
+    let target = join(baseDir, '默认项目');
+    let suffix = 2;
+    while (existsSync(target)) {
+      target = join(baseDir, `默认项目-${suffix}`);
+      suffix += 1;
+    }
+    try {
+      await mkdir(join(target, this.dataDirName), { recursive: true });
+      const opened = await this.storage.open(target);
+      const imported = await this.storage.importLegacyData(legacy);
+      this.state = {
+        schemaVersion: 1,
+        recentProjects: [{ path: opened.path, name: opened.name, lastOpenedAt: Date.now() }],
+      };
+      await this.saveState();
+      await this.storage.close();
+      console.info(`[创作工坊] 已迁移旧数据到项目：${opened.path}（候选 ${imported.candidates} · 设定 ${imported.sheets} · 关系 ${imported.relations}）`);
+    } catch (error) {
+      console.error(`[创作工坊] 旧数据迁移失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private spawnDetached(command: string, args: string[]): Promise<boolean> {
+    return new Promise((resolveResult) => {
+      try {
+        const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+        child.once('error', () => resolveResult(false));
+        child.once('spawn', () => {
+          child.unref();
+          resolveResult(true);
+        });
+      } catch {
+        resolveResult(false);
+      }
+    });
+  }
+}

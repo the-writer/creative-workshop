@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, Menu, Tray, nativeImage, session, type MenuItemConstructorOptions } from 'electron';
 import { registerWorkshopIpc } from './ipc/workshop-ipc.cjs';
+import { ProjectManager } from './services/project-manager.cjs';
 import { WorkshopStorage } from './services/workshop-storage.cjs';
 
 interface CreationWorkshopConfig {
@@ -11,8 +12,11 @@ interface CreationWorkshopConfig {
     titleBarStyle?: 'hiddenInset';
     alwaysOnTop?: boolean;
   };
-  storage?: {
-    fileName?: string;
+  project?: {
+    dataDirName?: string;
+    registryFileName?: string;
+    legacyDataFileName?: string;
+    maxRecentProjects?: number;
   };
   tray?: {
     iconFile?: string;
@@ -28,7 +32,7 @@ const windowWidth = config.window?.width ?? 640;
 const windowHeight = config.window?.height ?? 480;
 const titleBarStyle = config.window?.titleBarStyle ?? 'hiddenInset';
 const windowAlwaysOnTop = config.window?.alwaysOnTop ?? false;
-const storageFileName = config.storage?.fileName ?? 'workshop.json';
+const projectConfig = config.project ?? {};
 const trayIconFile = config.tray?.iconFile ?? 'assets/imgs/trayTemplate.png';
 
 app.setName(APP_NAME);
@@ -157,6 +161,10 @@ function createWindow(): BrowserWindow {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else void mainWindow.loadFile(join(app.getAppPath(), 'dist', 'index.html'));
 
+  // 启动后先显示窗口选择项目；关闭按钮仍只隐藏窗口，应用由托盘驻留
+  mainWindow.once('ready-to-show', () => {
+    showMainWindow();
+  });
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault();
@@ -169,10 +177,12 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
-app.whenReady().then(() => {
-  const storage = new WorkshopStorage(join(app.getPath('userData'), storageFileName));
-  console.info(`[${APP_NAME}] 数据文件：${storage.filePath}`);
-  registerWorkshopIpc(storage);
+app.whenReady().then(async () => {
+  const storage = new WorkshopStorage({ dataDirName: projectConfig.dataDirName });
+  const projects = new ProjectManager(app.getPath('userData'), storage, projectConfig);
+  await projects.initialize();
+  console.info(`[${APP_NAME}] 项目登记文件：${projects.registryFilePath}`);
+  registerWorkshopIpc(storage, projects);
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   createApplicationMenu();
   createWindow();

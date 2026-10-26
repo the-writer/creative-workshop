@@ -3,6 +3,7 @@ import { LEXICON, SURNAMES, SURNAME_RARE_POPULATION_SHARE, SYLLABLE_GENDER_BIAS,
 import { ELF_LEXICON, ELF_SYLLABLE_GENDER_BIAS, ELF_SYLLABLES } from '@/data/lexicon-elf';
 import {
   DEFAULT_GEN_PARAMS,
+  GEN_PREFS_SCHEMA_VERSION,
   genCombo,
   genNickname,
   genOffice,
@@ -10,8 +11,11 @@ import {
   genPlace,
   generateBatch,
   getSurnameChoices,
+  nameCharCount,
+  normalizeGenPrefs,
   pickSurname,
   type GenParams,
+  type PersonSuffix,
 } from '@/lib/generator';
 import { GENDER_KEYS, type NameTypeKey, type RaceKey } from '@/lib/types';
 
@@ -108,6 +112,30 @@ describe('lexicon', () => {
 });
 
 describe('generation', () => {
+  it('defaults gender preference to neutral and migrates legacy prefs once', () => {
+    expect(DEFAULT_GEN_PARAMS.gender).toBe('neutral');
+
+    const legacy = normalizeGenPrefs({
+      race: 'human',
+      types: ['person'],
+      params: { ...DEFAULT_GEN_PARAMS, gender: 'any', maxChars: 8 },
+    });
+    expect(legacy.schemaVersion).toBe(GEN_PREFS_SCHEMA_VERSION);
+    expect(legacy.params.gender).toBe('neutral');
+
+    // 已写入新版版本号的偏好里，用户手动选择的「不限」需要保留。
+    const current = normalizeGenPrefs({ ...legacy, params: { ...legacy.params, gender: 'any' } });
+    expect(current.params.gender).toBe('any');
+    expect(normalizeGenPrefs({ race: 'demon', types: ['bogus'] }).race).toBe('elf');
+  });
+
+  it('counts name characters without the composition separator', () => {
+    expect(nameCharCount('雷恩')).toBe(2);
+    expect(nameCharCount('雷恩·阿')).toBe(3);
+    expect(nameCharCount('')).toBe(0);
+    expect(nameCharCount('雷·恩·阿')).toBe(3);
+  });
+
   it.each(races)('generates every type for %s', (race) => {
     types.forEach((type) => {
       const result = generateBatch(race, [type], { ...DEFAULT_GEN_PARAMS, count: 20 });
@@ -115,7 +143,13 @@ describe('generation', () => {
       result.candidates.forEach((candidate) => {
         expect(candidate.nameText.length).toBeGreaterThan(0);
         expect(candidate.structure.length).toBeGreaterThan(0);
+        expect(candidate.charCount).toBe(nameCharCount(candidate.nameText));
         expect(Number.isSafeInteger(candidate.createdAt)).toBe(true);
+        if (type === 'person') {
+          expect(candidate.gender).toBe(DEFAULT_GEN_PARAMS.gender);
+        } else {
+          expect(candidate.gender).toBeUndefined();
+        }
       });
     });
   });
@@ -129,16 +163,49 @@ describe('generation', () => {
     });
   });
 
-  it('generates a female noble name with a weighted surname', () => {
-    const name = genPerson('human', {
-      ...DEFAULT_GEN_PARAMS,
-      gender: 'female',
-      surnameBias: 100,
-      personSuffix: 'title',
+  it('connects every person block with the middle dot separator', () => {
+    const suffixes: PersonSuffix[] = ['father', 'place', 'profession', 'contract', 'blood', 'title'];
+    suffixes.forEach((personSuffix) => {
+      const name = genPerson('human', { ...DEFAULT_GEN_PARAMS, personSuffix });
+      expect(name).not.toBeNull();
+      expect(name!.name.split('·')).toHaveLength(3);
+      expect(name!.name).not.toContain('··');
     });
-    expect(name?.structure.some((part) => part.label === '女性短名')).toBe(true);
-    expect(name?.structure.some((part) => part.label.startsWith('姓氏') || part.label.startsWith('稀有姓氏'))).toBe(true);
-    expect(name?.structure.some((part) => part.label === '贵族封号')).toBe(true);
+
+    const prefixed = genPerson('human', { ...DEFAULT_GEN_PARAMS, nicknamePrefix: true, nicknameChars: 4 });
+    expect(prefixed!.name.split('·')).toHaveLength(3);
+  });
+
+  it('drops short-name and patronymic structure tags but keeps surnames', () => {
+    races.forEach((race) => {
+      const name = genPerson(race, { ...DEFAULT_GEN_PARAMS, personSuffix: 'father' });
+      expect(name!.structure.some((part) => part.label.includes('短名'))).toBe(false);
+      expect(name!.structure.some((part) => part.label === '父名')).toBe(false);
+      expect(name!.structure.some((part) => part.label.startsWith('姓氏') || part.label.startsWith('稀有姓氏'))).toBe(true);
+
+      const titled = genPerson(race, { ...DEFAULT_GEN_PARAMS, gender: 'female', surnameBias: 100, personSuffix: 'title' });
+      expect(titled!.structure.some((part) => part.label === '女性短名')).toBe(false);
+      expect(titled!.structure.some((part) => part.label === '贵族封号')).toBe(true);
+
+      const placed = genPerson(race, { ...DEFAULT_GEN_PARAMS, personSuffix: 'place' });
+      expect(placed!.structure).toHaveLength(3);
+    });
+  });
+
+  it('keeps combo name as surname plus short name and gender as candidate field', () => {
+    const combo = genCombo('human', ['person', 'place', 'office', 'nickname'], { ...DEFAULT_GEN_PARAMS, gender: 'female' });
+    expect(combo).not.toBeNull();
+    expect(combo!.name.split('·')).toHaveLength(2);
+    expect(combo!.structure[0].label.startsWith('姓氏') || combo!.structure[0].label.startsWith('稀有姓氏')).toBe(true);
+    expect(combo!.structure[1].label).toBe('人名');
+
+    const batch = generateBatch('human', ['person', 'place'], { ...DEFAULT_GEN_PARAMS, gender: 'female', count: 10 });
+    expect(batch.candidates).toHaveLength(10);
+    batch.candidates.forEach((candidate) => {
+      expect(candidate.combo).toBe(true);
+      expect(candidate.gender).toBe('female');
+      expect(candidate.charCount).toBe(nameCharCount(candidate.nameText));
+    });
   });
 
   it('honors selected profession and ability in a combo', () => {
@@ -156,7 +223,7 @@ describe('generation', () => {
     races.forEach((race) => {
       expect(genPlace(race).structure).toHaveLength(2);
       expect(genOffice(race).structure).toHaveLength(3);
-      expect(genPerson(race, DEFAULT_GEN_PARAMS)?.structure.length).toBeGreaterThanOrEqual(3);
+      expect(genPerson(race, DEFAULT_GEN_PARAMS)?.name.split('·')).toHaveLength(3);
     });
   });
 });

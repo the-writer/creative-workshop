@@ -2,12 +2,24 @@
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Badge, Check, ChevronDown, Copy, MapPin, Minus, PenLine, Plus, Save, ScrollText, SlidersHorizontal, UserPlus, UserRound } from 'lucide-react';
-import { DEFAULT_GEN_PARAMS, generateBatch, type GenParams, type PersonSuffix, rerollCombo, rerollOne, type ShortMode } from '@/lib/generator';
+import {
+  DEFAULT_GEN_PARAMS,
+  GEN_PREFS_SCHEMA_VERSION,
+  generateBatch,
+  nameCharCount,
+  normalizeGenPrefs,
+  type GenParams,
+  type GenPrefs,
+  type PersonSuffix,
+  rerollCombo,
+  rerollOne,
+  type ShortMode,
+} from '@/lib/generator';
 import { computeCombinationTotals, LEXICON, SURNAME_BALANCED_BIAS, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
 import { SURNAME_BIAS_STEP } from '@/lib/generator-rules';
 import { insertCandidate } from '@/lib/db';
 import type { Candidate, NameTypeKey, RaceKey } from '@/lib/types';
-import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, normalizeRaceKey, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
+import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
 import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 
@@ -27,44 +39,8 @@ interface GenerateTabProps {
   onOpenEditor: (prefill: EditorPrefill) => void;
 }
 
-interface GenPrefs {
-  race: RaceKey;
-  types: NameTypeKey[];
-  params: GenParams;
-}
-
-function normalizePrefs(raw: unknown): GenPrefs {
-  const fallback: GenPrefs = { race: 'human', types: ['person'], params: { ...DEFAULT_GEN_PARAMS } };
-  try {
-    if (!raw || typeof raw !== 'object') return fallback;
-    const parsed = raw as Partial<GenPrefs>;
-    const legacyParams = parsed.params as Partial<GenParams> | undefined;
-    const isLegacy = !legacyParams || !('gender' in legacyParams) || !('surnameBias' in legacyParams);
-    const params = { ...DEFAULT_GEN_PARAMS, ...(parsed.params ?? {}) };
-    params.professions = Array.isArray(params.professions) ? params.professions.filter((s) => typeof s === 'string') : [];
-    params.abilities = Array.isArray(params.abilities) ? params.abilities.filter((s) => typeof s === 'string') : [];
-    params.nicknameSources = Array.isArray(params.nicknameSources) ? params.nicknameSources.filter((s) => typeof s === 'string') : [];
-    params.nicknameChars =
-      typeof params.nicknameChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.nicknameChars))) : DEFAULT_GEN_PARAMS.nicknameChars;
-    params.minChars = typeof params.minChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.minChars))) : DEFAULT_GEN_PARAMS.minChars;
-    params.maxChars = typeof params.maxChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.maxChars))) : DEFAULT_GEN_PARAMS.maxChars;
-    params.gender = GENDER_KEYS.includes(params.gender) ? params.gender : DEFAULT_GEN_PARAMS.gender;
-    params.surnameBias =
-      typeof params.surnameBias === 'number'
-        ? Math.max(SURNAME_NATURAL_BIAS, Math.min(SURNAME_MAX_BIAS, Math.round(params.surnameBias)))
-        : DEFAULT_GEN_PARAMS.surnameBias;
-    if (isLegacy && params.minChars === 4 && params.maxChars === 6) params.maxChars = DEFAULT_GEN_PARAMS.maxChars;
-    return {
-      race: normalizeRaceKey(parsed.race),
-      types:
-        Array.isArray(parsed.types) && parsed.types.some((t) => ['person', 'place', 'office', 'nickname'].includes(t))
-          ? parsed.types.filter((t) => ['person', 'place', 'office', 'nickname'].includes(t))
-          : ['person'],
-      params,
-    };
-  } catch {
-    return fallback;
-  }
+function defaultPrefs(): GenPrefs {
+  return { schemaVersion: GEN_PREFS_SCHEMA_VERSION, race: 'human', types: ['person'], params: { ...DEFAULT_GEN_PARAMS } };
 }
 
 const TYPE_ICONS: Record<NameTypeKey, ReactNode> = {
@@ -84,7 +60,7 @@ const NICK_SOURCE_OPTIONS: Array<[string, string]> = [
 
 export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   const toast = useAppToast();
-  const [prefs, setPrefs] = useState<GenPrefs>({ race: 'human', types: ['person'], params: { ...DEFAULT_GEN_PARAMS } });
+  const [prefs, setPrefs] = useState<GenPrefs>(defaultPrefs);
   const [prefsReady, setPrefsReady] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [results, setResults] = useState<Candidate[]>([]);
@@ -99,7 +75,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   useEffect(() => {
     void window.workshop.preferences
       .get('generator')
-      .then((raw) => setPrefs(normalizePrefs(raw)))
+      .then((raw) => setPrefs(normalizeGenPrefs(raw)))
       .catch(() => undefined)
       .finally(() => setPrefsReady(true));
   }, []);
@@ -218,6 +194,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
       nameType: c.nameType,
       nameText: c.nameText,
       structure: c.structure,
+      gender: c.gender,
       source: 'generated',
       favorite,
       note: c.note,
@@ -255,7 +232,15 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
         nextKeys.delete(key);
         return nextKeys;
       });
-      next[index] = { ...item, nameText: got.name, charCount: got.name.length, structure: got.structure, note: '', id: `tmp_${Date.now()}_${index}` };
+      next[index] = {
+        ...item,
+        nameText: got.name,
+        charCount: nameCharCount(got.name),
+        structure: got.structure,
+        gender: item.combo || item.nameType === 'person' ? params.gender : item.gender,
+        note: '',
+        id: `tmp_${Date.now()}_${index}`,
+      };
       return next;
     });
   };
@@ -325,6 +310,25 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             </Chip>
           ))}
         </div>
+        {/* 性别倾向：从规则设置移到主界面，仅在含人名/组合设定时展示 */}
+        {usesPerson ? (
+          <div className="rule-row" data-testid="gender-row">
+            <span className="rule-label">性别倾向</span>
+            <div className="segmented">
+              {GENDER_KEYS.map((gender) => (
+                <button
+                  key={gender}
+                  type="button"
+                  className={cn('seg-btn', params.gender === gender && 'seg-btn-active')}
+                  data-testid={`gender-${gender}`}
+                  onClick={() => setParams({ gender })}
+                >
+                  {GENDER_LABELS[gender]}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {/* 规则设置 */}
         <div className="rules-panel">
           <button type="button" className="rules-toggle" onClick={() => setRulesOpen((v) => !v)} data-testid="rules-toggle">
@@ -444,23 +448,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
 
               {usesPerson ? (
                 <>
-                  <div className="rule-row">
-                    <span className="rule-label">性别倾向</span>
-                    <div className="segmented">
-                      {GENDER_KEYS.map((gender) => (
-                        <button
-                          key={gender}
-                          type="button"
-                          className={cn('seg-btn', params.gender === gender && 'seg-btn-active')}
-                          data-testid={`gender-${gender}`}
-                          onClick={() => setParams({ gender })}
-                        >
-                          {GENDER_LABELS[gender]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <div className="rule-row rule-row-vertical">
                     <div className="weight-row-head">
                       <span className="rule-label">姓氏人口权重</span>
@@ -670,7 +657,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                           <td>{c.combo ? '组合设定' : TYPE_LABELS[c.nameType]}</td>
                           <td>{c.combo ? `${c.structure.length}项` : `${c.charCount}字`}</td>
                           <td>
-                            <StructureTags parts={c.structure} race={c.race} />
+                            <StructureTags parts={c.structure} race={c.race} gender={c.gender} />
                           </td>
                           <td>
                             <div className="result-actions">

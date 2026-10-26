@@ -2,13 +2,13 @@
 
 ### 8.1 脚本
 
-| 命令                | 行为                                        |
-| ------------------- | ------------------------------------------- |
-| `pnpm start`        | 构建渲染层与主进程后启动 Electron           |
-| `pnpm dev:renderer` | 启动 Vite 渲染层开发服务器                  |
-| `pnpm build`        | 类型检查、Vite 构建、Electron CommonJS 编译 |
-| `pnpm test`         | 运行 Vitest 单元测试                        |
-| `pnpm dist:mac`     | 清理旧产物、重新构建并生成 macOS arm64 PKG  |
+| 命令                | 行为                                                                             |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `pnpm start`        | 构建渲染层与主进程后启动 Electron                                                |
+| `pnpm dev:renderer` | 启动 Vite 渲染层开发服务器                                                       |
+| `pnpm build`        | 类型检查、Vite 构建、Electron CommonJS 编译                                      |
+| `pnpm test`         | 运行 Vitest 单测 + 编译 Electron + Markdown 存储测试（`tests/storage.test.mjs`） |
+| `pnpm dist:mac`     | 清理旧产物、重新构建并生成 macOS arm64 PKG                                       |
 
 源码构建输出：
 
@@ -18,7 +18,7 @@
 
 ### 8.2 打包配置
 
-`package.json` 中的 `build` 段配置：
+`package.json` 中的 `build` 段配置（运行期配置 `creationWorkshop` 见 §1.6，其中 `project.*` 取代旧的 `storage.fileName`）：
 
 - `appId`: `cn.com.stdout.creation-workshop`
 - `productName`: `创作工坊`
@@ -71,5 +71,5 @@ pnpm test
 pnpm run build
 ```
 
-涉及桌面窗口、托盘或 IPC 的改动还需进行一次 Electron 启动验证，并在同一轮检查 JSON 文件路径、主界面、托盘图标加载与关键弹窗。
+涉及桌面窗口、托盘或 IPC 的改动还需进行一次 Electron 启动验证，并在同一轮检查：项目门与最近项目、`.workshop` 六个分类文件路径、主界面、托盘图标加载与关键弹窗。
 打包变更还应确认 `release/` 中只有 `.pkg`，并检查安装脚本已被打入安装包。

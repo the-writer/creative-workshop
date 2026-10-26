@@ -2,6 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 const invoke = (channel: string, ...args: unknown[]): Promise<unknown> => ipcRenderer.invoke(channel, ...args);
 
 const IPC = {
+  projectsListRecent: 'workshop:projects:list-recent',
+  projectsCurrent: 'workshop:projects:current',
+  projectsOpen: 'workshop:projects:open',
+  projectsCreate: 'workshop:projects:create',
+  projectsPickDirectory: 'workshop:projects:pick-directory',
+  projectsOpenInVSCode: 'workshop:projects:open-vscode',
   candidateList: 'workshop:candidates:list',
   candidateGet: 'workshop:candidates:get',
   candidateCreate: 'workshop:candidates:create',
@@ -14,15 +20,23 @@ const IPC = {
   relationList: 'workshop:relations:list',
   relationAdd: 'workshop:relations:add',
   relationRemove: 'workshop:relations:remove',
-  allData: 'workshop:data:all',
   stats: 'workshop:data:stats',
+  graphGetLayout: 'workshop:graph:get-layout',
+  graphSaveLayout: 'workshop:graph:save-layout',
   preferencesGet: 'workshop:preferences:get',
   preferencesSet: 'workshop:preferences:set',
-  fileSave: 'workshop:files:save',
   clipboardWrite: 'workshop:clipboard:write',
 } as const;
 
 contextBridge.exposeInMainWorld('workshop', {
+  projects: {
+    listRecent: () => invoke(IPC.projectsListRecent),
+    current: () => invoke(IPC.projectsCurrent),
+    open: (path: string) => invoke(IPC.projectsOpen, path),
+    create: (input: { parentDir: string; name: string }) => invoke(IPC.projectsCreate, input),
+    pickDirectory: (kind: 'open' | 'parent') => invoke(IPC.projectsPickDirectory, kind),
+    openInVSCode: () => invoke(IPC.projectsOpenInVSCode),
+  },
   candidates: {
     list: (filters: unknown) => invoke(IPC.candidateList, filters),
     get: (id: string) => invoke(IPC.candidateGet, id),
@@ -42,15 +56,15 @@ contextBridge.exposeInMainWorld('workshop', {
     remove: (id: string) => invoke(IPC.relationRemove, id),
   },
   data: {
-    all: () => invoke(IPC.allData),
     stats: () => invoke(IPC.stats),
+  },
+  graph: {
+    getLayout: () => invoke(IPC.graphGetLayout),
+    saveLayout: (positions: unknown) => invoke(IPC.graphSaveLayout, positions),
   },
   preferences: {
     get: (key: 'generator' | 'libraryFilters') => invoke(IPC.preferencesGet, key),
     set: (key: 'generator' | 'libraryFilters', value: unknown) => invoke(IPC.preferencesSet, key, value),
-  },
-  files: {
-    save: (input: { fileName: string; dataBase64: string }) => invoke(IPC.fileSave, input),
   },
   clipboard: {
     writeText: (text: string) => invoke(IPC.clipboardWrite, text),

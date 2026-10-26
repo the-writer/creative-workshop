@@ -57,8 +57,11 @@
       "titleBarStyle": "hiddenInset",
       "alwaysOnTop": false
     },
-    "storage": {
-      "fileName": "workshop.json"
+    "project": {
+      "dataDirName": ".workshop",
+      "registryFileName": "projects.json",
+      "legacyDataFileName": "workshop.json",
+      "maxRecentProjects": 10
     },
     "tray": {
       "iconFile": "assets/imgs/trayTemplate.png"

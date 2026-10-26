@@ -22,6 +22,8 @@ export interface Candidate {
   source: SourceKey;
   favorite: boolean;
   note: string;
+  /** 人名（含组合设定）的性别倾向标签；地名/官职/绰号等类型没有性别 */
+  gender?: NameGender;
   createdAt: number;
   updatedAt: number;
   referenced?: boolean;

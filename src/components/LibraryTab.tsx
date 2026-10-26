@@ -1,13 +1,12 @@
 // 候选库：筛选面板 + 谱页列表 + 详情抽屉 + 增删改查与备注
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, Download, Filter, FilterX, RefreshCw, Search, Sparkles, Star, Trash2, UserPlus, X } from 'lucide-react';
+import { Copy, Filter, FilterX, RefreshCw, Search, Sparkles, Trash2, UserPlus, X } from 'lucide-react';
 import { deleteCandidate, fetchCandidates, getCandidateReferences, updateCandidate } from '@/lib/db';
 import type { Candidate, CandidateFilters, NameTypeKey, RaceKey, SortKey, StatusFilterKey } from '@/lib/types';
 import { candidateToSheetFields, DEFAULT_FILTERS, FILTER_MAX_CHARS, normalizeRaceFilter, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
 import { BottomSheet, Chip, ConfirmDialog, copyText, EmptyState, formatTime, Seal, StructureTags, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
-import { exportNameListTxt } from '@/lib/export';
 import type { EditorPrefill } from '@/components/GenerateTab';
 
 interface LibraryTabProps {
@@ -57,7 +56,6 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
   const [deleteTarget, setDeleteTarget] = useState<Candidate | null>(null);
   const [blockedRefs, setBlockedRefs] = useState<{ asCharacter: boolean; asHometown: boolean; asPlace: boolean } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [exportingTxt, setExportingTxt] = useState(false);
   const loadSeq = useRef(0);
 
   useEffect(() => {
@@ -207,14 +205,6 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
     toast.show(ok ? `已复制「${c.nameText}」` : '复制失败，请长按名称手动复制', ok ? 'success' : 'error');
   };
 
-  const handleExportTxt = async () => {
-    setExportingTxt(true);
-    const res = await exportNameListTxt(items);
-    setExportingTxt(false);
-    if (res.ok) toast.show(`已导出 ${res.fileName}`, 'success');
-    else toast.show(res.message || '导出失败', 'error');
-  };
-
   return (
     <div className="page-shell library-page">
       <div className="app-scroll">
@@ -237,16 +227,6 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
           <div className="filter-actions">
             <button type="button" className="icon-btn" title="刷新" data-testid="library-refresh" onClick={() => void reload({ silent: true })}>
               <RefreshCw size={16} className={cn(isRefreshing && 'spin')} />
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
-              title="导出当前清单"
-              data-testid="library-export"
-              disabled={exportingTxt || items.length === 0}
-              onClick={() => void handleExportTxt()}
-            >
-              <Download size={16} />
             </button>
           </div>
         </div>
@@ -463,7 +443,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
                 </p>
               </div>
             </div>
-            <StructureTags parts={selected.structure} race={selected.race} />
+            <StructureTags parts={selected.structure} race={selected.race} gender={selected.gender} />
             <div className="detail-note">
               <label className="detail-label" htmlFor="detail-note-input">
                 备注

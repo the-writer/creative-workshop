@@ -8,32 +8,56 @@ import { WorkshopStorage } from '../dist-electron/services/workshop-storage.cjs'
 const tempDirs = [];
 
 async function createStorage() {
-  const dir = await mkdtemp(join(tmpdir(), 'creation-workshop-'));
-  tempDirs.push(dir);
-  const dataFile = join(dir, 'workshop.json');
-  return { storage: new WorkshopStorage(dataFile), dataFile };
+  const projectDir = await mkdtemp(join(tmpdir(), 'creation-workshop-'));
+  tempDirs.push(projectDir);
+  const storage = new WorkshopStorage({ dataDirName: '.workshop' });
+  await storage.open(projectDir);
+  return { storage, projectDir, workshopDir: join(projectDir, '.workshop') };
+}
+
+async function readWorkshopFile(workshopDir, fileName) {
+  return readFile(join(workshopDir, fileName), 'utf8');
 }
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-test('persists preferences and candidate writes to JSON', async () => {
-  const { storage, dataFile } = await createStorage();
+test('creates .workshop files and persists preferences/candidate as Markdown', async () => {
+  const { storage, workshopDir } = await createStorage();
+  for (const fileName of ['project.md', 'candidates.md', 'sheets.md', 'relations.md', 'graph.md', 'preferences.md']) {
+    assert.ok((await readWorkshopFile(workshopDir, fileName)).length > 0, `${fileName} 应已创建`);
+  }
   await storage.preferencesSet('generator', { race: 'elf', count: 20 });
   const created = await storage.candidateCreate({
     race: 'human',
     nameType: 'person',
-    nameText: '雷恩',
-    structure: [{ label: '短名', word: '雷恩' }],
+    nameText: '雷·恩医·珂希',
+    structure: [{ label: '姓氏（1.0%人口）', word: '雷' }],
     source: 'generated',
+    gender: 'neutral',
     favorite: true,
   });
   assert.equal(created.ok, true);
-  const persisted = JSON.parse(await readFile(dataFile, 'utf8'));
-  assert.equal(persisted.preferences.generator.race, 'elf');
-  assert.equal(persisted.candidates[0].nameText, '雷恩');
-  assert.deepEqual(await new WorkshopStorage(dataFile).preferencesGet('generator'), { race: 'elf', count: 20 });
+
+  const candidatesMd = await readWorkshopFile(workshopDir, 'candidates.md');
+  assert.match(candidatesMd, /# 名称候选/);
+  assert.match(candidatesMd, /## 雷·恩医·珂希/);
+  assert.match(candidatesMd, /- 性别: 中性/);
+  assert.match(candidatesMd, /- 收藏: 是/);
+  const preferencesMd = await readWorkshopFile(workshopDir, 'preferences.md');
+  assert.match(preferencesMd, /## 生成规则/);
+  assert.match(preferencesMd, /"race": "elf"/);
+
+  const reopened = new WorkshopStorage({ dataDirName: '.workshop' });
+  await reopened.open(join(workshopDir, '..'));
+  assert.deepEqual(await reopened.preferencesGet('generator'), { race: 'elf', count: 20 });
+  const filters = { race: 'all', nameType: 'all', minChars: 1, maxChars: 99, status: 'all', keyword: '', sort: 'latest' };
+  const list = await reopened.candidatesList(filters);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].nameText, '雷·恩医·珂希');
+  assert.equal(list[0].charCount, 5, '字数应排除「·」分隔符');
+  assert.equal(list[0].gender, 'neutral');
 });
 
 test('rejects duplicate candidate names', async () => {
@@ -42,7 +66,7 @@ test('rejects duplicate candidate names', async () => {
     race: 'human',
     nameType: 'place',
     nameText: '青石城',
-    structure: [{ label: '地名', word: '青石' }],
+    structure: [{ label: '地形前缀', word: '青石' }],
     source: 'generated',
   };
   assert.equal((await storage.candidateCreate(input)).ok, true);
@@ -122,17 +146,19 @@ test('cascades sheet removal into relations and updates stats', async () => {
   assert.equal(stats.totalRelations, 0);
 });
 
-test('backs up malformed JSON and starts with empty data', async () => {
-  const { storage, dataFile } = await createStorage();
-  await writeFile(dataFile, '{not-json', 'utf8');
+test('tolerates malformed Markdown entries and starts from empty data', async () => {
+  const { storage, workshopDir } = await createStorage();
+  await writeFile(join(workshopDir, 'candidates.md'), '# 名称候选\n\n## 坏数据\n\n这不是字段行\n', 'utf8');
   const filters = { race: 'all', nameType: 'all', minChars: 1, maxChars: 99, status: 'all', keyword: '', sort: 'latest' };
   assert.deepEqual(await storage.candidatesList(filters), []);
   assert.equal((await storage.stats()).totalCandidates, 0);
+  assert.equal((await storage.candidateCreate({ race: 'human', nameType: 'place', nameText: '青石城', structure: [], source: 'generated' })).ok, true);
+  assert.equal((await storage.candidatesList(filters)).length, 1);
 });
 
-test('migrates legacy demon race values to elf on read', async () => {
-  const { storage, dataFile } = await createStorage();
-  const legacy = {
+test('imports legacy JSON data into classified Markdown files and migrates demon race', async () => {
+  const { storage, workshopDir } = await createStorage();
+  const imported = await storage.importLegacyData({
     schemaVersion: 1,
     candidates: [
       {
@@ -153,8 +179,8 @@ test('migrates legacy demon race values to elf on read', async () => {
         id: 'legacy-sheet',
         characterName: '旧妖族角色',
         race: 'demon',
-        candidateId: '',
-        occupation: '',
+        candidateId: 'legacy-candidate',
+        occupation: '剑修',
         office: '',
         hometown: '',
         hometownCandidateId: '',
@@ -166,12 +192,76 @@ test('migrates legacy demon race values to elf on read', async () => {
       },
     ],
     relations: [],
-    preferences: {},
-  };
-  await writeFile(dataFile, JSON.stringify(legacy), 'utf8');
+    preferences: { generator: { race: 'demon' } },
+  });
+  assert.equal(imported.candidates, 1);
+  assert.equal(imported.sheets, 1);
   const filters = { race: 'elf', nameType: 'all', minChars: 1, maxChars: 99, status: 'all', keyword: '', sort: 'latest' };
   const candidates = await storage.candidatesList(filters);
   assert.equal(candidates.length, 1);
   assert.equal(candidates[0].race, 'elf');
   assert.equal((await storage.sheetsList())[0].race, 'elf');
+  assert.deepEqual(await storage.preferencesGet('generator'), { race: 'demon' });
+  assert.match(await readWorkshopFile(workshopDir, 'sheets.md'), /旧妖族角色/);
+  assert.match(await readWorkshopFile(workshopDir, 'relations.md'), /# 人物与地名关系/);
+});
+
+test('persists graph layout coordinates in graph.md and keeps them after data changes', async () => {
+  const { storage, workshopDir } = await createStorage();
+  const sheet = await storage.sheetSave({
+    characterName: '雷恩',
+    race: 'human',
+    candidateId: '',
+    occupation: '',
+    office: '',
+    hometown: '',
+    hometownCandidateId: '',
+    nickname: '',
+    contractTitle: '',
+    note: '',
+  });
+  const nodeId = `s:${sheet.id}`;
+  assert.deepEqual(await storage.graphLayoutSave({ [nodeId]: { x: 12.5, y: 30.25 } }), { ok: true });
+  assert.deepEqual(await storage.graphLayoutGet(), { [nodeId]: { x: 12.5, y: 30.25 } });
+  const graphMd = await readWorkshopFile(workshopDir, 'graph.md');
+  assert.match(graphMd, /## 节点布局/);
+  assert.match(graphMd, /节点布局|人物：雷恩/);
+
+  // 数据变化刷新快照时不应丢失布局
+  await storage.candidateCreate({ race: 'human', nameType: 'place', nameText: '青石城', structure: [], source: 'generated' });
+  assert.deepEqual(await storage.graphLayoutGet(), { [nodeId]: { x: 12.5, y: 30.25 } });
+  assert.match(await readWorkshopFile(workshopDir, 'graph.md'), /节点布局/);
+});
+
+test('supports hand-written Markdown candidate files', async () => {
+  const { storage, workshopDir } = await createStorage();
+  await writeFile(
+    join(workshopDir, 'candidates.md'),
+    [
+      '# 名称候选',
+      '',
+      '## 手写·候选',
+      '',
+      '- ID: `hand-written-id`',
+      '- 名称: 手写·候选',
+      '- 族群: 精灵族',
+      '- 类型: 人名',
+      '- 性别: 女性',
+      '- 来源: 手动',
+      '- 收藏: 否',
+      '- 备注: "第一行\\n第二行"',
+      '- 创建时间: 2026-10-26T00:00:00.000Z',
+      '- 更新时间: 2026-10-26T00:00:00.000Z',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  const filters = { race: 'all', nameType: 'all', minChars: 1, maxChars: 99, status: 'all', keyword: '', sort: 'latest' };
+  const [candidate] = await storage.candidatesList(filters);
+  assert.equal(candidate.nameText, '手写·候选');
+  assert.equal(candidate.race, 'elf');
+  assert.equal(candidate.gender, 'female');
+  assert.equal(candidate.source, 'manual');
+  assert.equal(candidate.note, '第一行\n第二行');
+  assert.equal(candidate.charCount, 4);
 });

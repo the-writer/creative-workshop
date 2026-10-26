@@ -1,6 +1,6 @@
 // 桌面数据边界：业务组件只依赖此层，所有持久化请求由 Electron 主进程完成。
 
-import type { Candidate, CandidateFilters, NameTypeKey, RaceKey, Relation, Sheet, SourceKey } from '@/lib/types';
+import type { Candidate, CandidateFilters, NameGender, NameTypeKey, RaceKey, Relation, Sheet, SourceKey } from '@/lib/types';
 
 export interface SheetInput {
   id?: string;
@@ -27,13 +27,6 @@ export interface RelationInput {
   note: string;
 }
 
-export interface ExportBundle {
-  exportedAt: string;
-  candidates: Candidate[];
-  sheets: Sheet[];
-  relations: Relation[];
-}
-
 export interface StatsData {
   totalCandidates: number;
   totalFavorites: number;
@@ -45,10 +38,57 @@ export interface StatsData {
   relationTypeDist: Record<string, number>;
 }
 
+/** 项目摘要：项目目录路径与展示名 */
+export interface ProjectSummary {
+  path: string;
+  name: string;
+  lastOpenedAt: number;
+}
+
+export interface ProjectOpenResult {
+  ok: boolean;
+  project?: ProjectSummary;
+  message?: string;
+}
+
+export interface PickDirectoryResult {
+  ok: boolean;
+  canceled?: boolean;
+  path?: string;
+}
+
 function api() {
   if (!window.workshop) throw new Error('桌面数据服务尚未就绪，请重新打开应用');
   return window.workshop;
 }
+
+/* ---------------- 项目管理 ---------------- */
+
+export async function listRecentProjects(): Promise<ProjectSummary[]> {
+  return api().projects.listRecent();
+}
+
+export async function getCurrentProject(): Promise<ProjectSummary | null> {
+  return api().projects.current();
+}
+
+export async function openProject(path: string): Promise<ProjectOpenResult> {
+  return api().projects.open(path);
+}
+
+export async function createProject(input: { parentDir: string; name: string }): Promise<ProjectOpenResult> {
+  return api().projects.create(input);
+}
+
+export async function pickProjectDirectory(kind: 'open' | 'parent' = 'open'): Promise<PickDirectoryResult> {
+  return api().projects.pickDirectory(kind);
+}
+
+export async function openProjectInVSCode(): Promise<{ ok: boolean; message?: string }> {
+  return api().projects.openInVSCode();
+}
+
+/* ---------------- 候选库 ---------------- */
 
 export async function fetchCandidates(filters: CandidateFilters): Promise<Candidate[]> {
   return api().candidates.list(filters);
@@ -65,6 +105,7 @@ export async function insertCandidate(input: {
   nameText: string;
   structure: { label: string; word: string }[];
   source: SourceKey;
+  gender?: NameGender;
   favorite?: boolean;
   note?: string;
 }): Promise<{ ok: boolean; duplicate: boolean; id: string; message?: string }> {
@@ -90,6 +131,8 @@ export async function deleteCandidate(
   return api().candidates.remove(id, force);
 }
 
+/* ---------------- 设定与关系 ---------------- */
+
 export async function fetchRelations(): Promise<Relation[]> {
   return api().relations.list();
 }
@@ -114,9 +157,19 @@ export async function removeRelation(id: string): Promise<{ ok: boolean; message
   return api().relations.remove(id);
 }
 
-export async function fetchAllData(): Promise<ExportBundle> {
-  const bundle = await api().data.all();
-  return { ...bundle, exportedAt: new Date().toISOString() };
+/* ---------------- 图谱与统计 ---------------- */
+
+export interface GraphPoint {
+  x: number;
+  y: number;
+}
+
+export async function fetchGraphLayout(): Promise<Record<string, GraphPoint>> {
+  return api().graph.getLayout();
+}
+
+export async function saveGraphLayout(positions: Record<string, GraphPoint>): Promise<{ ok: boolean }> {
+  return api().graph.saveLayout(positions);
 }
 
 export async function fetchStats(): Promise<StatsData> {

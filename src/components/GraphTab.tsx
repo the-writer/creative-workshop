@@ -1,12 +1,11 @@
-// 图谱页：关系/全景视图、力导向布局、拖拽与缩放平移、节点/连线详情、PNG 导出
+// 图谱页：关系/全景视图、力导向布局、拖拽与缩放平移、节点/连线详情、布局持久化
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Home, Minus, Plus, RefreshCw, X } from 'lucide-react';
-import { fetchCandidates, fetchRelations, fetchSheets } from '@/lib/db';
+import { Home, Minus, Plus, RefreshCw, X } from 'lucide-react';
+import { fetchCandidates, fetchGraphLayout, fetchRelations, fetchSheets, saveGraphLayout } from '@/lib/db';
 import { buildGraphData, computeLayout, type GraphEdge, type GraphNode, type GraphViewMode, type NodeTypeFilter, type Position } from '@/lib/graph';
 import type { Candidate, RaceKey, Relation, Sheet } from '@/lib/types';
 import { FILTER_MAX_CHARS, normalizeRaceFilter, RACE_LABELS } from '@/lib/types';
 import { Chip, EmptyState, Seal, useAppToast } from '@/components/common';
-import { exportGraphPng } from '@/lib/export';
 import { cn } from '@/lib/utils';
 
 interface GraphTabProps {
@@ -15,6 +14,20 @@ interface GraphTabProps {
 }
 
 const NODE_R = { person: 22, place: 18 };
+
+const DRAG_SAVE_THRESHOLD_PX = 3;
+
+// 过滤掉历史/损坏的坐标，只保留有限数值，避免整张图谱被脏数据拉飞
+function sanitizeLayout(raw: Record<string, Position> | null | undefined): Record<string, Position> {
+  const result: Record<string, Position> = {};
+  if (!raw || typeof raw !== 'object') return result;
+  Object.entries(raw).forEach(([id, point]) => {
+    if (point && Number.isFinite(point.x) && Number.isFinite(point.y)) {
+      result[id] = { x: point.x, y: point.y };
+    }
+  });
+  return result;
+}
 
 export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
   const toast = useAppToast();
@@ -26,11 +39,14 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
   const [viewMode, setViewMode] = useState<GraphViewMode>('relation');
   const [typeFilter, setTypeFilter] = useState<NodeTypeFilter>('all');
   const [raceFilter, setRaceFilter] = useState<RaceKey | 'all'>('all');
-  const [exporting, setExporting] = useState(false);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 360, h: 480 });
   const [positions, setPositions] = useState<Map<string, Position>>(new Map());
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
+  // 已持久化的节点坐标（加载自 .workshop/graph.md，拖拽结束后更新），用于覆盖自动布局
+  const savedLayoutRef = useRef<Record<string, Position>>({});
   const [view, setView] = useState({ tx: 0, ty: 0, scale: 1 });
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -42,14 +58,17 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, r, p] = await Promise.all([
+      const [s, r, p, layout] = await Promise.all([
         fetchSheets(),
         fetchRelations(),
         fetchCandidates({ race: 'all', nameType: 'place', minChars: 1, maxChars: FILTER_MAX_CHARS, status: 'all', keyword: '', sort: 'latest' }),
+        // 布局读取失败不影响图谱主体展示，回退为自动布局
+        fetchGraphLayout().catch(() => null),
       ]);
       setSheets(s);
       setRelations(r);
       setPlaces(p);
+      savedLayoutRef.current = sanitizeLayout(layout);
       setError('');
     } catch (err) {
       setError((err as Error)?.message || '加载失败，请重试');
@@ -78,15 +97,23 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
     [sheets, relations, places, viewMode, typeFilter, raceFilter],
   );
 
-  // 数据/尺寸变化时重算布局
+  // 数据/尺寸变化时重算布局，再用已保存坐标覆盖当前存在的节点
   useEffect(() => {
-    setPositions(computeLayout(graphData.nodes, graphData.edges, size.w, size.h));
+    const layout = computeLayout(graphData.nodes, graphData.edges, size.w, size.h);
+    graphData.nodes.forEach((node) => {
+      const saved = savedLayoutRef.current[node.id];
+      if (saved) layout.set(node.id, { x: saved.x, y: saved.y });
+    });
+    setPositions(layout);
     setSelectedNode(null);
     setSelectedEdge(null);
   }, [graphData, size]);
 
+  // 重排布局：只刷新本次会话的坐标，不强制写盘
   const rerunLayout = () => {
-    setPositions(computeLayout(graphData.nodes, graphData.edges, size.w, size.h));
+    const layout = computeLayout(graphData.nodes, graphData.edges, size.w, size.h);
+    savedLayoutRef.current = Object.fromEntries(layout);
+    setPositions(layout);
   };
 
   const zoomAt = useCallback((clientX: number, clientY: number, factor: number) => {
@@ -138,9 +165,24 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
     }
   };
 
-  const onSvgPointerUp = () => {
+  const onSvgPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    const drag = dragRef.current;
     dragRef.current = null;
     panRef.current = null;
+    if (!drag) return;
+    // 仅有实际拖拽（非点选）时持久化全部节点坐标，保存失败不阻塞交互
+    const moved = Math.abs(e.clientX - drag.startX) > DRAG_SAVE_THRESHOLD_PX || Math.abs(e.clientY - drag.startY) > DRAG_SAVE_THRESHOLD_PX;
+    if (!moved) return;
+    const snapshot: Record<string, Position> = { ...savedLayoutRef.current };
+    positionsRef.current.forEach((point, id) => {
+      snapshot[id] = { x: point.x, y: point.y };
+    });
+    savedLayoutRef.current = snapshot;
+    void saveGraphLayout(snapshot)
+      .then((res) => {
+        if (!res.ok) toast.show('图谱布局保存失败，下次打开将沿用自动布局', 'error');
+      })
+      .catch(() => toast.show('图谱布局保存失败，下次打开将沿用自动布局', 'error'));
   };
 
   const onNodeDown = (e: React.PointerEvent, node: GraphNode) => {
@@ -149,16 +191,6 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
     if (!p) return;
     dragRef.current = { id: node.id, startX: e.clientX, startY: e.clientY, origX: p.x, origY: p.y };
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-  };
-
-  const handleExport = async () => {
-    if (graphData.nodes.length === 0) return;
-    setExporting(true);
-    const title = viewMode === 'relation' ? '关系图谱' : '全景图谱';
-    const res = await exportGraphPng(graphData.nodes, graphData.edges, positions, title);
-    setExporting(false);
-    if (res.ok) toast.show(`已导出 ${res.fileName}`, 'success');
-    else toast.show(res.message || '导出失败', 'error');
   };
 
   const hasAnyData = sheets.length > 0 || relations.length > 0 || places.length > 0;
@@ -185,16 +217,6 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className="icon-btn graph-export-btn"
-            title="导出图谱 PNG"
-            data-testid="graph-export"
-            disabled={exporting || graphData.nodes.length === 0}
-            onClick={() => void handleExport()}
-          >
-            <Download size={17} />
-          </button>
         </div>
         <div className="graph-toolbar-row graph-filter-row">
           <div className="filter-chips">
