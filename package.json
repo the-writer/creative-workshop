@@ -55,7 +55,6 @@
       "width": 800,
       "height": 600,
       "titleBarStyle": "hiddenInset",
-      "type": "panel",
       "alwaysOnTop": false
     },
     "storage": {

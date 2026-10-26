@@ -9,7 +9,6 @@ interface CreationWorkshopConfig {
     width?: number;
     height?: number;
     titleBarStyle?: 'hiddenInset';
-    type?: 'panel';
     alwaysOnTop?: boolean;
   };
   storage?: {
@@ -28,7 +27,6 @@ const config = packageJson.creationWorkshop ?? {};
 const windowWidth = config.window?.width ?? 640;
 const windowHeight = config.window?.height ?? 480;
 const titleBarStyle = config.window?.titleBarStyle ?? 'hiddenInset';
-const windowType = config.window?.type ?? 'panel';
 const windowAlwaysOnTop = config.window?.alwaysOnTop ?? false;
 const storageFileName = config.storage?.fileName ?? 'workshop.json';
 const trayIconFile = config.tray?.iconFile ?? 'assets/imgs/trayTemplate.png';
@@ -130,7 +128,6 @@ function createWindow(): BrowserWindow {
     maximizable: false,
     fullscreenable: false,
     show: false,
-    type: windowType,
     alwaysOnTop: windowAlwaysOnTop,
     title: APP_NAME,
     titleBarStyle,
@@ -154,11 +151,11 @@ function createWindow(): BrowserWindow {
     setCurrentDesktopBinding(mainWindow);
   }
 
-  mainWindow.webContents.toggleDevTools()
-
   const devUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devUrl) void mainWindow.loadURL(devUrl);
-  else void mainWindow.loadFile(join(app.getAppPath(), 'dist', 'index.html'));
+  if (devUrl) {
+    void mainWindow.loadURL(devUrl);
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  } else void mainWindow.loadFile(join(app.getAppPath(), 'dist', 'index.html'));
 
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
