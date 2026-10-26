@@ -312,7 +312,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
         </div>
         {/* 性别倾向：从规则设置移到主界面，仅在含人名/组合设定时展示 */}
         {usesPerson ? (
-          <div className="rule-row" data-testid="gender-row">
+          <div className="gender-row" data-testid="gender-row">
             <span className="rule-label">性别倾向</span>
             <div className="segmented">
               {GENDER_KEYS.map((gender) => (

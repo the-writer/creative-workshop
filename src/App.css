@@ -11,6 +11,10 @@
   --app-indigo: #3e4a5a;
   --app-pine: #4a7c59;
   --app-gold: #b98a3a;
+  /* 生成页：选型行（名称类型 chip 行、性别倾向行）的间距与尺寸 */
+  --app-chip-row-gap: 8px;
+  --app-choice-row-gap: 10px;
+  --app-choice-row-padding-y: 10px;
   --app-font-default:
     'Source Han Serif SC', 'Noto Serif CJK SC', 'Noto Serif SC', '思源宋体', 'FangSong', '仿宋', 'STFangsong', 'SimSun', '宋体', system-ui, -apple-system,
     BlinkMacSystemFont, sans-serif;
@@ -463,13 +467,23 @@ body {
 
 .race-chip-row {
   display: flex;
-  gap: 8px;
+  gap: var(--app-chip-row-gap);
 }
 
 .type-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--app-chip-row-gap);
+}
+
+/* 性别倾向行：与「名称类型」chip 行同为左对齐（不使用 .rule-row 的 space-between） */
+.gender-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: var(--app-choice-row-gap);
+  padding: var(--app-choice-row-padding-y) 0;
 }
 
 .rules-panel {

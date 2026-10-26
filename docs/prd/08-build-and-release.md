@@ -27,6 +27,7 @@
 - `afterPack`: `scripts/after-pack.cjs`
 - 未提供 `CSC_LINK` / `CSC_NAME` / `APPLE_ID` 时由 `dist-mac.sh` 关闭证书自动发现，避免误用钥匙串中的无效身份；`.app` 由后处理执行 ad-hoc 签名
 - `files` 明确包含 `assets/imgs/trayTemplate*.png`，保证打包后托盘图标可加载
+- `mac.extendInfo`：`NSHighResolutionCapable: true`、`LSUIElement: true`（应用为菜单栏常驻应用，打包后不显示 Dock 图标，见 §1.4）
 - 安装位置：固定 `/Applications`，禁止安装到任意位置或当前用户 Home
 - `isRelocatable=false`，避免 macOS Installer 把新版本重定位到旧路径
 - 产物名：`creation-workshop-v<version>-<arch>.pkg`

@@ -54,8 +54,10 @@
     "window": {
       "width": 800,
       "height": 600,
+      "type": "panel",
       "titleBarStyle": "hiddenInset",
-      "alwaysOnTop": false
+      "alwaysOnTop": false,
+      "alwaysOnTopLevel": "floating"
     },
     "project": {
       "dataDirName": ".workshop",
@@ -84,7 +86,8 @@
     "mac": {
       "category": "public.app-category.productivity",
       "extendInfo": {
-        "NSHighResolutionCapable": true
+        "NSHighResolutionCapable": true,
+        "LSUIElement": true
       },
       "target": [
         {

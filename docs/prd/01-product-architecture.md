@@ -53,32 +53,57 @@ flowchart TD
 
 ### 1.4 窗口行为
 
-| 项目           | 值                 | 来源                                                         |
-| -------------- | ------------------ | ------------------------------------------------------------ |
-| 窗口内容尺寸   | 800 × 600          | `package.json` → `creationWorkshop.window.width/height`      |
-| 尺寸缺省回退   | 640 × 480          | `electron/main.cts`（配置缺省时）                            |
-| 标题栏样式     | `hiddenInset`      | `package.json` → `creationWorkshop.window.titleBarStyle`     |
-| 红绿灯位置     | `{ x: 12, y: 12 }` | `electron/main.cts` → `trafficLightPosition`                 |
-| 窗口类型       | 普通窗口           | Electron 默认（不设置 `type`）                               |
-| 默认置顶       | 否                 | `creationWorkshop.window.alwaysOnTop`                        |
-| 可调整尺寸     | 否                 | `electron/main.cts` → `resizable/maximizable/fullscreenable` |
-| 使用内容尺寸   | 是                 | `electron/main.cts` → `useContentSize: true`                 |
-| 窗口背景色     | `#f5efe2`          | `electron/main.cts` → `backgroundColor`                      |
-| 应用名         | 创作工坊           | `package.json` → `productName`；`app.setName`                |
-| 拖拽标题栏高度 | 32 px              | `src/App.css` → `.desktop-titlebar`                          |
+| 项目           | 值                 | 来源                                                                                      |
+| -------------- | ------------------ | ----------------------------------------------------------------------------------------- |
+| 窗口内容尺寸   | 800 × 600          | `package.json` → `creationWorkshop.window.width/height`                                   |
+| 尺寸缺省回退   | 640 × 480          | `electron/main.cts`（配置缺省时）                                                         |
+| 标题栏样式     | `hiddenInset`      | `package.json` → `creationWorkshop.window.titleBarStyle`                                  |
+| 红绿灯位置     | `{ x: 12, y: 12 }` | `electron/main.cts` → `trafficLightPosition`                                              |
+| 窗口类型       | `panel` 面板窗口   | `package.json` → `creationWorkshop.window.type`（非 darwin 不传）                         |
+| 默认置顶       | 否                 | `creationWorkshop.window.alwaysOnTop`                                                     |
+| 置顶层级       | `floating`         | `creationWorkshop.window.alwaysOnTopLevel`（仅置顶为真时生效）                            |
+| Dock 图标      | 不显示             | `package.json` → `build.mac.extendInfo.LSUIElement`；`electron/main.cts` → `hideDockIcon` |
+| 可调整尺寸     | 否                 | `electron/main.cts` → `resizable/maximizable/fullscreenable`                              |
+| 使用内容尺寸   | 是                 | `electron/main.cts` → `useContentSize: true`                                              |
+| 窗口背景色     | `#f5efe2`          | `electron/main.cts` → `backgroundColor`                                                   |
+| 应用名         | 创作工坊           | `package.json` → `productName`；`app.setName`                                             |
+| 拖拽标题栏高度 | 32 px              | `src/App.css` → `.desktop-titlebar`                                                       |
 
 应用加载 `dist/index.html`；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务，并在该模式下自动打开独立 DevTools。
 
-启动时窗口由 `mainWindow.once('ready-to-show', showMainWindow)` 显示，用户首先看到项目门。主窗口系统关闭按钮只隐藏窗口（`close` 事件阻止默认并 `hide()`），应用继续由托盘驻留；托盘左键与右键菜单「打开主界面」重新打开，应用 `activate` 事件（macOS 点击 Dock）也重新打开。托盘右键菜单提供「打开主界面」和「退出创作工坊」。
+启动时窗口由 `mainWindow.once('ready-to-show', showMainWindow)` 显示，用户首先看到项目门。主窗口系统关闭按钮只隐藏窗口（`close` 事件阻止默认并 `hide()`），应用继续由托盘驻留；托盘左键与右键菜单「打开主界面」、应用菜单「窗口 → 显示主界面」重新打开。托盘右键菜单提供「打开主界面」和「退出创作工坊」。应用无 Dock 图标，因此 `activate`（点击 Dock）不是常规入口。
 
-主进程在 macOS 使用普通窗口（不设置 `type`），默认不启用 `alwaysOnTop`。窗口以
-`setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true, skipTransformProcessType: true })` 绑定到打开时所在的桌面，用户切换桌面时不会跟随，始终留在原桌面。
+主窗口是 macOS **`panel` 面板窗口**（`type: 'panel'`）：层级高于普通窗口、跟随当前活跃 Space（含全屏 Space），且 `canBecomeMainWindow = false`，
+不会把用户从其它应用的全屏界面里拉回桌面；`NSPanel` + `titled` 样式使窗口仍可成为 key window，正常接收键盘输入与中文输入法。
+窗口默认不置顶（`alwaysOnTop: false`）；置顶只在配置为真时设置，层级取 `alwaysOnTopLevel`（`floating`），且配置为假时**不调用任何 `setAlwaysOnTop`**，避免残留层级把窗口长期压在最上层。
 
-> 不使用 `type: 'panel'`：Electron 的 panel 窗口会出现在所有桌面（Spaces）上，导致切换桌面时窗口跟着跑到新桌面。
+`showMainWindow()`（`electron/main.cts`）是唯一的显示/抢焦点出口，流程如下：
 
-从隐藏状态点击托盘重新打开时，主进程先临时启用“所有工作区可见”，随后调用 `show()`、`focus()`、`moveTop()`，并在 **60ms** 后重新绑定当前桌面。因此窗口会在点击托盘时所在的桌面打开，而不是被系统拉回旧桌面；绑定完成后普通桌面切换不会再带走窗口。
+```mermaid
+flowchart TD
+  A[托盘/菜单/激活 触发 showMainWindow] --> B{窗口存在?}
+  B -- 否 --> C[createWindow]
+  B -- 是 --> D{isVisible 或 距上次 hide 小于 1000ms}
+  C --> D
+  D -- 是（窗口已在前台）--> E[applyNormalWindowLevel → show → moveTop]
+  D -- 否（关闭后重新打开）--> F[applyNormalWindowLevel → setVisibleOnAllWorkspaces true,visibleOnFullScreen → 若置顶则临时 screen-saver 层]
+  F --> G[show → app.focus steal → win.focus]
+  G --> H[300ms 兜底定时器到点 releaseFullscreenOverlay]
+  G --> I[focus 事件 → releaseFullscreenOverlay]
+  E --> J[用户关闭：close 阻止默认 → hide]
+  I --> J
+  H --> J
+  J --> K[hide 事件：记录 lastHiddenAt → 释放临时层级 → 60ms 后撤销所有工作区可见]
+```
 
-应用在 `Info.plist` 中显式声明 `NSHighResolutionCapable=true`，页面缩放固定为 1，并启用字体平滑以适配 Retina/HiDPI 显示。默认字体依次尝试思源宋体、仿宋、宋体，均不存在时回退系统默认字体。
+要点：
+
+- **在当前桌面打开**：窗口隐藏后于 `SPACE_SETTLE_DELAY_MS = 60ms` 撤销「所有工作区可见」（`releaseFromAllSpaces`），撤销发生在窗口不可见之后，不会闪动；由于是 panel，下一次打开按当前活跃 Space 落位，不会被系统拉回上次/首次打开的桌面。旧版「60ms 后重新绑定桌面 + `spaceBindTimer`」逻辑已整体删除。
+- **全屏下可打开**：重新打开时启用 `setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })`；置顶开启时再临时抬到 `FULLSCREEN_OVERLAY_LEVEL = 'screen-saver'`，拿到焦点或 `LEVEL_RESTORE_TIMEOUT_MS = 300ms` 兜底后恢复（`focus` 事件、`hide`、`closed` 均会清理，`before-quit` 清理定时器）。置顶关闭时**不抬层**，不会压住状态栏/Dock。
+- **重新打开判定**：`REVEAL_MIN_INTERVAL_MS = 1000`（`electron/main.cts`）——窗口不可见，或距上次 `hide` 超过 1 秒，才视为「关闭后重新打开」并抢一次焦点；窗口已在前台再次点托盘只 `show`/`moveTop`，不抢焦点、不叠加层级。
+- **不显示 Dock 图标**：打包后 `Info.plist` 声明 `LSUIElement = true`（`package.json` → `build.mac.extendInfo`），系统层面即无可激活 Dock 图标；运行期 `whenReady` 最先调用 `hideDockIcon()`（`app.dock?.isVisible()` 时 `app.dock.hide()`）作为开发态兜底，且只在启动时调用一次（规避 Electron「1 秒内重复 `dock.hide()` 无效」的已知问题），窗口再次显示不会让 Dock 图标回来。因无 Dock 图标，重新打开时在 darwin 上先 `app.focus({ steal: true })` 再 `win.focus()`，确保窗口成为 key window。
+
+应用在 `Info.plist` 中显式声明 `NSHighResolutionCapable=true` 与 `LSUIElement=true`，页面缩放固定为 1，并启用字体平滑以适配 Retina/HiDPI 显示。默认字体依次尝试思源宋体、仿宋、宋体，均不存在时回退系统默认字体。
 
 ### 1.5 安全与导航
 
@@ -99,10 +124,13 @@ flowchart TD
 | `project.maxRecentProjects`  | `10`                           | 最近项目数量上限                 | `electron/main.cts` → `ProjectManager`                     |
 | `window.width` / `height`    | `800` / `600`                  | 窗口内容尺寸                     | `electron/main.cts`                                        |
 | `window.titleBarStyle`       | `hiddenInset`                  | 标题栏样式                       | `electron/main.cts`                                        |
+| `window.type`                | `panel`                        | 窗口类型（仅 macOS 生效）        | `electron/main.cts`                                        |
+| `window.alwaysOnTopLevel`    | `floating`                     | 置顶时的窗口层级（仅置顶为真时） | `electron/main.cts`                                        |
 | `window.alwaysOnTop`         | `false`                        | 是否默认置顶                     | `electron/main.cts`                                        |
 | `tray.iconFile`              | `assets/imgs/trayTemplate.png` | 托盘模板图标                     | `electron/main.cts`                                        |
 
 四个 `project.*` 配置项缺省时回退到上表默认值；空字符串视为未配置。旧版 `creationWorkshop.storage.fileName` 已不存在。
+`window.*` 缺省时回退到 `electron/main.cts` 中集中定义的 `DEFAULT_*` 常量；`window.type` 仅 darwin 生效，其它平台不传 `type`。
 
 ### 1.7 数据位置
 

@@ -1,9 +1,9 @@
-// 设置页：项目切换、VS Code 打开项目目录、应用信息与保留的不可用入口（已移除导出）
+// 设置页：项目切换与 VS Code 打开项目目录、应用信息
 
 import { useState } from 'react';
-import { Code2, FolderOpen, Loader2, Share2 } from 'lucide-react';
+import { Code2, FolderOpen, Loader2 } from 'lucide-react';
 import { openProjectInVSCode, type ProjectSummary } from '@/lib/db';
-import { ConfirmDialog, SectionTitle, useAppToast } from '@/components/common';
+import { SectionTitle, useAppToast } from '@/components/common';
 
 interface SettingsTabProps {
   project: ProjectSummary;
@@ -13,7 +13,6 @@ interface SettingsTabProps {
 export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
   const toast = useAppToast();
   const [opening, setOpening] = useState(false);
-  const [shareUnavailable, setShareUnavailable] = useState(false);
 
   const handleOpenInVSCode = async () => {
     if (opening) return;
@@ -62,33 +61,7 @@ export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
           <p className="settings-about-name">创作工坊</p>
           <p className="settings-desc">为小说世界观生成人名、地名、官职与绰号，并组织候选、设定卡、关系图谱与统计。</p>
         </div>
-
-        <SectionTitle>更多</SectionTitle>
-        <div className="settings-card">
-          <div className="settings-card-title">
-            <Share2 size={18} className="settings-card-icon" />
-            分享
-          </div>
-          <p className="settings-desc">分享功能暂不可用，当前版本不包含远程请求或系统分享调用。</p>
-          <div className="settings-actions">
-            <button type="button" className="secondary-btn" data-testid="settings-share" onClick={() => setShareUnavailable(true)}>
-              <Share2 size={16} />
-              分享
-            </button>
-          </div>
-        </div>
       </div>
-
-      <ConfirmDialog
-        open={shareUnavailable}
-        onOpenChange={setShareUnavailable}
-        title="分享暂不可用"
-        description="当前版本暂不提供分享功能，入口会保留以便后续恢复。"
-        confirmText="知道了"
-        showCancel={false}
-        onConfirm={() => setShareUnavailable(false)}
-        testId="share-unavailable-dialog"
-      />
     </div>
   );
 }
