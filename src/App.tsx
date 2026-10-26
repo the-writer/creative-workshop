@@ -48,6 +48,33 @@ function App() {
         <span>创作工坊</span>
       </header>
       <ToastProvider>
+        {/* 生成页常驻挂载：切换底部页签或打开设定编辑器时只隐藏、不卸载，保留已生成结果 */}
+        <div className={cn('app-shell', editor && 'app-shell-hidden')} aria-hidden={editor ? true : undefined}>
+          <div className="app-page-slot">
+            <div className={cn('app-page-pane', page !== 'generate' && 'app-page-pane-hidden')}>
+              <GenerateTab onOpenEditor={(p) => openEditor(p)} />
+            </div>
+            {page === 'library' ? <LibraryTab refreshKey={refreshKey} onOpenEditor={(p) => openEditor(p)} onGoGenerate={() => setPage('generate')} /> : null}
+            {page === 'sheets' ? <SheetsTab refreshKey={refreshKey} onOpenEditor={(p, id) => openEditor(p, id)} /> : null}
+            {page === 'graph' ? <GraphTab refreshKey={refreshKey} onGoSheets={() => setPage('sheets')} /> : null}
+            {page === 'stats' ? <StatsTab refreshKey={refreshKey} /> : null}
+            {page === 'settings' ? <SettingsTab /> : null}
+          </div>
+          <nav className="bottom-nav">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={cn('bottom-nav-btn', page === item.key && 'bottom-nav-btn-active')}
+                data-testid={`nav-${item.key}`}
+                onClick={() => setPage(item.key)}
+              >
+                {item.icon}
+                <span className="nav-label">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
         {editor ? (
           <SheetEditor
             key={editor.sheetId ?? `new-${editor.prefill?.candidateId || editor.prefill?.characterName || 'blank'}`}
@@ -56,32 +83,7 @@ function App() {
             onBack={() => setEditor(null)}
             onSaved={handleSaved}
           />
-        ) : (
-          <div className="app-shell">
-            <div className="app-page-slot">
-              {page === 'generate' ? <GenerateTab onOpenEditor={(p) => openEditor(p)} /> : null}
-              {page === 'library' ? <LibraryTab refreshKey={refreshKey} onOpenEditor={(p) => openEditor(p)} onGoGenerate={() => setPage('generate')} /> : null}
-              {page === 'sheets' ? <SheetsTab refreshKey={refreshKey} onOpenEditor={(p, id) => openEditor(p, id)} /> : null}
-              {page === 'graph' ? <GraphTab refreshKey={refreshKey} onGoSheets={() => setPage('sheets')} /> : null}
-              {page === 'stats' ? <StatsTab refreshKey={refreshKey} /> : null}
-              {page === 'settings' ? <SettingsTab /> : null}
-            </div>
-            <nav className="bottom-nav">
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={cn('bottom-nav-btn', page === item.key && 'bottom-nav-btn-active')}
-                  data-testid={`nav-${item.key}`}
-                  onClick={() => setPage(item.key)}
-                >
-                  {item.icon}
-                  <span className="nav-label">{item.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-        )}
+        ) : null}
       </ToastProvider>
     </div>
   );

@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-export type RaceKey = 'human' | 'demon';
+export type RaceKey = 'human' | 'elf';
 export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
 export type EntityType = 'sheet' | 'place';
 
@@ -143,8 +143,9 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+// 旧数据中的妖族 key 为 demon，读取时静默迁移为精灵族 elf；非法值回退人族。
 function asRace(value: unknown): RaceKey {
-  return value === 'demon' ? 'demon' : 'human';
+  return value === 'elf' || value === 'demon' ? 'elf' : 'human';
 }
 
 function asNameType(value: unknown): NameTypeKey {

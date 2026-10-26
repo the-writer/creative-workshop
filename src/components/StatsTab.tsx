@@ -143,13 +143,7 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
             {/* 分布 */}
             <div className="stat-chart-card">
               <SectionTitle>族群分布</SectionTitle>
-              <BarChart
-                data={stats.raceDist}
-                order={['human', 'demon']}
-                labels={RACE_LABELS}
-                color="#B23A2E"
-                colorMap={{ human: '#B23A2E', demon: '#3E4A5A' }}
-              />
+              <BarChart data={stats.raceDist} order={['human', 'elf']} labels={RACE_LABELS} color="#B23A2E" colorMap={{ human: '#B23A2E', elf: '#3E4A5A' }} />
             </div>
             <div className="stat-chart-card">
               <SectionTitle>类型分布</SectionTitle>
@@ -181,8 +175,8 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
                 <strong>{formatCombination(combo.perRace.human.total)}</strong>
               </div>
               <div className="lexicon-row">
-                <span>妖族组合量</span>
-                <strong>{formatCombination(combo.perRace.demon.total)}</strong>
+                <span>精灵族组合量</span>
+                <strong>{formatCombination(combo.perRace.elf.total)}</strong>
               </div>
               <div className="lexicon-row lexicon-row-total">
                 <span>理论组合总量</span>

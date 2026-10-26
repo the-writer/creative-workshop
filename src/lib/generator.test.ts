@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LEXICON, SURNAMES, SURNAME_RARE_POPULATION_SHARE, SYLLABLE_GENDER_BIAS, SYLLABLES, computeCombinationTotals, formatCombination } from '@/data/lexicon';
+import { ELF_LEXICON, ELF_SYLLABLE_GENDER_BIAS, ELF_SYLLABLES } from '@/data/lexicon-elf';
 import {
   DEFAULT_GEN_PARAMS,
   genCombo,
@@ -14,7 +15,7 @@ import {
 } from '@/lib/generator';
 import { GENDER_KEYS, type NameTypeKey, type RaceKey } from '@/lib/types';
 
-const races: RaceKey[] = ['human', 'demon'];
+const races: RaceKey[] = ['human', 'elf'];
 const types: NameTypeKey[] = ['person', 'place', 'office', 'nickname'];
 
 describe('lexicon', () => {
@@ -53,6 +54,50 @@ describe('lexicon', () => {
     expect(new Set(balanced.map((surname) => surname.selectionWeight.toFixed(8))).size).toBe(1);
     expect(natural.find((surname) => surname.rare)!.selectionWeight).toBeLessThan(natural.find((surname) => !surname.rare)!.selectionWeight);
     expect(pickSurname('human', 100, 0.999999).rare).toBe(true);
+  });
+
+  it('keeps the elf lexicon free of demonic vocabulary', () => {
+    const forbidden = /[妖魔怪鬼尸骨血咒蛊毒瘟疫魇魑魍魅煞烬墟冥邪恶灾祸噬蚀腐锈枯骸骷髅獠祟瘴蜃魃虬蟒蛛蝎]/;
+    const words = [...ELF_SYLLABLES, ...Object.values(ELF_LEXICON).flat(), ...SURNAMES.elf.map((surname) => surname.name)];
+    expect(words.filter((word) => forbidden.test(word))).toEqual([]);
+  });
+
+  it('keeps elf gender pools as subsets of the elf syllable table', () => {
+    const pools = Object.values(ELF_SYLLABLE_GENDER_BIAS);
+    expect(ELF_SYLLABLES).toHaveLength(160);
+    pools.forEach((pool) => {
+      expect(pool.length).toBeGreaterThanOrEqual(18);
+      expect(new Set(pool).size).toBe(pool.length);
+      expect(pool.every((syllable) => ELF_SYLLABLES.includes(syllable))).toBe(true);
+    });
+  });
+
+  it('avoids mechanical prefix repetition in elf word lists', () => {
+    const categories = [
+      ELF_LEXICON.professions,
+      ELF_LEXICON.abilities,
+      ELF_LEXICON.placePrefix2,
+      ELF_LEXICON.placeSuffix2,
+      ELF_LEXICON.officeTerritories,
+      ELF_LEXICON.nickProfession,
+      ELF_LEXICON.nickAppearance,
+      ELF_LEXICON.nickDeed,
+      ELF_LEXICON.nickTerrain,
+      ELF_LEXICON.nickContract,
+    ];
+    categories.forEach((words) => {
+      const first = new Map<string, number>();
+      const last = new Map<string, number>();
+      words
+        .filter((word) => Array.from(word).length === 2)
+        .forEach((word) => {
+          const [head, tail] = Array.from(word);
+          first.set(head, (first.get(head) ?? 0) + 1);
+          last.set(tail, (last.get(tail) ?? 0) + 1);
+        });
+      expect(Math.max(...first.values())).toBeLessThanOrEqual(4);
+      expect(Math.max(...last.values())).toBeLessThanOrEqual(4);
+    });
   });
 
   it('uses exact bigint combination totals beyond the safe integer range', () => {

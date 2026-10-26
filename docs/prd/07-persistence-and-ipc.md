@@ -75,5 +75,6 @@ const result = await window.workshop.candidates.create({
 
 - 对外字段采用 camelCase。
 - 读取时兼容旧的 snake_case 字段名与字符串结构数据。
+- 种族 key 当前为 `human` / `elf`；旧数据或旧偏好中的 `demon` 在读取时自动迁移为 `elf`，不丢失历史候选与设定。
 - 不允许渲染层提交任意保存路径。
 - 新增 IPC 通道必须在预加载白名单、类型声明、主进程处理器与本章节同时登记。

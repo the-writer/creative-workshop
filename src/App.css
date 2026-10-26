@@ -96,6 +96,18 @@ body {
   display: flex;
   flex-direction: column;
 }
+.app-page-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-page-pane-hidden {
+  display: none;
+}
+.app-shell-hidden {
+  display: none;
+}
 
 .page-shell {
   flex: 1;
@@ -199,7 +211,7 @@ body {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
-.seal-demon {
+.seal-elf {
   background: var(--app-indigo);
 }
 
@@ -225,7 +237,7 @@ body {
   color: var(--app-paper);
 }
 
-.app-chip-selected.chip-tone-demon {
+.app-chip-selected.chip-tone-elf {
   background: var(--app-indigo);
   border-color: var(--app-indigo);
   color: var(--app-paper);
@@ -402,7 +414,7 @@ body {
   color: var(--app-cinnabar);
 }
 
-.tag-race-demon {
+.tag-race-elf {
   border-color: rgba(62, 74, 90, 0.35);
   color: var(--app-indigo);
 }
@@ -743,81 +755,71 @@ body {
   font-size: 13px;
   color: var(--app-ink-2);
 }
-
-.batch-save-btn {
-  background: none;
-  border: 1px solid var(--app-pine);
-  color: var(--app-pine);
-  border-radius: 12px;
-  padding: 6px 12px;
-  font-family: inherit;
-  font-size: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.name-card-list {
-  display: flex;
-  gap: 10px;
+.result-table-wrap {
   margin-top: 10px;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: space-around;
-}
-
-.name-card {
-  max-width: 49%;
   border: 1px solid var(--app-line);
   border-radius: 10px;
   background: var(--app-paper);
-  padding: 12px 14px;
+  overflow-x: auto;
 }
 
-.name-card-top {
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.result-table th,
+.result-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--app-line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.result-table thead th {
+  color: var(--app-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(46, 38, 32, 0.04);
+  white-space: nowrap;
+}
+
+.result-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.result-table tbody tr:hover {
+  background: rgba(46, 38, 32, 0.03);
+}
+
+.result-name-cell {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
+  min-width: 150px;
 }
 
-.name-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.name-text {
-  margin: 0;
-  font-size: 17px;
-  font-weight: bold;
+.result-name-text {
+  color: var(--app-ink);
+  font-size: 15px;
+  font-weight: 700;
   letter-spacing: 1px;
 }
 
-.name-meta {
-  display: flex;
-  gap: 8px;
-  margin-top: 3px;
-  font-size: 11px;
-  color: var(--app-ink-2);
+.result-actions-head,
+.result-table td:last-child {
+  width: 108px;
 }
 
-.name-actions {
+.result-actions {
   display: flex;
-  gap: 2px;
-  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 3px;
 }
 
-.saved-stamp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--app-cinnabar);
-  color: var(--app-cinnabar);
-  border-radius: 10px;
-  font-size: 12px;
-  writing-mode: vertical-rl;
-  letter-spacing: 2px;
+.result-saved-btn {
+  color: var(--app-pine);
 }
 
 /* ============ 候选库 ============ */

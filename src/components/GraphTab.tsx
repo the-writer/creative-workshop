@@ -4,7 +4,7 @@ import { Download, Home, Minus, Plus, RefreshCw, X } from 'lucide-react';
 import { fetchCandidates, fetchRelations, fetchSheets } from '@/lib/db';
 import { buildGraphData, computeLayout, type GraphEdge, type GraphNode, type GraphViewMode, type NodeTypeFilter, type Position } from '@/lib/graph';
 import type { Candidate, RaceKey, Relation, Sheet } from '@/lib/types';
-import { FILTER_MAX_CHARS, RACE_LABELS } from '@/lib/types';
+import { FILTER_MAX_CHARS, normalizeRaceFilter, RACE_LABELS } from '@/lib/types';
 import { Chip, EmptyState, Seal, useAppToast } from '@/components/common';
 import { exportGraphPng } from '@/lib/export';
 import { cn } from '@/lib/utils';
@@ -215,7 +215,7 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
               [
                 ['all', '全族'],
                 ['human', '人族'],
-                ['demon', '妖族'],
+                ['elf', '精灵族'],
               ] as Array<[RaceKey | 'all', string]>
             ).map(([k, label]) => (
               <Chip key={k} selected={raceFilter === k} tone="neutral" onClick={() => setRaceFilter(k)} dataTestId={`graph-race-${k}`}>

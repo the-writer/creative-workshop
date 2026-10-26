@@ -20,7 +20,7 @@ afterEach(async () => {
 
 test('persists preferences and candidate writes to JSON', async () => {
   const { storage, dataFile } = await createStorage();
-  await storage.preferencesSet('generator', { race: 'demon', count: 20 });
+  await storage.preferencesSet('generator', { race: 'elf', count: 20 });
   const created = await storage.candidateCreate({
     race: 'human',
     nameType: 'person',
@@ -31,9 +31,9 @@ test('persists preferences and candidate writes to JSON', async () => {
   });
   assert.equal(created.ok, true);
   const persisted = JSON.parse(await readFile(dataFile, 'utf8'));
-  assert.equal(persisted.preferences.generator.race, 'demon');
+  assert.equal(persisted.preferences.generator.race, 'elf');
   assert.equal(persisted.candidates[0].nameText, '雷恩');
-  assert.deepEqual(await new WorkshopStorage(dataFile).preferencesGet('generator'), { race: 'demon', count: 20 });
+  assert.deepEqual(await new WorkshopStorage(dataFile).preferencesGet('generator'), { race: 'elf', count: 20 });
 });
 
 test('rejects duplicate candidate names', async () => {
@@ -128,4 +128,50 @@ test('backs up malformed JSON and starts with empty data', async () => {
   const filters = { race: 'all', nameType: 'all', minChars: 1, maxChars: 99, status: 'all', keyword: '', sort: 'latest' };
   assert.deepEqual(await storage.candidatesList(filters), []);
   assert.equal((await storage.stats()).totalCandidates, 0);
+});
+
+test('migrates legacy demon race values to elf on read', async () => {
+  const { storage, dataFile } = await createStorage();
+  const legacy = {
+    schemaVersion: 1,
+    candidates: [
+      {
+        id: 'legacy-candidate',
+        race: 'demon',
+        nameType: 'person',
+        nameText: '旧妖族名',
+        structure: [],
+        source: 'generated',
+        favorite: false,
+        note: '',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+    sheets: [
+      {
+        id: 'legacy-sheet',
+        characterName: '旧妖族角色',
+        race: 'demon',
+        candidateId: '',
+        occupation: '',
+        office: '',
+        hometown: '',
+        hometownCandidateId: '',
+        nickname: '',
+        contractTitle: '',
+        note: '',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+    relations: [],
+    preferences: {},
+  };
+  await writeFile(dataFile, JSON.stringify(legacy), 'utf8');
+  const filters = { race: 'elf', nameType: 'all', minChars: 1, maxChars: 99, status: 'all', keyword: '', sort: 'latest' };
+  const candidates = await storage.candidatesList(filters);
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].race, 'elf');
+  assert.equal((await storage.sheetsList())[0].race, 'elf');
 });

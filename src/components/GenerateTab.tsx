@@ -1,13 +1,13 @@
 // 生成页：族群/类型/规则选择 + 批量生成引擎 + 名称笺结果区 + 单条保存/收藏/复制/换一批
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { Badge, ChevronDown, Copy, Info, MapPin, Minus, PenLine, Plus, Save, ScrollText, SlidersHorizontal, UserPlus, UserRound, X } from 'lucide-react';
+import { Badge, Check, ChevronDown, Copy, MapPin, Minus, PenLine, Plus, Save, ScrollText, SlidersHorizontal, UserPlus, UserRound } from 'lucide-react';
 import { DEFAULT_GEN_PARAMS, generateBatch, type GenParams, type PersonSuffix, rerollCombo, rerollOne, type ShortMode } from '@/lib/generator';
 import { computeCombinationTotals, LEXICON, SURNAME_BALANCED_BIAS, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
 import { SURNAME_BIAS_STEP } from '@/lib/generator-rules';
 import { insertCandidate } from '@/lib/db';
 import type { Candidate, NameTypeKey, RaceKey } from '@/lib/types';
-import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
+import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, normalizeRaceKey, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
 import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +55,7 @@ function normalizePrefs(raw: unknown): GenPrefs {
         : DEFAULT_GEN_PARAMS.surnameBias;
     if (isLegacy && params.minChars === 4 && params.maxChars === 6) params.maxChars = DEFAULT_GEN_PARAMS.maxChars;
     return {
-      race: parsed.race === 'demon' ? 'demon' : 'human',
+      race: normalizeRaceKey(parsed.race),
       types:
         Array.isArray(parsed.types) && parsed.types.some((t) => ['person', 'place', 'office', 'nickname'].includes(t))
           ? parsed.types.filter((t) => ['person', 'place', 'office', 'nickname'].includes(t))
@@ -93,8 +93,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   const [validateError, setValidateError] = useState('');
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
-  const [savingAll, setSavingAll] = useState(false);
-  const [detailIdx, setDetailIdx] = useState<number | null>(null);
 
   const { race, types, params } = prefs;
 
@@ -169,28 +167,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
       },
     }));
 
-  // ---- 候选详情 ----
-  const closeDetail = () => {
-    setDetailIdx(null);
-  };
-
-  // 更新指定候选的备注（保存入谱时带入候选库）
-  const patchNote = (index: number, note: string) => {
-    setResults((prev) => {
-      const next = [...prev];
-      const item = next[index];
-      if (!item) return prev;
-      next[index] = { ...item, note };
-      return next;
-    });
-  };
-
-  const openDetail = (index: number) => {
-    const c = results[index];
-    if (!c) return;
-    setDetailIdx(index);
-  };
-
   const batchKey = (c: Candidate) => (c.combo ? `${c.race}|combo|${c.nameText}` : `${c.race}|${c.nameType}|${c.nameText}`);
 
   const comboMode = types.length > 1;
@@ -226,7 +202,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
       }
       setBatchStats({ total: res.total, deduped: res.deduped });
       setSavedKeys(new Set());
-      setDetailIdx(null);
       setIsGenerating(false);
     }, 420);
   };
@@ -261,36 +236,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
     } else {
       toast.show(res.message || '保存失败，请重试', 'error');
     }
-  };
-
-  const saveAll = async () => {
-    const unsaved = results.filter((c) => !savedKeys.has(batchKey(c)));
-    if (unsaved.length === 0) {
-      toast.show('本批均已入谱', 'info');
-      return;
-    }
-    setSavingAll(true);
-    let okCount = 0;
-    for (const c of unsaved) {
-      const res = await insertCandidate({
-        race: c.race,
-        nameType: c.nameType,
-        nameText: c.nameText,
-        structure: c.structure,
-        source: 'generated',
-        favorite: false,
-        note: c.note,
-      });
-      if (res.ok || res.duplicate) {
-        setSavedKeys((prev) => new Set(prev).add(batchKey(c)));
-        okCount += 1;
-      }
-    }
-    setSavingAll(false);
-    toast.show(
-      `本批已入谱 ${okCount} 条${okCount < unsaved.length ? `，${unsaved.length - okCount} 条失败` : ''}`,
-      okCount === unsaved.length ? 'success' : 'error',
-    );
   };
 
   const rerollItem = (index: number) => {
@@ -380,75 +325,74 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
             </Chip>
           ))}
         </div>
-        {/* 职业与特殊能力 */}
-        <SectionTitle>职业与特殊能力</SectionTitle>
-        <div className="param-panel">
-          <div className="param-columns">
-            <div className="param-group param-column">
-              <div className="param-group-head">
-                <span className="param-group-label">职业</span>
-                <span className="param-group-count">{params.professions.length > 0 ? `已选 ${params.professions.length}` : '不勾选时会随机抽取'}</span>
-                {params.professions.length > 0 ? (
-                  <button type="button" className="param-clear-btn" data-testid="clear-professions" onClick={() => setParams({ professions: [] })}>
-                    清空
-                  </button>
-                ) : null}
-              </div>
-              <div className="param-chip-wrap">
-                {LEXICON[race].professions.map((p) => (
-                  <Chip
-                    key={p}
-                    selected={params.professions.includes(p)}
-                    tone={race}
-                    className="param-chip"
-                    dataTestId={`prof-${p}`}
-                    onClick={() => toggleProfession(p)}
-                  >
-                    {p}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-            <div className="param-group param-column">
-              <div className="param-group-head">
-                <span className="param-group-label">特殊能力</span>
-                <span className="param-group-count">{params.abilities.length > 0 ? `已选 ${params.abilities.length}` : '不勾选时会随机抽取'}</span>
-                {params.abilities.length > 0 ? (
-                  <button type="button" className="param-clear-btn" data-testid="clear-abilities" onClick={() => setParams({ abilities: [] })}>
-                    清空
-                  </button>
-                ) : null}
-              </div>
-              <div className="param-chip-wrap">
-                {LEXICON[race].abilities.map((a) => (
-                  <Chip
-                    key={a}
-                    selected={params.abilities.includes(a)}
-                    tone={race}
-                    className="param-chip"
-                    dataTestId={`ability-${a}`}
-                    onClick={() => toggleAbility(a)}
-                  >
-                    {a}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* 规则设置 */}
         <div className="rules-panel">
           <button type="button" className="rules-toggle" onClick={() => setRulesOpen((v) => !v)} data-testid="rules-toggle">
             <SlidersHorizontal size={15} />
             <span>规则设置</span>
             <span className="rules-summary">
-              {params.count}条 · {genderLabel} · {surnameBiasLabel}姓氏
+              {params.count}条 · {genderLabel} · {surnameBiasLabel}姓氏 · 职业{params.professions.length} · 能力{params.abilities.length}
             </span>
             <ChevronDown size={15} className={cn('rules-chevron', rulesOpen && 'rules-chevron-open')} />
           </button>
           {rulesOpen ? (
             <div className="rules-body">
+              {/* 职业与特殊能力 */}
+              <div className="param-panel">
+                <div className="param-columns">
+                  <div className="param-group param-column">
+                    <div className="param-group-head">
+                      <span className="param-group-label">职业</span>
+                      <span className="param-group-count">{params.professions.length > 0 ? `已选 ${params.professions.length}` : '不勾选时会随机抽取'}</span>
+                      {params.professions.length > 0 ? (
+                        <button type="button" className="param-clear-btn" data-testid="clear-professions" onClick={() => setParams({ professions: [] })}>
+                          清空
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="param-chip-wrap">
+                      {LEXICON[race].professions.map((p) => (
+                        <Chip
+                          key={p}
+                          selected={params.professions.includes(p)}
+                          tone={race}
+                          className="param-chip"
+                          dataTestId={`prof-${p}`}
+                          onClick={() => toggleProfession(p)}
+                        >
+                          {p}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="param-group param-column">
+                    <div className="param-group-head">
+                      <span className="param-group-label">特殊能力</span>
+                      <span className="param-group-count">{params.abilities.length > 0 ? `已选 ${params.abilities.length}` : '不勾选时会随机抽取'}</span>
+                      {params.abilities.length > 0 ? (
+                        <button type="button" className="param-clear-btn" data-testid="clear-abilities" onClick={() => setParams({ abilities: [] })}>
+                          清空
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="param-chip-wrap">
+                      {LEXICON[race].abilities.map((a) => (
+                        <Chip
+                          key={a}
+                          selected={params.abilities.includes(a)}
+                          tone={race}
+                          className="param-chip"
+                          dataTestId={`ability-${a}`}
+                          onClick={() => toggleAbility(a)}
+                        >
+                          {a}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* 数量 */}
               <div className="rule-row">
                 <span className="rule-label">生成数量</span>
@@ -698,119 +642,82 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                   本批 {batchStats?.total ?? results.length} 条
                   {typeof batchStats?.deduped === 'number' && batchStats.deduped > 0 ? `（去重 ${batchStats.deduped} 条）` : ''}
                 </span>
-                <button type="button" className="batch-save-btn" onClick={saveAll} disabled={savingAll} data-testid="save-all">
-                  <Save size={15} />
-                  {savingAll ? '入谱中…' : '本批全部入谱'}
-                </button>
               </div>
-              <div className="name-card-list">
-                {results.map((c, idx) => {
-                  const key = batchKey(c);
-                  const isSaved = savedKeys.has(key);
-                  const isSaving = savingKeys.has(key);
-                  return (
-                    <div key={`${c.id}-${c.nameText}`} className={cn('name-card')} data-testid={`name-card-${idx}`}>
-                      <div className="name-card-top">
-                        <Seal race={c.race} size={22} />
-                        <div className="name-main">
-                          <p className="name-text">{c.nameText}</p>
-                          <div className="name-meta">
-                            <span className="name-type">{c.combo ? '组合设定' : TYPE_LABELS[c.nameType]}</span>
-                            <span className="name-chars">{c.combo ? `${c.structure.length}项` : `${c.charCount}字`}</span>
-                          </div>
-                        </div>
-                        <div className="name-actions">
-                          {isSaved ? (
-                            <span className="saved-stamp" data-testid={`saved-stamp-${idx}`}>
-                              已藏
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              className="icon-btn"
-                              title="保存"
-                              data-testid={`save-${idx}`}
-                              disabled={isSaving}
-                              onClick={() => saveOne(c, false)}
-                            >
-                              <Save size={17} />
-                            </button>
-                          )}
-                          <button type="button" className="icon-btn" title="复制" data-testid={`copy-${idx}`} onClick={() => copyItem(c)}>
-                            <Copy size={16} />
-                          </button>
-                          <button type="button" className="icon-btn" title="加入设定" data-testid={`tosheet-${idx}`} onClick={() => addToSheet(c)}>
-                            <UserPlus size={17} />
-                          </button>
-                        </div>
-                      </div>
-                      <StructureTags parts={c.structure} race={c.race} />
-                      <button type="button" className="ai-card-btn" data-testid={`detail-${idx}`} onClick={() => openDetail(idx)}>
-                        <Info size={14} />
-                        查看详情
-                      </button>
-                    </div>
-                  );
-                })}
+              <div className="result-table-wrap">
+                <table className="result-table">
+                  <thead>
+                    <tr>
+                      <th>名称</th>
+                      <th>类型</th>
+                      <th>字数</th>
+                      <th>结构</th>
+                      <th className="result-actions-head">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.map((c, idx) => {
+                      const key = batchKey(c);
+                      const isSaved = savedKeys.has(key);
+                      const isSaving = savingKeys.has(key);
+                      return (
+                        <tr key={`${c.id}-${c.nameText}`} data-testid={`name-row-${idx}`}>
+                          <td>
+                            <div className="result-name-cell">
+                              <Seal race={c.race} size={20} />
+                              <span className="result-name-text">{c.nameText}</span>
+                            </div>
+                          </td>
+                          <td>{c.combo ? '组合设定' : TYPE_LABELS[c.nameType]}</td>
+                          <td>{c.combo ? `${c.structure.length}项` : `${c.charCount}字`}</td>
+                          <td>
+                            <StructureTags parts={c.structure} race={c.race} />
+                          </td>
+                          <td>
+                            <div className="result-actions">
+                              <button
+                                type="button"
+                                className={cn('icon-btn', isSaved && 'result-saved-btn')}
+                                title={isSaved ? '已入谱' : '保存入谱'}
+                                aria-label={isSaved ? '已入谱' : '保存入谱'}
+                                data-testid={`save-${idx}`}
+                                disabled={isSaving || isSaved}
+                                onClick={() => void saveOne(c, false)}
+                              >
+                                {isSaved ? <Check size={16} /> : <Save size={16} />}
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn"
+                                title="复制"
+                                aria-label="复制"
+                                data-testid={`copy-${idx}`}
+                                onClick={() => void copyItem(c)}
+                              >
+                                <Copy size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn"
+                                title="加入设定"
+                                aria-label="加入设定"
+                                data-testid={`tosheet-${idx}`}
+                                onClick={() => addToSheet(c)}
+                              >
+                                <UserPlus size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </>
           ) : (
             <></>
           )}
         </div>
-        {/* 候选详情面板：结构 + 备注编辑 + 保存入谱（AI 设定请到候选库详情页） */}
-        {detailIdx !== null && results[detailIdx] ? (
-          <div
-            className="ai-panel-overlay"
-            data-testid="detail-panel"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) closeDetail();
-            }}
-          >
-            <div className="ai-panel detail-panel">
-              <div className="ai-panel-header">
-                <div className="ai-panel-title">
-                  <Seal race={results[detailIdx].race} size={20} />
-                  <span className="ai-panel-name">{results[detailIdx].nameText}</span>
-                  <span className="ai-panel-badge">{results[detailIdx].combo ? '组合设定' : TYPE_LABELS[results[detailIdx].nameType]}</span>
-                </div>
-                <button type="button" className="icon-btn" title="关闭" data-testid="detail-close" onClick={closeDetail}>
-                  <X size={18} />
-                </button>
-              </div>
-              <StructureTags parts={results[detailIdx].structure} race={results[detailIdx].race} />
-              <div className="detail-note">
-                <label className="detail-label" htmlFor="candidate-note">
-                  备注
-                </label>
-                <textarea
-                  id="candidate-note"
-                  className="detail-textarea"
-                  rows={5}
-                  value={results[detailIdx].note}
-                  data-testid="detail-note-input"
-                  onChange={(e) => patchNote(detailIdx, e.target.value)}
-                  placeholder="可手动记录用途或灵感，保存入谱后带入候选库"
-                />
-              </div>
-              <div className="ai-panel-footer">
-                <button
-                  type="button"
-                  className="primary-btn"
-                  data-testid="detail-save"
-                  disabled={savingKeys.has(batchKey(results[detailIdx])) || savedKeys.has(batchKey(results[detailIdx]))}
-                  onClick={() => {
-                    const c = results[detailIdx];
-                    if (c) void saveOne(c, false).then(closeDetail);
-                  }}
-                >
-                  <Save size={14} />
-                  {savedKeys.has(batchKey(results[detailIdx])) ? '已入谱' : '保存入谱'}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );

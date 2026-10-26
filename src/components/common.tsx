@@ -58,12 +58,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 export function Seal({ race, size = 28, className }: { race: RaceKey; size?: number; className?: string }) {
   return (
     <span
-      className={cn('seal-fallback', race === 'demon' && 'seal-demon', className)}
+      className={cn('seal-fallback', race === 'elf' && 'seal-elf', className)}
       style={{ width: size, height: size, fontSize: Math.max(11, size * 0.46) }}
       data-testid={`seal-${race}-${size}`}
-      aria-label={race === 'demon' ? '妖族' : '人族'}
+      aria-label={race === 'elf' ? '精灵族' : '人族'}
     >
-      {race === 'demon' ? '妖' : '人'}
+      {race === 'elf' ? '灵' : '人'}
     </span>
   );
 }
@@ -85,7 +85,7 @@ export function Chip({
   selected?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
-  tone?: 'human' | 'demon' | 'neutral';
+  tone?: 'human' | 'elf' | 'neutral';
   className?: string;
   dataTestId?: string;
 }) {
@@ -118,7 +118,7 @@ export function EmptyState({ title, desc, actions, testId }: { title: string; de
     <div className="empty-state" data-testid={testId}>
       <div className="empty-seal-row">
         <Seal race="human" size={34} />
-        <Seal race="demon" size={34} />
+        <Seal race="elf" size={34} />
       </div>
       <p className="empty-title">{title}</p>
       {desc ? <p className="empty-desc">{desc}</p> : null}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Download, Filter, FilterX, RefreshCw, Search, Sparkles, Star, Trash2, UserPlus, X } from 'lucide-react';
 import { deleteCandidate, fetchCandidates, getCandidateReferences, updateCandidate } from '@/lib/db';
 import type { Candidate, CandidateFilters, NameTypeKey, RaceKey, SortKey, StatusFilterKey } from '@/lib/types';
-import { candidateToSheetFields, DEFAULT_FILTERS, FILTER_MAX_CHARS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
+import { candidateToSheetFields, DEFAULT_FILTERS, FILTER_MAX_CHARS, normalizeRaceFilter, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
 import { BottomSheet, Chip, ConfirmDialog, copyText, EmptyState, formatTime, Seal, StructureTags, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 import { exportNameListTxt } from '@/lib/export';
@@ -21,7 +21,7 @@ function normalizeFilters(parsed: Partial<CandidateFilters> | null | undefined):
   try {
     const p = parsed ?? {};
     const result: CandidateFilters = {
-      race: p.race === 'human' || p.race === 'demon' ? p.race : 'all',
+      race: normalizeRaceFilter(p.race),
       nameType: ['person', 'place', 'office', 'nickname'].includes(p.nameType ?? '') ? (p.nameType as NameTypeKey) : 'all',
       minChars: typeof p.minChars === 'number' ? Math.max(1, Math.min(FILTER_MAX_CHARS, Math.round(p.minChars))) : 1,
       maxChars: typeof p.maxChars === 'number' ? Math.max(1, Math.min(FILTER_MAX_CHARS, Math.round(p.maxChars))) : FILTER_MAX_CHARS,
@@ -268,7 +268,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
                   [
                     ['all', '全部'],
                     ['human', '人族'],
-                    ['demon', '妖族'],
+                    ['elf', '精灵族'],
                   ] as Array<[RaceKey | 'all', string]>
                 ).map(([k, label]) => (
                   <Chip key={k} selected={filters.race === k} tone="neutral" onClick={() => setFilter({ race: k })} dataTestId={`filter-race-${k}`}>
