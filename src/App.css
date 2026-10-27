@@ -2800,13 +2800,6 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-.rules-window-hint {
-  margin: 8px 0 4px;
-  color: var(--app-ink-2);
-  font-size: 12px;
-  line-height: 1.7;
-}
-
 .rules-window-card {
   border: 1px solid var(--app-line);
   border-radius: 10px;

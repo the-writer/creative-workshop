@@ -22,7 +22,7 @@
   间距数值取自 CSS 变量：行内间距 `--app-choice-row-gap`（10px）、上下内边距 `--app-choice-row-padding-y`（10px）；名称类型 / 族群 Chip 行间距为 `--app-chip-row-gap`（8px）。三个变量均在 `src/App.css` 的 `:root` 中定义。
 - 选择多个类型时生成组合设定句，形式为「短名·姓氏」，结构包含人名、官职、居地、营生、特殊能力与绰号等分项。
 - 多选类型后不显示额外说明条；组合模式下不显示人名全名字数范围（不受该范围约束）。
-- 职业与特殊能力、数量、短名块数、姓氏权重、后缀、绰号等规则收进「规则设置」模态子窗口（原生 `BrowserWindow`，`modal: true`），不再向下展开；子窗口写回 `preferences.md` 并通过 `workshop:rules:changed` 事件实时同步主窗口。
+- 职业与特殊能力、数量、短名块数、姓氏权重、后缀、绰号等规则收进「规则设置」模态子窗口（原生 `BrowserWindow`，`modal: true`），不再向下展开；子窗口内「基础规则」在前、「职业与特殊能力」在后，且不显示顶部「当前：…」摘要行。子窗口写回 `preferences.md` 并通过 `workshop:rules:changed` 事件实时同步主窗口。
 - 主界面「规则设置」按钮与「落笔生成」按钮在同一行，两者使用完全相同的宽高（156 × 44 px），不占满整行（`GenerateTab.tsx` → `.generate-action-row` / `src/App.css`）。
 - 性别参数影响短名的音节加权倾向，不删除其他性别的音节。选择具体性别（男性/女性/中性）时，`SYLLABLE_GENDER_BIAS` 中对应音系池的音节获得 `GENDER_MATCH_WEIGHT = 7` 倍权重，其余音节保留 `GENDER_BASE_WEIGHT = 1`；选择「不限」时每条人名先随机解析为男性 / 女性 / 中性之一，再按该真实性别加权（`resolveActualGender`）。因此「不限」生成的候选 TAG 显示真实性别，而不是「不限」。
 - 校验规则（`GenerateTab.tsx` → `validate`）：至少选中一种类型；数量 5–100；非组合模式下最少字数不得大于最多字数；绰号前置且含人名时 `绰号字数 + 3` 不得超过全名字数上限（姓氏至少 1 字 + 短名至少 2 字）；姓氏权重 0–100。

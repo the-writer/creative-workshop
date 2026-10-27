@@ -57,8 +57,8 @@ flowchart TD
 
 | 项目           | 值                         | 来源                                                                                      |
 | -------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
-| 窗口内容尺寸   | 1024 × 768                 | `package.json` → `creationWorkshop.window.width/height`                                   |
-| 尺寸缺省回退   | 1024 × 768                 | `electron/main.cts`（配置缺省时）                                                         |
+| 窗口内容尺寸   | 800 × 600                  | `package.json` → `creationWorkshop.window.width/height`                                   |
+| 尺寸缺省回退   | 800 × 600                  | `electron/main.cts`（配置缺省时）                                                         |
 | 标题栏样式     | `hiddenInset`              | `package.json` → `creationWorkshop.window.titleBarStyle`                                  |
 | 红绿灯位置     | `{ x: 12, y: 12 }`         | `electron/main.cts` → `trafficLightPosition`                                              |
 | 窗口类型       | 普通独立窗口（非 panel）   | `electron/main.cts` 不传 `type`                                                           |
@@ -105,7 +105,7 @@ flowchart TD
 - **重新打开落在当前桌面**：窗口原本隐藏时先临时 `setVisibleOnAllWorkspaces(true, …)`，`show()` 并聚焦后在 `SPACE_BIND_DELAY_MS = 60ms` 绑定当前桌面；窗口已可见时只 `show` / `moveTop` / `focus`，不改变桌面归属。
 - **不置顶**：配置 `alwaysOnTop` 为 `false`（默认）时不会调用 `setAlwaysOnTop`，窗口不压住其它应用，也不会长期悬浮在最上层。
 - **不显示 Dock 图标**：打包后 `Info.plist` 声明 `LSUIElement = true`（`package.json` → `build.mac.extendInfo`），系统层面即无可激活 Dock 图标；运行期 `whenReady` 最先调用 `hideDockIcon()`（`app.dock?.isVisible()` 时 `app.dock.hide()`）作为开发态兜底，且只在启动时调用一次（规避 Electron「1 秒内重复 `dock.hide()` 无效」的已知问题），窗口再次显示不会让 Dock 图标回来。因无 Dock 图标，重新打开时在 darwin 上先 `app.focus({ steal: true })` 再 `win.focus()`，确保窗口成为 key window。
-- **规则设置为模态子窗口**：主界面点击「规则设置」通过 `rules:open` 打开独立 `BrowserWindow`（`parent` 为主窗口、`modal: true`，尺寸 900 × 600、不可移动、打开后自动居中），而不是在页面内向下展开或使用 HTML 弹层；子窗口关闭不影响主窗口。
+- **规则设置为模态子窗口**：主界面点击「规则设置」通过 `rules:open` 打开独立 `BrowserWindow`（`parent` 为主窗口、`modal: true`，宽高为主窗口内容尺寸的 80%（主窗口 800 × 600 时为 640 × 480）、不可移动、打开后自动居中），而不是在页面内向下展开或使用 HTML 弹层；子窗口关闭不影响主窗口。
 
 应用在 `Info.plist` 中显式声明 `NSHighResolutionCapable=true` 与 `LSUIElement=true`，页面缩放固定为 1，并启用字体平滑以适配 Retina/HiDPI 显示。默认字体依次尝试思源宋体、仿宋、宋体，均不存在时回退系统默认字体。
 

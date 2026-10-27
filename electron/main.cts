@@ -27,15 +27,14 @@ interface CreationWorkshopConfig {
 const APP_NAME = '创作工坊';
 
 // 窗口常量集中在此（配置项缺省时的回退值），业务代码不散落魔法值
-const DEFAULT_WINDOW_WIDTH = 1024;
-const DEFAULT_WINDOW_HEIGHT = 768;
+const DEFAULT_WINDOW_WIDTH = 800;
+const DEFAULT_WINDOW_HEIGHT = 600;
 const DEFAULT_TITLE_BAR_STYLE = 'hiddenInset';
 const DEFAULT_ALWAYS_ON_TOP_LEVEL = 'floating';
 // 独立窗口模式：窗口绑定在打开时所在的桌面，打开期间切换桌面不跟随。
 // 显示后延迟绑定一次，等 macOS 的空间切换动画结束，避免窗口被系统重新分配到旧桌面。
 const SPACE_BIND_DELAY_MS = 60;
-const RULES_WINDOW_WIDTH = 900;
-const RULES_WINDOW_HEIGHT = 600;
+const RULES_WINDOW_SIZE_RATIO = 0.8;
 const RULES_WINDOW_QUERY = 'rules';
 
 const packageJson = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as {
@@ -156,11 +155,12 @@ function openRulesWindow(): void {
     return;
   }
 
+  const [parentWidth = windowWidth, parentHeight = windowHeight] = mainWindow.getContentSize();
   const child = new BrowserWindow({
     parent: mainWindow,
     modal: true,
-    width: RULES_WINDOW_WIDTH,
-    height: RULES_WINDOW_HEIGHT,
+    width: Math.round(parentWidth * RULES_WINDOW_SIZE_RATIO),
+    height: Math.round(parentHeight * RULES_WINDOW_SIZE_RATIO),
     useContentSize: true,
     center: true,
     movable: false,
