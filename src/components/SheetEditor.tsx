@@ -73,7 +73,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
   const [relTargets, setRelTargets] = useState<RelTarget[]>([]);
   const [relTargetId, setRelTargetId] = useState<string | null>(null);
   const [relType, setRelType] = useState<string>('师徒');
-  const [relNote, setRelNote] = useState('');
+  const [relCustom, setRelCustom] = useState('');
   const [addingRel, setAddingRel] = useState(false);
   // 新建模式下尚未保存的关系，保存设定卡后一并写入
   const [pendingRelations, setPendingRelations] = useState<Array<{ key: string; target: RelTarget; relationType: string; note: string }>>([]);
@@ -251,17 +251,18 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
     const target = relTargets.find((t) => t.id === relTargetId);
     if (!target) return;
     const targetName = target.self ? characterName.trim() || '未命名人物' : target.name;
+    const relationType = relType === '其他' ? relCustom.trim() || '其他' : relType;
     if (!savedId) {
-      if (pendingRelations.some((p) => p.target.id === target.id && p.relationType === relType)) {
+      if (pendingRelations.some((p) => p.target.id === target.id && p.relationType === relationType)) {
         toast.show('该关系已在待保存列表', 'info');
         return;
       }
       setPendingRelations((prev) => [
         ...prev,
-        { key: `pending-${Date.now()}-${prev.length}`, target: { ...target, name: targetName }, relationType: relType, note: relNote.trim() },
+        { key: `pending-${Date.now()}-${prev.length}`, target: { ...target, name: targetName }, relationType, note: '' },
       ]);
       setRelTargetId(null);
-      setRelNote('');
+      setRelCustom('');
       toast.show('关系将在保存设定后一并添加', 'success');
       return;
     }
@@ -273,14 +274,14 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
       toType: target.type,
       toId: target.self ? savedId : target.id,
       toName: targetName,
-      relationType: relType,
-      note: relNote.trim(),
+      relationType,
+      note: '',
     });
     setAddingRel(false);
     if (res.ok) {
       toast.show('关系已添加', 'success');
       setRelTargetId(null);
-      setRelNote('');
+      setRelCustom('');
       try {
         const rels = await fetchRelations();
         setRelations(rels.filter((r) => r.fromId === savedId || r.toId === savedId));
@@ -750,14 +751,16 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
                 </Chip>
               ))}
             </div>
-            <input
-              type="text"
-              className="form-input"
-              value={relNote}
-              placeholder="关系备注（可选）"
-              data-testid="rel-note"
-              onChange={(e) => setRelNote(e.target.value)}
-            />
+            {relType === '其他' ? (
+              <input
+                type="text"
+                className="form-input"
+                value={relCustom}
+                placeholder="自定义关系（可选，留空则为「其他」）"
+                data-testid="rel-custom"
+                onChange={(e) => setRelCustom(e.target.value)}
+              />
+            ) : null}
             <button
               type="button"
               className="secondary-btn relation-add-btn"

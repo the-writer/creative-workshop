@@ -87,8 +87,7 @@ export const SCHEMA_VERSION = 1;
 
 const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族' };
 const TYPE_LABELS: Record<NameTypeKey, string> = { person: '人名', place: '地名', office: '官职', nickname: '绰号' };
-const INI_TYPE_GROUPS: Record<NameTypeKey, string> = { person: '人物', place: '地名', office: '官职', nickname: '绰号' };
-const INI_GROUP_ORDER = ['人物', '地名', '官职', '绰号'];
+const INI_PEOPLE_GROUP = '人物';
 const GENDER_LABELS: Record<NameGender, string> = { any: '不限', male: '男性', female: '女性', neutral: '中性' };
 const ENTITY_LABELS: Record<EntityType, string> = { sheet: '设定卡', place: '地名' };
 
@@ -382,7 +381,24 @@ export function parseSheetsMarkdown(text: string): Sheet[] {
   return result;
 }
 
-export function serializeSheetsMarkdown(sheets: Sheet[]): string {
+/** 把设定卡参与的关系压缩成一行，如「自己（男主）、兰诺（同僚）」；关联自身排在前面。 */
+function sheetRelationsText(sheet: Sheet, relations: Relation[]): string {
+  const selfParts: string[] = [];
+  const otherParts: string[] = [];
+  relations.forEach((relation) => {
+    const isFrom = relation.fromId === sheet.id;
+    const isTo = relation.toId === sheet.id;
+    if (!isFrom && !isTo) return;
+    if (isFrom && isTo) {
+      selfParts.push(`自己（${iniText(relation.relationType)}）`);
+      return;
+    }
+    otherParts.push(`${iniText(isFrom ? relation.toName : relation.fromName)}（${iniText(relation.relationType)}）`);
+  });
+  return [...selfParts, ...otherParts].join('、');
+}
+
+export function serializeSheetsMarkdown(sheets: Sheet[], relations: Relation[] = []): string {
   const out: string[] = ['# 设定卡', '', '> 由「创作工坊」自动维护。每张设定卡以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
   sheets.forEach((sheet) => {
     out.push(`## ${headingText(sheet.characterName || '未命名人物')}`);
@@ -399,6 +415,8 @@ export function serializeSheetsMarkdown(sheets: Sheet[]): string {
     out.push(`- 绰号: ${encodeValue(sheet.nickname)}`);
     out.push(`- 契约称号: ${encodeValue(sheet.contractTitle)}`);
     out.push(`- 备注: ${encodeValue(sheet.note)}`);
+    const relationsText = sheetRelationsText(sheet, relations);
+    if (relationsText) out.push(`- 关系: ${encodeValue(relationsText)}`);
     out.push(`- 创建时间: ${timestamp(sheet.createdAt)}`);
     out.push(`- 更新时间: ${timestamp(sheet.updatedAt)}`);
     out.push('');
@@ -429,27 +447,20 @@ function candidateSummary(candidate: Candidate): string {
     .join('，');
 }
 
-/** 生成 `.workshop/sheets.ini`：已设定的设定卡与候选按类型分组，全部候选另在 `[候选]` 中以注释重复列出。 */
+/** 生成 `.workshop/sheets.ini`：只有已设定的设定卡写入 `[人物]`，候选仅在 `[候选]` 中以注释列出。 */
 export function serializeSheetsIni(candidates: Candidate[], sheets: Sheet[]): string {
-  const groups = new Map<string, Map<string, string>>();
-  const add = (group: string, name: string, summary: string): void => {
-    const key = iniText(name);
-    if (!key) return;
-    if (!groups.has(group)) groups.set(group, new Map());
-    const entries = groups.get(group);
-    if (entries && !entries.has(key)) entries.set(key, summary);
-  };
-  sheets.forEach((sheet) => add('人物', sheet.characterName, sheetSummary(sheet)));
-  candidates.forEach((candidate) => add(INI_TYPE_GROUPS[candidate.nameType], candidate.nameText, candidateSummary(candidate)));
-
   const out: string[] = [];
-  INI_GROUP_ORDER.forEach((group) => {
-    const entries = groups.get(group);
-    if (!entries || entries.size === 0) return;
-    out.push(`[${group}]`);
-    entries.forEach((summary, name) => out.push(`${name} = ${summary}`));
-    out.push('');
+  const people = new Map<string, string>();
+  sheets.forEach((sheet) => {
+    const name = iniText(sheet.characterName);
+    if (!name || people.has(name)) return;
+    people.set(name, sheetSummary(sheet));
   });
+  if (people.size > 0) {
+    out.push(`[${INI_PEOPLE_GROUP}]`);
+    people.forEach((summary, name) => out.push(`${name} = ${summary}`));
+    out.push('');
+  }
   out.push('[候选]');
   candidates.forEach((candidate) => {
     const name = iniText(candidate.nameText);

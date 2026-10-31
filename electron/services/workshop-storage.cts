@@ -292,8 +292,8 @@ export class WorkshopStorage {
     await this.writeText(PROJECT_FILES.candidates, serializeCandidatesMarkdown(candidates));
   }
 
-  private async writeSheets(sheets: Sheet[]): Promise<void> {
-    await this.writeText(PROJECT_FILES.sheets, serializeSheetsMarkdown(sheets));
+  private async writeSheets(sheets: Sheet[], relations: Relation[]): Promise<void> {
+    await this.writeText(PROJECT_FILES.sheets, serializeSheetsMarkdown(sheets, relations));
   }
 
   private async writeRelations(relations: Relation[]): Promise<void> {
@@ -433,7 +433,7 @@ export class WorkshopStorage {
         const nextRelations = relations.filter(
           (relation) => !(relation.fromType === 'place' && relation.fromId === id) && !(relation.toType === 'place' && relation.toId === id),
         );
-        await this.writeSheets(sheets);
+        await this.writeSheets(sheets, nextRelations);
         await this.writeRelations(nextRelations);
       }
       const before = candidates.length;
@@ -465,7 +465,7 @@ export class WorkshopStorage {
   public sheetSave(input: SheetInput): Promise<{ ok: boolean; id: string; message?: string }> {
     return this.enqueue(async () => {
       if (!input.characterName.trim()) return { ok: false, id: '', message: '人物名不能为空' };
-      const sheets = await this.loadSheets();
+      const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
       const now = Date.now();
       const gender = asGender(input.gender);
       const normalized = {
@@ -486,14 +486,14 @@ export class WorkshopStorage {
         const sheet = sheets.find((item) => item.id === input.id);
         if (!sheet) return { ok: false, id: '', message: '未找到该设定卡' };
         Object.assign(sheet, normalized);
-        await this.writeSheets(sheets);
+        await this.writeSheets(sheets, relations);
         await this.refreshGraph();
         await this.refreshSheetsIni();
         return { ok: true, id: sheet.id };
       }
       const id = randomUUID();
       sheets.unshift({ id, ...normalized, createdAt: now });
-      await this.writeSheets(sheets);
+      await this.writeSheets(sheets, relations);
       await this.refreshGraph();
       await this.refreshSheetsIni();
       return { ok: true, id };
@@ -509,7 +509,7 @@ export class WorkshopStorage {
       const nextRelations = relations.filter(
         (relation) => !(relation.fromType === 'sheet' && relation.fromId === id) && !(relation.toType === 'sheet' && relation.toId === id),
       );
-      await this.writeSheets(remaining);
+      await this.writeSheets(remaining, nextRelations);
       await this.writeRelations(nextRelations);
       await this.refreshGraph();
       await this.refreshSheetsIni();
@@ -529,7 +529,7 @@ export class WorkshopStorage {
   public relationAdd(input: RelationInput): Promise<{ ok: boolean; message?: string }> {
     return this.enqueue(async () => {
       if (!input.fromId || !input.toId) return { ok: false, message: '关系的来源与目标不能为空' };
-      const relations = await this.loadRelations();
+      const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
       const duplicate = relations.some(
         (relation) =>
           relation.fromType === input.fromType &&
@@ -552,6 +552,7 @@ export class WorkshopStorage {
         createdAt: Date.now(),
       });
       await this.writeRelations(relations);
+      await this.writeSheets(sheets, relations);
       await this.refreshGraph();
       return { ok: true };
     });
@@ -559,11 +560,12 @@ export class WorkshopStorage {
 
   public relationRemove(id: string): Promise<{ ok: boolean; message?: string }> {
     return this.enqueue(async () => {
-      const relations = await this.loadRelations();
+      const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
       const before = relations.length;
       const remaining = relations.filter((relation) => relation.id !== id);
       if (before === remaining.length) return { ok: false, message: '未找到该关系' };
       await this.writeRelations(remaining);
+      await this.writeSheets(sheets, remaining);
       await this.refreshGraph();
       return { ok: true };
     });
@@ -697,7 +699,7 @@ export class WorkshopStorage {
           ? clone(source.preferences as Record<string, unknown>)
           : {};
       await this.writeCandidates(candidates);
-      await this.writeSheets(sheets);
+      await this.writeSheets(sheets, relations);
       await this.writeRelations(relations);
       await this.writePreferences(preferences);
       await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown({}, candidates, sheets, relations));

@@ -65,11 +65,11 @@ test('creates .workshop files and persists preferences/candidate as Markdown', a
   assert.equal(list[0].rarity, 'SSSR');
 });
 
-test('writes sheets.ini grouped by type with candidate comments', async () => {
+test('writes relation summary to sheets.md and keeps candidates only under [候选]', async () => {
   const { storage, workshopDir } = await createStorage();
   await storage.candidateCreate({ race: 'human', nameType: 'person', nameText: '林深', structure: [], source: 'manual', note: '男主名字' });
   await storage.candidateCreate({ race: 'human', nameType: 'place', nameText: '边界城', structure: [], source: 'manual', note: '边境主城' });
-  await storage.sheetSave({
+  const lin = await storage.sheetSave({
     characterName: '林深',
     race: 'human',
     gender: 'female',
@@ -82,14 +82,62 @@ test('writes sheets.ini grouped by type with candidate comments', async () => {
     contractTitle: '',
     note: '',
   });
+  const su = await storage.sheetSave({
+    characterName: '苏晚',
+    race: 'human',
+    candidateId: '',
+    occupation: '',
+    office: '',
+    hometown: '',
+    hometownCandidateId: '',
+    nickname: '',
+    contractTitle: '',
+    note: '',
+  });
+  await storage.relationAdd({
+    fromType: 'sheet',
+    fromId: lin.id,
+    fromName: '林深',
+    toType: 'sheet',
+    toId: lin.id,
+    toName: '林深',
+    relationType: '男主',
+    note: '',
+  });
+  await storage.relationAdd({
+    fromType: 'sheet',
+    fromId: lin.id,
+    fromName: '林深',
+    toType: 'sheet',
+    toId: su.id,
+    toName: '苏晚',
+    relationType: '师徒',
+    note: '',
+  });
+  await storage.relationAdd({
+    fromType: 'sheet',
+    fromId: lin.id,
+    fromName: '林深',
+    toType: 'sheet',
+    toId: su.id,
+    toName: '苏晚',
+    relationType: '青梅竹马',
+    note: '',
+  });
+
   const sheetsMd = await readWorkshopFile(workshopDir, 'sheets.md');
   assert.match(sheetsMd, /- 性别: 女性/);
-  assert.equal((await storage.sheetsList())[0]?.gender, 'female');
+  assert.match(sheetsMd, /- 关系: 自己（男主）、[^\n]*苏晚（师徒）/);
+  assert.match(sheetsMd, /- 关系: [^\n]*苏晚（青梅竹马）/);
+  const relationsMd = await readWorkshopFile(workshopDir, 'relations.md');
+  assert.match(relationsMd, /- 关系类型: 青梅竹马/);
+  assert.equal((await storage.sheetsList()).find((sheet) => sheet.characterName === '林深')?.gender, 'female');
+
   const ini = await readWorkshopFile(workshopDir, 'sheets.ini');
   assert.match(ini, /\[人物\]/);
   assert.match(ini, /林深 = 剑修/);
-  assert.match(ini, /\[地名\]/);
-  assert.match(ini, /边界城 = 边境主城/);
+  assert.doesNotMatch(ini, /\[地名\]/);
+  assert.doesNotMatch(ini, /^边界城 = /m);
   assert.match(ini, /\[候选\]/);
   assert.match(ini, /; 林深 = 男主名字/);
   assert.match(ini, /; 边界城 = 边境主城/);
