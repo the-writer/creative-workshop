@@ -18,6 +18,7 @@
 - 应用常驻系统托盘；关闭主窗口只隐藏窗口，点击托盘图标在当前桌面重新打开主界面。最近一次打开的项目排在最近列表第一位并显示「上次」TAG。
 - 主窗口为普通独立窗口：不置顶，打开期间切换桌面不跟随；关闭后从其它桌面重新打开时落在当前桌面。启动与重新打开均不显示 Dock 图标。
 - 不提供导出（JSON / TXT / Markdown / PNG）与分享；AI 详细设定入口保留，点击后以弹窗明确说明，不发起网络请求。
+- 仓库内附带配套 VS Code 插件 `vscode-extension/`（Type Stats）：读取工作区 `.workshop/sheets.ini` / `sheets.md` 提供字数统计、码字计时/速率与设定集高亮；随主项目构建自动打包 VSIX。
 
 ## 阅读指南
 
@@ -31,6 +32,7 @@
 | 修改不可用能力入口                        | [06-unavailable-features.md](prd/06-unavailable-features.md) |
 | 修改项目选择/打开、`.workshop` 格式或 IPC | [07-persistence-and-ipc.md](prd/07-persistence-and-ipc.md)   |
 | 修改依赖、脚本、打包或发布                | [08-build-and-release.md](prd/08-build-and-release.md)       |
+| 修改 VS Code 插件、统计口径或设定集高亮   | [09-vscode-extension.md](prd/09-vscode-extension.md)         |
 
 ## 维护规则
 
@@ -46,6 +48,7 @@
 | 不可用能力入口                                       | `prd/06-unavailable-features.md` |
 | 项目选择/打开、项目登记、`.workshop` 格式、迁移、IPC | `prd/07-persistence-and-ipc.md`  |
 | 依赖、脚本、打包产物、CI                             | `prd/08-build-and-release.md`    |
+| VS Code 插件、统计规则、设定集高亮、插件命令与配置   | `prd/09-vscode-extension.md`     |
 
 ### 编号与书写约束
 

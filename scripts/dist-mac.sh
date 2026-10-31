@@ -21,5 +21,6 @@ fi
 
 pnpm exec electron-builder --mac --arm64 --publish never
 
-# Keep the release directory focused on the only distributable artifact.
+# Keep the release directory focused on distributable artifacts.
 find release -mindepth 1 -maxdepth 1 ! -name '*.pkg' -exec rm -rf -- {} +
+cp vscode-extension/type-stats.vsix release/

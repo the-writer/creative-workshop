@@ -2,6 +2,9 @@
 /dist-electron
 /release
 /node_modules
+/vscode-extension/node_modules
+/vscode-extension/dist
+/vscode-extension/*.vsix
 /.idea
 *.log
 .DS_Store

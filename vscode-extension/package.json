@@ -1,0 +1,107 @@
+{
+  "name": "type-stats",
+  "displayName": "Type Stats",
+  "description": "Writing statistics and setting-sheet highlighting for .txt and .md files.",
+  "version": "0.2.0",
+  "publisher": "border-writer",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "writing",
+    "statistics",
+    "markdown",
+    "chinese"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "typeStats.openInWorkshop",
+        "title": "在工坊中打开"
+      },
+      {
+        "command": "typeStats.openSheetEntry",
+        "title": "打开设定集条目"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "typeStats.openInWorkshop",
+          "when": "typeStats.active",
+          "group": "9_typestats"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "typeStats.openInWorkshop",
+          "when": "false"
+        },
+        {
+          "command": "typeStats.openSheetEntry",
+          "when": "false"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "typeStats.sheetsExplorer",
+          "name": "设定集",
+          "when": "typeStats.active"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Type Stats",
+      "order": 1,
+      "properties": {
+        "typeStats.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "order": 1,
+          "markdownDescription": "启用状态栏字数统计与设定集高亮。\n\n插件仍需工作区存在 `.workshop/sheets.ini`（或自定义 `typeStats.sheetsPath`）才会生效。"
+        },
+        "typeStats.idlePauseSeconds": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 600,
+          "scope": "window",
+          "order": 2,
+          "markdownDescription": "连续多少秒没有文本变动后自动暂停计时。"
+        },
+        "typeStats.sheetsPath": {
+          "type": "string",
+          "default": "",
+          "scope": "window",
+          "order": 3,
+          "markdownDescription": "`sheets.ini` 路径，支持绝对路径或相对工作区根目录的路径。\n\n留空时自动查找工作区根目录下的 `.workshop/sheets.ini`。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "esbuild src/extension.ts --bundle --platform=node --target=node18 --external:vscode --outfile=dist/extension.js",
+    "watch": "pnpm run compile -- --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "pnpm run typecheck && pnpm run compile && vsce package --no-dependencies --allow-missing-repository --allow-star-activation --out type-stats.vsix",
+    "build": "sh scripts/build.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.20.2",
+    "typescript": "^5.4.3"
+  }
+}
