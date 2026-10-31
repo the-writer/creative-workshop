@@ -12,6 +12,7 @@
     "dev:renderer": "vite",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build:extension": "pnpm --dir vscode-extension run package",
+    "install:extension": "code --install-extension \"vscode-extension/type-stats-v$(node -p \"require('./vscode-extension/package.json').version\").vsix\" --force",
     "build": "pnpm run typecheck && vite build && tsc -p tsconfig.electron.json && pnpm run build:extension",
     "dist:mac": "sh scripts/dist-mac.sh",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.electron.json --noEmit",

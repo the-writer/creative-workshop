@@ -9,7 +9,8 @@ VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `p
 | `pnpm start`        | 构建渲染层与主进程后启动 Electron                                                |
 | `pnpm dev:renderer` | 启动 Vite 渲染层开发服务器                                                       |
 | `pnpm build`        | 类型检查、Vite 构建、Electron CommonJS 编译，并自动构建 VS Code 插件 VSIX        |
-| `pnpm build:extension` | 仅构建 `vscode-extension/`：类型检查、esbuild 打包、生成 `type-stats.vsix`    |
+| `pnpm build:extension` | 仅构建 `vscode-extension/`：类型检查、esbuild 打包、生成 `type-stats-v<version>.vsix`    |
+| `pnpm install:extension` | 按当前版本号把 `vscode-extension/type-stats-v<version>.vsix` 安装到 VS Code（`--force`） |
 | `pnpm test`         | 运行 Vitest 单测 + 编译 Electron + Markdown 存储测试（`tests/storage.test.mjs`） |
 | `pnpm dist:mac`     | 清理旧产物、重新构建并生成 macOS arm64 PKG，同时把 VSIX 复制到 `release/`         |
 
@@ -18,7 +19,7 @@ VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `p
 - `dist/`：渲染层。
 - `dist-electron/`：主进程与预加载脚本。
 - `vscode-extension/dist/extension.js`：插件运行时代码。
-- `vscode-extension/type-stats.vsix`：插件安装包。
+- `vscode-extension/type-stats-v<version>.vsix`：插件安装包。
 - `release/`：应用打包产物（PKG），`dist:mac` 后同时包含插件 VSIX，不参与源码提交。
 
 ### 8.2 打包配置
@@ -39,7 +40,7 @@ VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `p
 
 `dist:mac` 执行 `scripts/dist-mac.sh`：先删除 `dist`、`dist-electron` 与 `release`，再重新构建并调用
 `electron-builder --mac --arm64 --publish never`。PKG 成功后删除 `release/` 中的 `mac-arm64`、调试元数据与组件
-plist，仅保留 `.pkg`，随后把 `vscode-extension/type-stats.vsix` 复制到 `release/`。发布目录最终包含应用 PKG 与插件 VSIX；脚本不会生成 DMG 或 ZIP。
+plist，仅保留 `.pkg`，随后把 `vscode-extension/type-stats-v<version>.vsix` 复制到 `release/`。发布目录最终包含应用 PKG 与插件 VSIX；脚本不会生成 DMG 或 ZIP。
 
 PKG 安装脚本目录为 `scripts/pkg-scripts`：
 
@@ -79,6 +80,6 @@ pnpm run build
 ```
 
 涉及桌面窗口、托盘或 IPC 的改动还需进行一次 Electron 启动验证，并在同一轮检查：启动时只有托盘且不弹主窗口、点击托盘后出现项目门与「上次」TAG、打开目录自动初始化 `.workshop`、主界面、规则设置模态子窗口、托盘图标加载与桌面切换不跟随。
-打包变更还应确认 `release/` 中只有 `.pkg` 与 `type-stats.vsix`，并检查安装脚本已被打入安装包。
+打包变更还应确认 `release/` 中只有 `.pkg` 与 `type-stats-v<version>.vsix`，并检查安装脚本已被打入安装包。
 
-插件改动还需确认 `pnpm run build:extension` 通过，且 `vscode-extension/type-stats.vsix` 包含 `package.json`、`README.md`、`LICENSE.txt` 与 `dist/extension.js`，不包含 `src/` 与 `scripts/`。
+插件改动还需确认 `pnpm run build:extension` 通过，且 `vscode-extension/type-stats-v<version>.vsix` 包含 `package.json`、`README.md`、`LICENSE.txt`、`assets/imgs/app-icon.png` 与 `dist/extension.js`，不包含 `src/` 与 `scripts/`。

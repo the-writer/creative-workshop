@@ -11,7 +11,7 @@ vscode-extension/
 │   ├── stats.ts       # 字符统计、状态栏条目、计时器、净输入与速率
 │   ├── sheets.ts      # sheets.ini / sheets.md 解析、装饰器与高亮刷新
 │   └── explorer.ts    # 「设定集」树视图与条目跳转
-├── scripts/build.sh   # 类型检查、打包、生成 type-stats.vsix
+├── scripts/build.sh   # 类型检查、打包、生成 type-stats-v<version>.vsix
 ├── package.json       # 插件清单、配置项、命令与视图声明
 └── tsconfig.json
 ```
@@ -23,14 +23,17 @@ vscode-extension/
 | 命令                              | 行为                                                         |
 | --------------------------------- | ------------------------------------------------------------ |
 | `pnpm run build:extension`        | 在 `vscode-extension/` 执行类型检查、esbuild 打包并生成 VSIX |
+| `pnpm run install:extension`      | 按当前版本号把生成的 VSIX 安装到 VS Code（`--force`）        |
 | `pnpm run build`                  | 主项目构建末尾自动调用 `build:extension`                     |
 | `pnpm --dir vscode-extension run typecheck` | 仅 TypeScript 类型检查                              |
 | `pnpm --dir vscode-extension run compile`   | 仅打包到 `vscode-extension/dist/extension.js`       |
 
-产物为 `vscode-extension/type-stats.vsix`，不参与源码提交；执行 `pnpm dist:mac` 时会同时复制到 `release/`。安装：
+VSIX 文件名由构建脚本自动拼接当前插件版本：`type-stats-v<version>.vsix`；产物不参与源码提交，执行 `pnpm dist:mac` 时会同时复制到 `release/`。
+
+插件与应用共用同一应用图标：构建时从根目录 `assets/imgs/app-icon.png` 复制到 `vscode-extension/assets/imgs/app-icon.png`，并通过 `package.json` 的 `icon` 字段打包进 VSIX；复制产物不参与源码提交。安装：
 
 ```bash
-code --install-extension vscode-extension/type-stats.vsix --force
+pnpm run install:extension
 ```
 
 依赖由根 `pnpm-workspace.yaml` 统一管理，禁止使用 `npm` / `yarn`。VSIX 打包使用 `vsce --no-dependencies`，运行时不依赖 `node_modules`。

@@ -18,7 +18,7 @@ VS Code 写作辅助插件：状态栏字数统计、码字计时/速率，以�
 ```bash
 pnpm install
 pnpm run build:extension
-code --install-extension vscode-extension/type-stats.vsix --force
+pnpm run install:extension
 ```
 
 安装后重新加载窗口，插件会在启动时自动激活。

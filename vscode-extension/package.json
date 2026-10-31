@@ -5,6 +5,7 @@
   "version": "1.9.0",
   "publisher": "border-writer",
   "license": "MIT",
+  "icon": "assets/imgs/app-icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -94,7 +95,7 @@
     "compile": "esbuild src/extension.ts --bundle --platform=node --target=node18 --external:vscode --outfile=dist/extension.js",
     "watch": "pnpm run compile -- --watch",
     "typecheck": "tsc --noEmit",
-    "package": "pnpm run typecheck && pnpm run compile && vsce package --no-dependencies --allow-missing-repository --allow-star-activation --out type-stats.vsix",
+    "package": "sh scripts/build.sh",
     "build": "sh scripts/build.sh"
   },
   "devDependencies": {
