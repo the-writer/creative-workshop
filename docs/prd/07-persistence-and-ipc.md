@@ -189,6 +189,7 @@ flowchart TD
 - ID: `b2a1…`
 - 人物名: 雷恩
 - 族群: 人族
+- 性别: 男性
 - 候选关联: `1f0f2f5e-…`
 - 职业: 剑修
 - 官职:
@@ -206,6 +207,7 @@ flowchart TD
 | `ID`                                                    | 是       | 缺失则跳过                           |
 | `人物名`                                                | 是       | 缺失时回退 `##` 标题；两者均空则跳过 |
 | `族群`                                                  | 否       | 缺省 `human`                         |
+| `性别`                                                  | 否       | 男性 / 女性 / 中性；缺失表示未设定   |
 | `候选关联`                                              | 否       | 为空时不写该行；读取为空字符串       |
 | `职业` / `官职` / `籍贯` / `绰号` / `契约称号` / `备注` | 否       | 保存时去首尾空白                     |
 | `籍贯候选`                                              | 否       | 为空时不写该行                       |
@@ -274,7 +276,7 @@ flowchart TD
 | 顶部字段      | `更新时间`、`节点数`、`连线数`；读取只使用 `更新时间`                                                             |
 | `## 节点布局` | Markdown 表格，列为「节点 ID / X / Y」；ID 用反引号包裹；坐标保留两位小数。读取时跳过表头与分隔行，非有限数值忽略 |
 | `## 节点快照` | 由设定卡与地名候选派生的人物/地名清单；**只供阅读，不参与恢复**                                                   |
-| `## 连线快照` | 由关系派生的连线清单；同上                                                                                        |
+| `## 连线快照` | 由关系派生的连线清单（不含关联自身）；同上                                                                        |
 
 节点 ID 规则：设定卡 `s:<sheetId>`，地名候选 `p:<candidateId>`。快照节点来源：全部设定卡 + 被关系引用或被设定籍贯引用（`hometownCandidateId`）的地名候选；边只在两端节点都存在时写入。
 
@@ -371,8 +373,8 @@ flowchart TD
 - 条件严格：仅当 `projects.json` **不存在**且旧 `workshop.json` **存在**时执行一次；之后 `projects.json` 已存在，不再迁移。
 - 旧文件 JSON 无法解析时静默跳过，启动继续（项目门为空列表）。
 - 候选：读取 `nameText`/`name_text`（为空则跳过）、`race`、`nameType`/`name_type`、`structure`、`source`、`favorite`、`note`、`gender`（可选）、`createdAt`/`created_at`、`updatedAt`/`updated_at`；ID 缺失时生成 UUID；字数按名称重算。
-- 设定卡：读取 `characterName`/`character_name`（为空跳过）及全部字段，兼容 snake_case。
-- 关系：读取 `fromId`/`from_id`、`toId`/`to_id` 等，来源与目标同一 ID 时跳过。
+- 设定卡：读取 `characterName`/`character_name`（为空跳过）、可选 `gender` 及全部字段，兼容 snake_case。
+- 关系：读取 `fromId`/`from_id`、`toId`/`to_id` 等；来源与目标同一 ID 表示关联自身，保留该关系。
 - 旧 `preferences` 对象**原样写入** `preferences.md`，不在迁移时规范化；生成偏好在渲染层读取时按 §2.6 迁移（如旧 `race: demon` → `elf`、旧 `gender: any` → `neutral`）。
 - 迁移后旧 `workshop.json` 保留，不删除、不改名；不存在「损坏 JSON 改名为 `.corrupt-*`」的行为。
 - 迁移失败只输出 `console.error('[创作工坊] 旧数据迁移失败：…')`，不阻塞启动。
@@ -401,10 +403,10 @@ flowchart TD
 | `candidates.references(id)`            | `workshop:candidates:references`   | 不写盘                                                                               | 返回 `{ asCharacter, asHometown, asPlace }`                                                                               |
 | `candidates.remove(id, force)`         | `workshop:candidates:delete`       | 写 `candidates.md`（必要时改 `sheets.md`/`relations.md`）+ `graph.md` + `sheets.ini` | `force=false` 且存在引用时拒绝；`force=true` 时清空引用并删除地名关系                                                     |
 | `sheets.list()`                        | `workshop:sheets:list`             | 不写盘                                                                               | 返回按创建时间倒序、带 `relationCount` 的设定卡                                                                           |
-| `sheets.save(input)`                   | `workshop:sheets:save`             | 写 `sheets.md` + `graph.md` + `sheets.ini`                                           | 新建或按 `id` 更新；人物名为空拒绝；返回 `{ ok, id, message? }`                                                           |
+| `sheets.save(input)`                   | `workshop:sheets:save`             | 写 `sheets.md` + `graph.md` + `sheets.ini`                                           | 新建或按 `id` 更新，可带可选 `gender`；人物名为空拒绝；返回 `{ ok, id, message? }`                                        |
 | `sheets.remove(id)`                    | `workshop:sheets:delete`           | 写 `sheets.md`、`relations.md`、`graph.md`、`sheets.ini`                             | 删除设定卡并级联删除相关关系                                                                                              |
 | `relations.list()`                     | `workshop:relations:list`          | 不写盘                                                                               | 返回按创建时间倒序的关系列表                                                                                              |
-| `relations.add(input)`                 | `workshop:relations:add`           | 写 `relations.md` + `graph.md`                                                       | 自身关系/空端点/重复关系拒绝                                                                                              |
+| `relations.add(input)`                 | `workshop:relations:add`           | 写 `relations.md` + `graph.md`                                                       | 空端点/重复关系拒绝；允许来源与目标相同（关联自身）                                                                       |
 | `relations.remove(id)`                 | `workshop:relations:remove`        | 写 `relations.md` + `graph.md`                                                       | 删除关系                                                                                                                  |
 | `data.stats()`                         | `workshop:data:stats`              | 不写盘                                                                               | 返回实时统计 `StatsData`                                                                                                  |
 | `graph.getLayout()`                    | `workshop:graph:get-layout`        | 不写盘                                                                               | 返回 `Record<节点ID, { x, y }>`                                                                                           |

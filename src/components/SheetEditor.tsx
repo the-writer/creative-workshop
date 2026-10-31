@@ -4,8 +4,18 @@ import { ArrowLeft, RefreshCw, Trash2, X } from 'lucide-react';
 import { addRelation, fetchCandidates, fetchRelations, fetchSheets, removeRelation, saveSheet } from '@/lib/db';
 import { LEXICON } from '@/data/lexicon';
 import { DEFAULT_GEN_PARAMS, genOffice, genPerson } from '@/lib/generator';
-import type { Candidate, RaceKey, Relation } from '@/lib/types';
-import { FILTER_MAX_CHARS, RACE_KEYS, RACE_LABELS, RELATION_TYPES, TYPE_LABELS, candidateToSheetFields } from '@/lib/types';
+import type { Candidate, NameGender, RaceKey, Relation } from '@/lib/types';
+import {
+  FILTER_MAX_CHARS,
+  GENDER_LABELS,
+  RACE_KEYS,
+  RACE_LABELS,
+  RELATION_TYPES,
+  SELF_RELATION_TARGET_ID,
+  SHEET_GENDER_KEYS,
+  TYPE_LABELS,
+  candidateToSheetFields,
+} from '@/lib/types';
 import { Chip, ConfirmDialog, Seal, SectionTitle, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 import type { EditorPrefill } from '@/components/GenerateTab';
@@ -25,6 +35,7 @@ interface RelTarget {
   name: string;
   type: 'sheet' | 'place';
   race: RaceKey;
+  self?: boolean;
 }
 
 export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorProps) {
@@ -38,6 +49,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
 
   const [characterName, setCharacterName] = useState(prefill?.characterName ?? '');
   const [race, setRace] = useState<RaceKey>(prefill?.race ?? 'human');
+  const [gender, setGender] = useState<NameGender | ''>(prefill?.gender ?? '');
   const [candidateId, setCandidateId] = useState(prefill?.candidateId ?? '');
   const [sourceMode, setSourceMode] = useState<SourceMode>('manual');
   const [occupation, setOccupation] = useState(prefill?.occupation ?? '');
@@ -63,6 +75,8 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
   const [relType, setRelType] = useState<string>('师徒');
   const [relNote, setRelNote] = useState('');
   const [addingRel, setAddingRel] = useState(false);
+  // 新建模式下尚未保存的关系，保存设定卡后一并写入
+  const [pendingRelations, setPendingRelations] = useState<Array<{ key: string; target: RelTarget; relationType: string; note: string }>>([]);
 
   // 初始加载：编辑模式回填；新建模式应用预填
   useEffect(() => {
@@ -77,6 +91,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
           }
           setCharacterName(s.characterName);
           setRace(s.race);
+          setGender(s.gender ?? '');
           setCandidateId(s.candidateId);
           setOccupation(s.occupation);
           setOffice(s.office);
@@ -149,6 +164,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
     } else {
       setCharacterName(c.nameText);
       setRace(c.race);
+      if (c.gender && c.gender !== 'any') setGender(c.gender);
       setCandidateId(c.id);
       setSourceMode('pick');
       // 候选库中除名字外的设定项（职业/官职/绰号/契约/能力等）一并带入，不覆盖已填内容
@@ -187,9 +203,17 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
     try {
       if (tab === 'sheet') {
         const sheets = await fetchSheets();
-        setRelTargets(
-          sheets.filter((s) => s.id !== savedId).map((s) => ({ id: s.id, name: s.characterName || '未命名人物', type: 'sheet' as const, race: s.race })),
-        );
+        const selfTarget: RelTarget = {
+          id: savedId ?? SELF_RELATION_TARGET_ID,
+          name: characterName.trim() || '未命名人物',
+          type: 'sheet',
+          race,
+          self: true,
+        };
+        setRelTargets([
+          selfTarget,
+          ...sheets.filter((s) => s.id !== savedId).map((s) => ({ id: s.id, name: s.characterName || '未命名人物', type: 'sheet' as const, race: s.race })),
+        ]);
       } else {
         const list = await fetchCandidates({
           race: 'all',
@@ -207,6 +231,12 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
     }
   };
 
+  // 初始加载人物目标，让「自己」与已有设定在进入编辑器时即可选择
+  useEffect(() => {
+    void loadRelTargets('sheet');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const switchRelTab = (tab: 'sheet' | 'place') => {
     setRelTab(tab);
     setRelTargetId(null);
@@ -214,21 +244,35 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
   };
 
   const handleAddRelation = async () => {
-    if (!savedId) return;
     if (!relTargetId) {
       toast.show('请先选择关联对象', 'info');
       return;
     }
     const target = relTargets.find((t) => t.id === relTargetId);
     if (!target) return;
+    const targetName = target.self ? characterName.trim() || '未命名人物' : target.name;
+    if (!savedId) {
+      if (pendingRelations.some((p) => p.target.id === target.id && p.relationType === relType)) {
+        toast.show('该关系已在待保存列表', 'info');
+        return;
+      }
+      setPendingRelations((prev) => [
+        ...prev,
+        { key: `pending-${Date.now()}-${prev.length}`, target: { ...target, name: targetName }, relationType: relType, note: relNote.trim() },
+      ]);
+      setRelTargetId(null);
+      setRelNote('');
+      toast.show('关系将在保存设定后一并添加', 'success');
+      return;
+    }
     setAddingRel(true);
     const res = await addRelation({
       fromType: 'sheet',
       fromId: savedId,
       fromName: characterName.trim() || '未命名人物',
       toType: target.type,
-      toId: target.id,
-      toName: target.name,
+      toId: target.self ? savedId : target.id,
+      toName: targetName,
       relationType: relType,
       note: relNote.trim(),
     });
@@ -273,6 +317,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
       id: savedId ?? undefined,
       characterName: name,
       race,
+      gender: gender || undefined,
       candidateId,
       occupation: occupation.trim(),
       office: office.trim(),
@@ -282,17 +327,33 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
       contractTitle: contractTitle.trim(),
       note: note.trim(),
     });
-    setSaving(false);
     if (res.ok) {
-      toast.show('设定已保存', 'success');
+      let failed = 0;
+      for (const pending of pendingRelations) {
+        const relRes = await addRelation({
+          fromType: 'sheet',
+          fromId: res.id,
+          fromName: name,
+          toType: pending.target.type,
+          toId: pending.target.self ? res.id : pending.target.id,
+          toName: pending.target.self ? name : pending.target.name,
+          relationType: pending.relationType,
+          note: pending.note,
+        });
+        if (!relRes.ok) failed += 1;
+      }
+      setSaving(false);
+      if (failed > 0) toast.show(`设定已保存，${failed} 条关系添加失败`, 'error');
+      else toast.show('设定已保存', 'success');
       onSaved();
     } else {
+      setSaving(false);
       toast.show(res.message || '保存失败，请重试', 'error');
     }
   };
 
   const requestBack = () => {
-    if (dirty) setConfirmLeave(true);
+    if (dirty || pendingRelations.length > 0) setConfirmLeave(true);
     else onBack();
   };
 
@@ -339,6 +400,25 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
               {RACE_KEYS.map((r) => (
                 <Chip key={r} selected={race === r} tone={r} onClick={() => setRaceByClick(r)} dataTestId={`editor-race-${r}`}>
                   {RACE_LABELS[r]}
+                </Chip>
+              ))}
+            </div>
+          </div>
+          <div className="form-row">
+            <span className="form-label">性别</span>
+            <div className="filter-chips">
+              {SHEET_GENDER_KEYS.map((g) => (
+                <Chip
+                  key={g}
+                  selected={gender === g}
+                  tone="neutral"
+                  dataTestId={`editor-gender-${g}`}
+                  onClick={() => {
+                    setGender((prev) => (prev === g ? '' : g));
+                    setDirty(true);
+                  }}
+                >
+                  {GENDER_LABELS[g]}
                 </Chip>
               ))}
             </div>
@@ -582,97 +662,112 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
 
         {/* 关系 */}
         <div className="editor-section">
-          <SectionTitle right={<span className="section-sub">关系 {relations.length}</span>}>关系</SectionTitle>
-          {!savedId ? (
-            <p className="source-hint">保存设定后即可为人物添加关系</p>
-          ) : (
-            <>
-              {relations.length > 0 ? (
-                <div className="relation-list">
-                  {relations.map((r) => {
-                    const otherName = r.fromId === savedId ? r.toName : r.fromName;
-                    return (
-                      <div key={r.id} className="relation-item">
-                        <div className="relation-item-main">
-                          <p className="relation-item-line">
-                            {otherName} <span className="relation-type-badge">{r.relationType}</span>
-                          </p>
-                          {r.note ? <p className="relation-item-note">{r.note}</p> : null}
-                        </div>
-                        <button type="button" className="icon-btn" title="解除关系" data-testid={`relation-del-${r.id}`} onClick={() => setRemoveTarget(r)}>
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="source-hint">暂无关系，可在下方添加</p>
-              )}
-              <div className="relation-add">
-                <div className="segmented">
-                  {(
-                    [
-                      ['sheet', '关联人物'],
-                      ['place', '关联地名'],
-                    ] as Array<['sheet' | 'place', string]>
-                  ).map(([k, label]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      className={cn('seg-btn', relTab === k && 'seg-btn-active')}
-                      data-testid={`rel-tab-${k}`}
-                      onClick={() => switchRelTab(k)}
-                    >
-                      {label}
+          <SectionTitle right={<span className="section-sub">关系 {relations.length + pendingRelations.length}</span>}>关系</SectionTitle>
+          {relations.length + pendingRelations.length > 0 ? (
+            <div className="relation-list">
+              {relations.map((r) => {
+                const isSelf = r.fromId === savedId && r.toId === savedId;
+                const otherName = isSelf ? '自己' : r.fromId === savedId ? r.toName : r.fromName;
+                return (
+                  <div key={r.id} className="relation-item">
+                    <div className="relation-item-main">
+                      <p className="relation-item-line">
+                        {otherName} <span className="relation-type-badge">{r.relationType}</span>
+                      </p>
+                      {r.note ? <p className="relation-item-note">{r.note}</p> : null}
+                    </div>
+                    <button type="button" className="icon-btn" title="解除关系" data-testid={`relation-del-${r.id}`} onClick={() => setRemoveTarget(r)}>
+                      <Trash2 size={15} />
                     </button>
-                  ))}
-                </div>
-                {relTargets.length > 0 ? (
-                  <div className="relation-target-list">
-                    {relTargets.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        className={cn('relation-target', relTargetId === t.id && 'relation-target-selected')}
-                        data-testid={`rel-target-${t.id}`}
-                        onClick={() => setRelTargetId(t.id)}
-                      >
-                        <Seal race={t.race} size={16} />
-                        {t.name}
-                      </button>
-                    ))}
                   </div>
-                ) : (
-                  <p className="source-hint">{relTab === 'sheet' ? '暂无其他人物设定' : '暂无地名候选，可先到生成页产出地名'}</p>
-                )}
-                <div className="filter-chips">
-                  {RELATION_TYPES.map((t) => (
-                    <Chip key={t} selected={relType === t} tone="neutral" onClick={() => setRelType(t)} dataTestId={`rel-type-${t}`}>
-                      {t}
-                    </Chip>
-                  ))}
+                );
+              })}
+              {pendingRelations.map((p) => (
+                <div key={p.key} className="relation-item" data-testid={`relation-pending-${p.key}`}>
+                  <div className="relation-item-main">
+                    <p className="relation-item-line">
+                      {p.target.self ? '自己' : p.target.name} <span className="relation-type-badge">{p.relationType}</span>
+                      <span className="section-sub">待保存</span>
+                    </p>
+                    {p.note ? <p className="relation-item-note">{p.note}</p> : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="移除待保存关系"
+                    data-testid={`relation-pending-del-${p.key}`}
+                    onClick={() => setPendingRelations((prev) => prev.filter((item) => item.key !== p.key))}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={relNote}
-                  placeholder="关系备注（可选）"
-                  data-testid="rel-note"
-                  onChange={(e) => setRelNote(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="secondary-btn relation-add-btn"
-                  data-testid="rel-add"
-                  disabled={addingRel}
-                  onClick={() => void handleAddRelation()}
-                >
-                  {addingRel ? '添加中…' : '添加关系'}
-                </button>
-              </div>
-            </>
+              ))}
+            </div>
+          ) : (
+            <p className="source-hint">暂无关系，可在下方添加{savedId ? '' : '（保存设定后一并写入）'}</p>
           )}
+          <div className="relation-add">
+            <div className="segmented">
+              {(
+                [
+                  ['sheet', '关联人物'],
+                  ['place', '关联地名'],
+                ] as Array<['sheet' | 'place', string]>
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={cn('seg-btn', relTab === k && 'seg-btn-active')}
+                  data-testid={`rel-tab-${k}`}
+                  onClick={() => switchRelTab(k)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {relTargets.length > 0 ? (
+              <div className="relation-target-list">
+                {relTargets.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={cn('relation-target', relTargetId === t.id && 'relation-target-selected')}
+                    data-testid={`rel-target-${t.id}`}
+                    onClick={() => setRelTargetId(t.id)}
+                  >
+                    <Seal race={t.self ? race : t.race} size={16} />
+                    {t.self ? `自己（${characterName.trim() || '未命名人物'}）` : t.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="source-hint">{relTab === 'sheet' ? '暂无其他人物设定' : '暂无地名候选，可先到生成页产出地名'}</p>
+            )}
+            <div className="filter-chips">
+              {RELATION_TYPES.map((t) => (
+                <Chip key={t} selected={relType === t} tone="neutral" onClick={() => setRelType(t)} dataTestId={`rel-type-${t}`}>
+                  {t}
+                </Chip>
+              ))}
+            </div>
+            <input
+              type="text"
+              className="form-input"
+              value={relNote}
+              placeholder="关系备注（可选）"
+              data-testid="rel-note"
+              onChange={(e) => setRelNote(e.target.value)}
+            />
+            <button
+              type="button"
+              className="secondary-btn relation-add-btn"
+              data-testid="rel-add"
+              disabled={addingRel}
+              onClick={() => void handleAddRelation()}
+            >
+              {addingRel ? '添加中…' : '添加关系'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -706,7 +801,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
         open={!!removeTarget}
         onOpenChange={(open) => !open && setRemoveTarget(null)}
         title="解除这条关系？"
-        description={`解除与「${removeTarget ? (removeTarget.fromId === savedId ? removeTarget.toName : removeTarget.fromName) : ''}」的${removeTarget?.relationType ?? ''}关系，图谱连线将移除。`}
+        description={`解除与「${removeTarget ? (removeTarget.fromId === removeTarget.toId ? '自己' : removeTarget.fromId === savedId ? removeTarget.toName : removeTarget.fromName) : ''}」的${removeTarget?.relationType ?? ''}关系，图谱连线将移除。`}
         confirmText="解除"
         destructive
         testId="relation-remove-confirm"

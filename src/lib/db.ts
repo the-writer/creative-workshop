@@ -6,6 +6,7 @@ export interface SheetInput {
   id?: string;
   characterName: string;
   race: RaceKey;
+  gender?: NameGender;
   candidateId: string;
   occupation: string;
   office: string;

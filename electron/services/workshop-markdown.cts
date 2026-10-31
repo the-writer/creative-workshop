@@ -32,6 +32,7 @@ export interface Sheet {
   id: string;
   characterName: string;
   race: RaceKey;
+  gender?: NameGender;
   candidateId: string;
   occupation: string;
   office: string;
@@ -360,10 +361,12 @@ export function parseSheetsMarkdown(text: string): Sheet[] {
     const characterName = fieldValue(fields, '人物名', 'characterName') || cleanHeading(section.heading);
     if (!id || !characterName) continue;
     const createdAt = parseTimestamp(fieldValue(fields, '创建时间', 'createdAt'));
+    const gender = parseGender(fieldValue(fields, '性别'));
     result.push({
       id,
       characterName,
       race: parseRace(fieldValue(fields, '族群')),
+      ...(gender ? { gender } : {}),
       candidateId: fieldValue(fields, '候选关联', 'candidateId'),
       occupation: fieldValue(fields, '职业'),
       office: fieldValue(fields, '官职'),
@@ -387,6 +390,7 @@ export function serializeSheetsMarkdown(sheets: Sheet[]): string {
     out.push(`- ID: ${encodeId(sheet.id)}`);
     out.push(`- 人物名: ${encodeValue(sheet.characterName)}`);
     out.push(`- 族群: ${RACE_LABELS[sheet.race]}`);
+    if (sheet.gender) out.push(`- 性别: ${GENDER_LABELS[sheet.gender]}`);
     if (sheet.candidateId) out.push(`- 候选关联: ${encodeId(sheet.candidateId)}`);
     out.push(`- 职业: ${encodeValue(sheet.occupation)}`);
     out.push(`- 官职: ${encodeValue(sheet.office)}`);
@@ -466,7 +470,7 @@ export function parseRelationsMarkdown(text: string): Relation[] {
     const id = fieldValue(fields, 'ID', 'id');
     const fromId = fieldValue(fields, '来源 ID', '来源ID', 'fromId');
     const toId = fieldValue(fields, '目标 ID', '目标ID', 'toId');
-    if (!id || !fromId || !toId || fromId === toId) continue;
+    if (!id || !fromId || !toId) continue;
     result.push({
       id,
       fromType: parseEntityType(fieldValue(fields, '来源类型')),
@@ -582,8 +586,10 @@ export function buildGraphSnapshot(
   candidates.forEach((candidate) => {
     if (candidate.nameType === 'place') placeById.set(candidate.id, candidate);
   });
+  // 关联自身不进入图谱快照
+  const graphRelations = relations.filter((relation) => !(relation.fromType === relation.toType && relation.fromId === relation.toId));
   const placeIds = new Set<string>();
-  relations.forEach((relation) => {
+  graphRelations.forEach((relation) => {
     if (relation.fromType === 'place') placeIds.add(relation.fromId);
     if (relation.toType === 'place') placeIds.add(relation.toId);
   });
@@ -600,7 +606,7 @@ export function buildGraphSnapshot(
 
   const nodeIds = new Set(nodes.map((node) => node.id));
   const edges: GraphSnapshotEdge[] = [];
-  relations.forEach((relation) => {
+  graphRelations.forEach((relation) => {
     const source = relation.fromType === 'sheet' ? `s:${relation.fromId}` : `p:${relation.fromId}`;
     const target = relation.toType === 'sheet' ? `s:${relation.toId}` : `p:${relation.toId}`;
     if (!nodeIds.has(source) || !nodeIds.has(target)) return;

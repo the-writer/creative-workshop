@@ -15,7 +15,7 @@ import {
 } from '@/lib/generator';
 import { computeCombinationTotals, LEXICON, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
 import { insertCandidate, onRulesChanged, openRulesWindow } from '@/lib/db';
-import type { Candidate, NameTypeKey, RaceKey } from '@/lib/types';
+import type { Candidate, NameGender, NameTypeKey, RaceKey } from '@/lib/types';
 import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
 import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast, visibleStructureParts } from '@/components/common';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 export interface EditorPrefill {
   characterName: string;
   race: RaceKey;
+  gender?: NameGender;
   candidateId: string;
   occupation?: string;
   office?: string;
@@ -248,6 +249,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
     onOpenEditor({
       characterName: anchor,
       race: c.race,
+      gender: c.gender && c.gender !== 'any' ? c.gender : undefined,
       candidateId: c.id.startsWith('tmp_') ? '' : c.id,
       occupation: f.occupation,
       office: f.office,

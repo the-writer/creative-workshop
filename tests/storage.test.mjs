@@ -72,6 +72,7 @@ test('writes sheets.ini grouped by type with candidate comments', async () => {
   await storage.sheetSave({
     characterName: '林深',
     race: 'human',
+    gender: 'female',
     candidateId: '',
     occupation: '剑修',
     office: '',
@@ -81,6 +82,9 @@ test('writes sheets.ini grouped by type with candidate comments', async () => {
     contractTitle: '',
     note: '',
   });
+  const sheetsMd = await readWorkshopFile(workshopDir, 'sheets.md');
+  assert.match(sheetsMd, /- 性别: 女性/);
+  assert.equal((await storage.sheetsList())[0]?.gender, 'female');
   const ini = await readWorkshopFile(workshopDir, 'sheets.ini');
   assert.match(ini, /\[人物\]/);
   assert.match(ini, /林深 = 剑修/);
@@ -175,6 +179,48 @@ test('cascades sheet removal into relations and updates stats', async () => {
   const stats = await storage.stats();
   assert.equal(stats.totalSheets, 1);
   assert.equal(stats.totalRelations, 0);
+});
+
+test('supports self relations and counts them once per sheet', async () => {
+  const { storage, workshopDir } = await createStorage();
+  const sheet = await storage.sheetSave({
+    characterName: '雷恩',
+    race: 'human',
+    candidateId: '',
+    occupation: '',
+    office: '',
+    hometown: '',
+    hometownCandidateId: '',
+    nickname: '',
+    contractTitle: '',
+    note: '',
+  });
+  const added = await storage.relationAdd({
+    fromType: 'sheet',
+    fromId: sheet.id,
+    fromName: '雷恩',
+    toType: 'sheet',
+    toId: sheet.id,
+    toName: '雷恩',
+    relationType: '契约',
+    note: '与自身立约',
+  });
+  assert.equal(added.ok, true);
+  const relations = await storage.relationsList();
+  assert.equal(relations.length, 1);
+  assert.equal(relations[0].fromId, relations[0].toId);
+  const sheets = await storage.sheetsList();
+  assert.equal(sheets[0]?.relationCount, 1, '自关联只计一次');
+  assert.match(await readWorkshopFile(workshopDir, 'relations.md'), /契约/);
+  const graphMd = await readWorkshopFile(workshopDir, 'graph.md');
+  assert.match(graphMd, /连线数: 0/, '自关联不应进入图谱快照');
+  assert.doesNotMatch(graphMd, /契约/);
+
+  const reopened = new WorkshopStorage({ dataDirName: '.workshop' });
+  await reopened.open(join(workshopDir, '..'));
+  const reloaded = await reopened.relationsList();
+  assert.equal(reloaded.length, 1, '自关联应能从 Markdown 重新解析');
+  assert.equal(reloaded[0].fromId, reloaded[0].toId);
 });
 
 test('tolerates malformed Markdown entries and starts from empty data', async () => {

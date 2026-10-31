@@ -1,9 +1,9 @@
 // 设定工作台：设定卡列表 + 新建/编辑入口 + 删除（级联解除关系）
 import { useCallback, useEffect, useState } from 'react';
-import { Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { deleteSheet, fetchSheets } from '@/lib/db';
 import type { Sheet } from '@/lib/types';
-import { RACE_LABELS } from '@/lib/types';
+import { GENDER_LABELS, RACE_LABELS } from '@/lib/types';
 import { ConfirmDialog, EmptyState, Seal, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 import type { EditorPrefill } from '@/components/GenerateTab';
@@ -61,6 +61,10 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
         <div className="sheets-header">
           <p className="sheets-title">设定卡</p>
           <div className="sheets-actions">
+            <button type="button" className="secondary-btn sheets-new" data-testid="sheets-new" onClick={() => onOpenEditor()}>
+              <Plus size={15} />
+              新增
+            </button>
             <button type="button" className="icon-btn" title="刷新" data-testid="sheets-refresh" onClick={() => void reload({ silent: true })}>
               <RefreshCw size={16} className={cn(refreshing && 'spin')} />
             </button>
@@ -101,7 +105,8 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
                   <div className="sheet-main">
                     <p className="sheet-name">{s.characterName || '未命名人物'}</p>
                     <p className="sheet-meta">
-                      {RACE_LABELS[s.race]} · 关系 {s.relationCount}
+                      {RACE_LABELS[s.race]}
+                      {s.gender ? ` · ${GENDER_LABELS[s.gender]}` : ''} · 关系 {s.relationCount}
                     </p>
                   </div>
                   <div className="sheet-actions">

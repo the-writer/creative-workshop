@@ -63,8 +63,11 @@ export function buildGraphData(
     if (c.nameType === 'place') placeById.set(c.id, c);
   });
 
+  // 关联自身仅用于设定卡内的男主/女主等标记，不进入图谱
+  const graphRelations = relations.filter((r) => !(r.fromType === r.toType && r.fromId === r.toId));
+
   const placeNodeIds = new Set<string>();
-  relations.forEach((r) => {
+  graphRelations.forEach((r) => {
     if (r.fromType === 'place') placeNodeIds.add(r.fromId);
     if (r.toType === 'place') placeNodeIds.add(r.toId);
   });
@@ -85,7 +88,7 @@ export function buildGraphData(
   placeNodes.forEach((n) => nodes.set(n.id, n));
 
   const edges: GraphEdge[] = [];
-  relations.forEach((r) => {
+  graphRelations.forEach((r) => {
     const source = r.fromType === 'sheet' ? sheetNodeId(r.fromId) : placeNodeId(r.fromId);
     const target = r.toType === 'sheet' ? sheetNodeId(r.toId) : placeNodeId(r.toId);
     if (!nodes.has(source) || !nodes.has(target)) return;

@@ -69,6 +69,7 @@ export interface SheetInput {
   id?: string;
   characterName: string;
   race: RaceKey;
+  gender?: NameGender;
   candidateId: string;
   occupation: string;
   office: string;
@@ -452,8 +453,10 @@ export class WorkshopStorage {
       const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
       const countMap = new Map<string, number>();
       relations.forEach((relation) => {
-        if (relation.fromType === 'sheet') countMap.set(relation.fromId, (countMap.get(relation.fromId) ?? 0) + 1);
-        if (relation.toType === 'sheet') countMap.set(relation.toId, (countMap.get(relation.toId) ?? 0) + 1);
+        const sheetIds = new Set<string>();
+        if (relation.fromType === 'sheet') sheetIds.add(relation.fromId);
+        if (relation.toType === 'sheet') sheetIds.add(relation.toId);
+        sheetIds.forEach((id) => countMap.set(id, (countMap.get(id) ?? 0) + 1));
       });
       return clone([...sheets].sort((a, b) => b.createdAt - a.createdAt).map((sheet) => ({ ...sheet, relationCount: countMap.get(sheet.id) ?? 0 })));
     });
@@ -464,9 +467,11 @@ export class WorkshopStorage {
       if (!input.characterName.trim()) return { ok: false, id: '', message: '人物名不能为空' };
       const sheets = await this.loadSheets();
       const now = Date.now();
+      const gender = asGender(input.gender);
       const normalized = {
         characterName: input.characterName.trim(),
         race: asRace(input.race),
+        gender,
         candidateId: asString(input.candidateId),
         occupation: asString(input.occupation).trim(),
         office: asString(input.office).trim(),
@@ -523,7 +528,7 @@ export class WorkshopStorage {
 
   public relationAdd(input: RelationInput): Promise<{ ok: boolean; message?: string }> {
     return this.enqueue(async () => {
-      if (!input.fromId || !input.toId || input.fromId === input.toId) return { ok: false, message: '无法建立指向自身的空关系' };
+      if (!input.fromId || !input.toId) return { ok: false, message: '关系的来源与目标不能为空' };
       const relations = await this.loadRelations();
       const duplicate = relations.some(
         (relation) =>
@@ -645,10 +650,12 @@ export class WorkshopStorage {
             .map((row) => {
               const characterName = asString(row.characterName ?? row.character_name);
               if (!characterName) return null;
+              const gender = asGender(row.gender);
               return {
                 id: asString(row.id) || randomUUID(),
                 characterName,
                 race: asRace(row.race),
+                ...(gender ? { gender } : {}),
                 candidateId: asString(row.candidateId ?? row.candidate_id),
                 occupation: asString(row.occupation),
                 office: asString(row.office),
@@ -669,7 +676,7 @@ export class WorkshopStorage {
             .map((row) => {
               const fromId = asString(row.fromId ?? row.from_id);
               const toId = asString(row.toId ?? row.to_id);
-              if (!fromId || !toId || fromId === toId) return null;
+              if (!fromId || !toId) return null;
               return {
                 id: asString(row.id) || randomUUID(),
                 fromType: asEntityType(row.fromType ?? row.from_type),

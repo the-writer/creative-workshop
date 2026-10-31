@@ -37,6 +37,7 @@ export interface Sheet {
   id: string;
   characterName: string;
   race: RaceKey;
+  gender?: NameGender;
   candidateId: string;
   occupation: string;
   office: string;
@@ -95,6 +96,8 @@ export const GENDER_LABELS: Record<NameGender, string> = {
   neutral: '中性',
 };
 export const GENDER_KEYS: NameGender[] = ['any', 'male', 'female', 'neutral'];
+// 设定卡记录人物的真实性别，不提供「不限」；空值表示未设定。
+export const SHEET_GENDER_KEYS: NameGender[] = ['male', 'female', 'neutral'];
 
 export const TYPE_LABELS: Record<NameTypeKey, string> = {
   person: '人名',
@@ -106,7 +109,10 @@ export const TYPE_KEYS: NameTypeKey[] = ['person', 'place', 'office', 'nickname'
 
 export const RARITY_TIERS: RarityTier[] = ['S', 'SS', 'SSS', 'SSSR'];
 
-export const RELATION_TYPES = ['师徒', '父子', '同僚', '敌对', '隶属', '契约', '其他'] as const;
+export const RELATION_TYPES = ['师徒', '父子', '同僚', '敌对', '隶属', '契约', '男主', '女主', '女配', '男配', '其他'] as const;
+
+// 新建尚未保存的设定卡关联自身时使用的临时目标 ID，保存后替换为真实设定卡 ID。
+export const SELF_RELATION_TARGET_ID = '__self__';
 
 export const DEFAULT_FILTERS: CandidateFilters = {
   race: 'all',
