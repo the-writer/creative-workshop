@@ -7,6 +7,8 @@ const IPC = {
   projectsOpen: 'workshop:projects:open',
   projectsCreate: 'workshop:projects:create',
   projectsPickDirectory: 'workshop:projects:pick-directory',
+  projectsRemoveRecent: 'workshop:projects:remove-recent',
+  projectsOverview: 'workshop:project:overview',
   projectsOpenInVSCode: 'workshop:projects:open-vscode',
   rulesOpen: 'workshop:rules:open',
   rulesClose: 'workshop:rules:close',
@@ -38,6 +40,8 @@ contextBridge.exposeInMainWorld('workshop', {
     open: (path: string) => invoke(IPC.projectsOpen, path),
     create: (input: { parentDir: string; name: string }) => invoke(IPC.projectsCreate, input),
     pickDirectory: (kind: 'open' | 'parent') => invoke(IPC.projectsPickDirectory, kind),
+    removeRecent: (path: string) => invoke(IPC.projectsRemoveRecent, path),
+    overview: () => invoke(IPC.projectsOverview),
     openInVSCode: () => invoke(IPC.projectsOpenInVSCode),
   },
   rules: {

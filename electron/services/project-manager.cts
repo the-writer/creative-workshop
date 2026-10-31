@@ -92,6 +92,28 @@ export class ProjectManager {
   }
 
   /**
+   * 从最近项目列表中移除指定项目，只改 `projects.json`，**不删除磁盘上的任何文件**。
+   * 若移除的是当前项目，同时关闭数据服务并清空当前项目。
+   */
+  public async removeRecent(projectPath: string): Promise<{ ok: boolean; message?: string }> {
+    const resolved = resolve(String(projectPath ?? ''));
+    const before = this.state.recentProjects.length;
+    const remaining = this.state.recentProjects.filter((project) => project.path !== resolved);
+    if (remaining.length === before) return { ok: false, message: '该目录不在最近项目列表中' };
+    this.state = { schemaVersion: 1, recentProjects: remaining };
+    if (this.currentProject?.path === resolved) {
+      this.currentProject = null;
+      await this.storage.close();
+    }
+    try {
+      await this.saveState();
+    } catch (error) {
+      return { ok: false, message: `无法写入项目登记：${error instanceof Error ? error.message : String(error)}` };
+    }
+    return { ok: true };
+  }
+
+  /**
    * 打开项目；目录不存在时自动创建，缺少 `.workshop` 时自动初始化为项目。
    *
    * 这使「打开项目」可以覆盖两种场景：选择一个新目录即新建项目；选择一个已有空目录即就地初始化。

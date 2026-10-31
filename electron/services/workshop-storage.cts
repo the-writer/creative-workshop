@@ -6,7 +6,9 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
+  extractSectionMarkdown,
   nameCharCount,
+  OVERVIEW_HEADING,
   parseCandidatesMarkdown,
   parseGraphMarkdown,
   parsePreferencesMarkdown,
@@ -318,6 +320,14 @@ export class WorkshopStorage {
   private async refreshSheetsIni(): Promise<void> {
     const [candidates, sheets] = await Promise.all([this.loadCandidates(), this.loadSheets()]);
     await this.writeText(PROJECT_FILES.sheetsIni, serializeSheetsIni(candidates, sheets));
+  }
+
+  /** 读取 `project.md` 中「## 总览」小节的正文（不含标题），用于设置页只读展示。 */
+  public projectOverview(): Promise<string> {
+    return this.enqueue(async () => {
+      const text = await this.readText(PROJECT_FILES.project);
+      return extractSectionMarkdown(text, OVERVIEW_HEADING);
+    });
   }
 
   /* ---------------- 偏好 ---------------- */

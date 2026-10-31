@@ -35,6 +35,8 @@ export interface WorkshopApi {
     open: (path: string) => Promise<ProjectOpenResult>;
     create: (input: { parentDir: string; name: string }) => Promise<ProjectOpenResult>;
     pickDirectory: (kind: 'open' | 'parent') => Promise<PickDirectoryResult>;
+    removeRecent: (path: string) => Promise<{ ok: boolean; message?: string }>;
+    overview: () => Promise<string>;
     openInVSCode: () => Promise<{ ok: boolean; message?: string }>;
   };
   rules: {

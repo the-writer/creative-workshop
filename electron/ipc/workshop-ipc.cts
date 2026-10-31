@@ -15,6 +15,8 @@ export const IPC = {
   projectsOpen: 'workshop:projects:open',
   projectsCreate: 'workshop:projects:create',
   projectsPickDirectory: 'workshop:projects:pick-directory',
+  projectsRemoveRecent: 'workshop:projects:remove-recent',
+  projectsOverview: 'workshop:project:overview',
   projectsOpenInVSCode: 'workshop:projects:open-vscode',
   rulesOpen: 'workshop:rules:open',
   rulesClose: 'workshop:rules:close',
@@ -97,6 +99,8 @@ export function registerWorkshopIpc(storage: WorkshopStorage, projects: ProjectM
   registerHandler(IPC.projectsOpen, (_event, path: string) => projects.open(path));
   registerHandler(IPC.projectsCreate, (_event, input: { parentDir: string; name: string }) => projects.create(input));
   registerHandler(IPC.projectsPickDirectory, (event, kind: 'open' | 'parent') => pickDirectory(event, kind === 'parent' ? 'parent' : 'open'));
+  registerHandler(IPC.projectsRemoveRecent, (_event, path: string) => projects.removeRecent(path));
+  registerHandler(IPC.projectsOverview, () => storage.projectOverview());
   registerHandler(IPC.projectsOpenInVSCode, () => projects.openInVSCode());
   registerHandler(IPC.rulesOpen, () => rulesBridge?.openRulesWindow());
   registerHandler(IPC.rulesClose, () => rulesBridge?.closeRulesWindow());

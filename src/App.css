@@ -2468,6 +2468,107 @@ body {
   color: var(--app-ink);
 }
 
+.settings-overview-card {
+  padding: 12px 14px 14px;
+}
+
+.settings-overview-error {
+  color: var(--app-cinnabar);
+}
+
+.markdown-view {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--app-ink);
+  word-break: break-word;
+}
+
+.markdown-view > :first-child {
+  margin-top: 0;
+}
+
+.markdown-view > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-view .md-heading {
+  margin: 12px 0 6px;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.markdown-view .md-h1 {
+  font-size: 17px;
+}
+
+.markdown-view .md-h2 {
+  font-size: 15px;
+}
+
+.markdown-view .md-h3,
+.markdown-view .md-h4,
+.markdown-view .md-h5,
+.markdown-view .md-h6 {
+  font-size: 14px;
+}
+
+.markdown-view .md-paragraph {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+}
+
+.markdown-view .md-list {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.markdown-view .md-list li {
+  margin: 2px 0;
+}
+
+.markdown-view .md-quote {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--app-gold);
+  border-radius: 0 8px 8px 0;
+  background: var(--app-bg);
+  color: var(--app-ink-2);
+  white-space: pre-wrap;
+}
+
+.markdown-view code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 12px;
+}
+
+.markdown-view .md-code-block {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-bg);
+  overflow-x: auto;
+}
+
+.markdown-view .md-code-block code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+
+.markdown-view .md-hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--app-line);
+}
+
+.markdown-view a {
+  color: var(--app-cinnabar);
+  text-decoration: underline;
+}
+
 .settings-project-path {
   margin: 0 0 8px;
   padding: 6px 9px;
@@ -2630,6 +2731,22 @@ body {
   gap: 8px;
   max-height: 208px;
   overflow-y: auto;
+}
+
+.project-recent-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.project-recent-row .project-recent-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-recent-delete {
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .project-recent-item {

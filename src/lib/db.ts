@@ -85,6 +85,16 @@ export async function pickProjectDirectory(kind: 'open' | 'parent' = 'open'): Pr
   return api().projects.pickDirectory(kind);
 }
 
+/** 从最近项目列表移除（不删除磁盘文件） */
+export async function removeRecentProject(path: string): Promise<{ ok: boolean; message?: string }> {
+  return api().projects.removeRecent(path);
+}
+
+/** 读取当前项目 `.workshop/project.md` 中「## 总览」小节的 Markdown 正文 */
+export async function fetchProjectOverview(): Promise<string> {
+  return api().projects.overview();
+}
+
 export async function openProjectInVSCode(): Promise<{ ok: boolean; message?: string }> {
   return api().projects.openInVSCode();
 }

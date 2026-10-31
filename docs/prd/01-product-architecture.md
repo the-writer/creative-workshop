@@ -51,7 +51,9 @@ flowchart TD
 - 「打开项目」与点击最近项目都调用 `projects.open(path)`：目录不存在时自动创建；目录存在但没有 `.workshop` 时自动初始化；已有 `.workshop` 时直接打开（`electron/services/project-manager.cts`）。
 - **空目录初始化**：目录原本为空（或不存在、刚被创建）时，除 `.workshop` 外还自动创建 `README.md`（首行 `# <目录名>`）与 `第一卷/第一章.md`；已有内容或已有 `.workshop` 的目录不会补写这两个文件。
 - `projects.create({ parentDir, name })` IPC 仍保留以兼容旧调用，但项目门不再提供新建入口；日常新建项目通过「打开项目」选择一个新目录完成。
+- **从最近列表移除**：每条最近项目右侧提供删除图标按钮（`data-testid="project-delete-<项目名>"`），点击后弹出二次确认；确认后只调用 `projects.removeRecent(path)` 从 `projects.json` 最近项目列表中移除该条目，**不删除磁盘上的目录或任何文件**。
 - 设置页「切换项目」只回到项目门（渲染层将当前项目置空），不关闭主进程内的数据服务；再次打开项目时替换当前项目。
+- 设置页提供「总览」只读 Markdown 展示：读取当前项目 `.workshop/project.md` 的 `## 总览` 小节正文并渲染（不包含小节标题），支持刷新；小节不存在或为空时显示引导提示。
 
 ### 1.4 窗口行为
 

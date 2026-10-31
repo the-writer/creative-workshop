@@ -84,6 +84,8 @@ export interface CandidateFilters {
 /* ---------------- 常量与枚举映射 ---------------- */
 
 export const SCHEMA_VERSION = 1;
+/** `project.md` 中用于展示项目总览的二级小节标题。 */
+export const OVERVIEW_HEADING = '总览';
 
 const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族', mixed: '混血' };
 const TYPE_LABELS: Record<NameTypeKey, string> = { person: '人名', place: '地名', office: '官职', nickname: '绰号' };
@@ -258,6 +260,13 @@ function headingText(text: string): string {
     .trim();
 }
 
+/** 取出指定 `## 小节` 的正文（不含标题行）；小节不存在时返回空字符串。 */
+export function extractSectionMarkdown(text: string, heading: string): string {
+  const section = splitSections(text).sections.find((entry) => cleanHeading(entry.heading) === heading);
+  if (!section) return '';
+  return section.body.join('\n').trim();
+}
+
 function normalizeStructure(parts: Array<{ key: string; value: string }>): StructurePart[] {
   return parts.map((part) => ({ label: part.key, word: part.value })).filter((part) => part.label !== '' && part.word !== '' && part.label !== '结构');
 }
@@ -287,6 +296,8 @@ export function serializeProjectMarkdown(name: string): string {
     '',
     `- 格式版本: ${SCHEMA_VERSION}`,
     `- 创建时间: ${timestamp(Date.now())}`,
+    '',
+    `## ${OVERVIEW_HEADING}`,
     '',
   ].join('\n');
 }

@@ -438,3 +438,48 @@ test('uses the first line of README.md as the project display name', async () =>
   const recent = await manager.listRecent();
   assert.equal(recent[0]?.name, '星河纪事');
 });
+
+test('removes a project from the recent list without deleting files', async () => {
+  const baseDir = await mkdtemp(join(tmpdir(), 'creation-workshop-remove-'));
+  tempDirs.push(baseDir);
+  const storage = new WorkshopStorage({ dataDirName: '.workshop' });
+  const manager = new ProjectManager(join(baseDir, 'userData'), storage, {
+    dataDirName: '.workshop',
+    registryFileName: 'projects.json',
+    legacyDataFileName: 'workshop.json',
+    maxRecentProjects: 10,
+  });
+  await manager.initialize();
+  const first = join(baseDir, '项目甲');
+  const second = join(baseDir, '项目乙');
+  await manager.open(first);
+  await manager.open(second);
+  assert.equal((await manager.listRecent()).length, 2);
+
+  assert.deepEqual(await manager.removeRecent(first), { ok: true });
+  const recent = await manager.listRecent();
+  assert.equal(recent.length, 1);
+  assert.equal(recent[0]?.path, second);
+  assert.ok(existsSync(join(first, '.workshop', 'project.md')), '移除的项目文件应保留');
+  assert.equal((await manager.removeRecent(first)).ok, false, '重复移除应失败');
+});
+
+test('extracts the overview section from project.md and seeds it for new projects', async () => {
+  const { storage, projectDir, workshopDir } = await createStorage();
+  assert.match(await readFile(join(workshopDir, 'project.md'), 'utf8'), /## 总览/);
+  assert.equal(await storage.projectOverview(), '');
+
+  await writeFile(
+    join(workshopDir, 'project.md'),
+    ['# 项目：测试', '', '## 总览', '', '### 世界观', '', '- 北境终年积雪', '- 魔法源于血脉', ''].join('\n'),
+    'utf8',
+  );
+  const overview = await storage.projectOverview();
+  assert.match(overview, /### 世界观/);
+  assert.match(overview, /北境终年积雪/);
+  assert.ok(!overview.includes('## 总览'), '不应包含小节标题');
+
+  const reopened = new WorkshopStorage({ dataDirName: '.workshop' });
+  await reopened.open(projectDir);
+  assert.match(await reopened.projectOverview(), /魔法源于血脉/);
+});

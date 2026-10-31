@@ -1,9 +1,9 @@
 // 项目门：启动或切换项目时选择项目；打开目录时自动创建目录并初始化缺失的 .workshop。
 
 import { useEffect, useState } from 'react';
-import { FolderOpen, Loader2, PenLine } from 'lucide-react';
-import { listRecentProjects, openProject, pickProjectDirectory, type ProjectSummary } from '@/lib/db';
-import { formatTime } from '@/components/common';
+import { FolderOpen, Loader2, PenLine, Trash2 } from 'lucide-react';
+import { listRecentProjects, openProject, pickProjectDirectory, removeRecentProject, type ProjectSummary } from '@/lib/db';
+import { ConfirmDialog, formatTime, useAppToast } from '@/components/common';
 
 interface ProjectGateProps {
   onOpened: (project: ProjectSummary) => void;
@@ -12,9 +12,12 @@ interface ProjectGateProps {
 type Busy = 'open' | 'recent' | null;
 
 export function ProjectGate({ onOpened }: ProjectGateProps) {
+  const toast = useAppToast();
   const [recents, setRecents] = useState<ProjectSummary[] | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState('');
+  const [removeTarget, setRemoveTarget] = useState<ProjectSummary | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -56,6 +59,26 @@ export function ProjectGate({ onOpened }: ProjectGateProps) {
     await openPath(picked.path, 'open');
   };
 
+  const handleRemoveRecent = async () => {
+    if (!removeTarget || removing) return;
+    const target = removeTarget;
+    setRemoving(true);
+    try {
+      const res = await removeRecentProject(target.path);
+      if (res.ok) {
+        setRecents((prev) => (prev ? prev.filter((project) => project.path !== target.path) : prev));
+        toast.show('已从最近项目列表移除（未删除任何文件）', 'success');
+      } else {
+        toast.show(res.message || '移除失败，请重试', 'error');
+      }
+    } catch (err) {
+      toast.show((err as Error)?.message || '移除失败，请重试', 'error');
+    } finally {
+      setRemoving(false);
+      setRemoveTarget(null);
+    }
+  };
+
   return (
     <div className="project-gate" data-testid="project-gate">
       <div className="project-gate-inner">
@@ -95,7 +118,7 @@ export function ProjectGate({ onOpened }: ProjectGateProps) {
           ) : (
             <ul className="project-recent-list" data-testid="project-recent-list">
               {recents.map((project, index) => (
-                <li key={project.path}>
+                <li key={project.path} className="project-recent-row">
                   <button
                     type="button"
                     className="project-recent-item"
@@ -115,6 +138,17 @@ export function ProjectGate({ onOpened }: ProjectGateProps) {
                     <span className="project-recent-path">{project.path}</span>
                     <span className="project-recent-time">{project.lastOpenedAt ? `上次打开 ${formatTime(project.lastOpenedAt)}` : ''}</span>
                   </button>
+                  <button
+                    type="button"
+                    className="icon-btn project-recent-delete"
+                    title="从最近项目列表移除（不会删除文件）"
+                    aria-label={`从列表移除 ${project.name}`}
+                    data-testid={`project-delete-${project.name}`}
+                    disabled={busy !== null}
+                    onClick={() => setRemoveTarget(project)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </li>
               ))}
             </ul>
@@ -127,6 +161,17 @@ export function ProjectGate({ onOpened }: ProjectGateProps) {
           ) : null}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={!!removeTarget}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title="从最近项目列表移除？"
+        description={`只会从列表中移除「${removeTarget?.name ?? ''}」，磁盘上的项目文件不会被删除。`}
+        confirmText={removing ? '移除中…' : '移除'}
+        destructive
+        testId="project-remove-confirm"
+        onConfirm={() => void handleRemoveRecent()}
+      />
     </div>
   );
 }
