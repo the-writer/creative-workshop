@@ -194,6 +194,8 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
   };
 
   const hasAnyData = sheets.length > 0 || relations.length > 0 || places.length > 0;
+  // 同一节点上的多条自关联依次外扩
+  const selfLoopIndex = new Map<string, number>();
 
   return (
     <div className="page-shell graph-page">
@@ -329,8 +331,43 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
                   const a = positions.get(e.source);
                   const b = positions.get(e.target);
                   if (!a || !b) return null;
-                  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
                   const sel = selectedEdge?.id === e.id;
+                  if (e.source === e.target) {
+                    // 自关联画成节点上方的自环，多条时逐层外扩避免重叠
+                    const index = selfLoopIndex.get(e.source) ?? 0;
+                    selfLoopIndex.set(e.source, index + 1);
+                    const loopRadius = 16 + index * 9;
+                    const centerY = a.y - NODE_R.person - loopRadius - 6 - index * 4;
+                    return (
+                      <g key={e.id}>
+                        <circle
+                          cx={a.x}
+                          cy={centerY}
+                          r={loopRadius}
+                          fill="none"
+                          className="graph-edge-hit"
+                          data-edge={e.id}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            setSelectedEdge(e);
+                            setSelectedNode(null);
+                          }}
+                        />
+                        <circle
+                          cx={a.x}
+                          cy={centerY}
+                          r={loopRadius}
+                          fill="none"
+                          pointerEvents="none"
+                          className={cn('graph-edge', sel && 'graph-edge-selected')}
+                        />
+                        <text x={a.x} y={centerY - loopRadius - 6} className="graph-edge-label" textAnchor="middle">
+                          {e.relationType}
+                        </text>
+                      </g>
+                    );
+                  }
+                  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
                   return (
                     <g key={e.id}>
                       <line

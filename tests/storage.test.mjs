@@ -262,8 +262,8 @@ test('supports self relations and counts them once per sheet', async () => {
   assert.match(await readWorkshopFile(workshopDir, 'relations.md'), /契约/);
   assert.match(await readWorkshopFile(workshopDir, 'sheets.md'), /- 关系: 自己（契约）/);
   const graphMd = await readWorkshopFile(workshopDir, 'graph.md');
-  assert.match(graphMd, /连线数: 0/, '自关联不应进入图谱快照');
-  assert.doesNotMatch(graphMd, /契约/);
+  assert.match(graphMd, /连线数: 1/, '自关联应进入图谱快照');
+  assert.match(graphMd, /雷恩 — 契约 → 雷恩/);
 
   // 模拟旧数据：relations.md 有自关联，但 sheets.md 缺少派生的关系摘要
   const sheetsWithoutRelation = (await readWorkshopFile(workshopDir, 'sheets.md')).replace(/^- 关系:.*\n/m, '');

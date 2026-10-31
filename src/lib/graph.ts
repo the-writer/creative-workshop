@@ -63,8 +63,8 @@ export function buildGraphData(
     if (c.nameType === 'place') placeById.set(c.id, c);
   });
 
-  // 关联自身仅用于设定卡内的男主/女主等标记，不进入图谱
-  const graphRelations = relations.filter((r) => !(r.fromType === r.toType && r.fromId === r.toId));
+  // 关联自身同样进入图谱：人物节点上用自环表示（如男主/女主标记）
+  const graphRelations = relations;
 
   const placeNodeIds = new Set<string>();
   graphRelations.forEach((r) => {

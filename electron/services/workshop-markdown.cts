@@ -609,8 +609,8 @@ export function buildGraphSnapshot(
   candidates.forEach((candidate) => {
     if (candidate.nameType === 'place') placeById.set(candidate.id, candidate);
   });
-  // 关联自身不进入图谱快照
-  const graphRelations = relations.filter((relation) => !(relation.fromType === relation.toType && relation.fromId === relation.toId));
+  // 关联自身同样写入图谱快照，由前端渲染为节点自环
+  const graphRelations = relations;
   const placeIds = new Set<string>();
   graphRelations.forEach((relation) => {
     if (relation.fromType === 'place') placeIds.add(relation.fromId);

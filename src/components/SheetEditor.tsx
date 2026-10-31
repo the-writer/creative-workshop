@@ -202,16 +202,16 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
   }, [race]);
 
   const loadRelTargets = async (tab: 'sheet' | 'place') => {
+    const selfTarget: RelTarget = {
+      id: savedId ?? SELF_RELATION_TARGET_ID,
+      name: characterName.trim() || '未命名人物',
+      type: 'sheet',
+      race,
+      self: true,
+    };
     try {
       if (tab === 'sheet') {
         const sheets = await fetchSheets();
-        const selfTarget: RelTarget = {
-          id: savedId ?? SELF_RELATION_TARGET_ID,
-          name: characterName.trim() || '未命名人物',
-          type: 'sheet',
-          race,
-          self: true,
-        };
         setRelTargets([
           selfTarget,
           ...sheets.filter((s) => s.id !== savedId).map((s) => ({ id: s.id, name: s.characterName || '未命名人物', type: 'sheet' as const, race: s.race })),
@@ -229,7 +229,8 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
         setRelTargets(list.slice(0, 200).map((c) => ({ id: c.id, name: c.nameText, type: 'place' as const, race: c.race })));
       }
     } catch {
-      setRelTargets([]);
+      // 读取其他设定失败时仍保留「自己」，确保关联自身可用
+      setRelTargets(tab === 'sheet' ? [selfTarget] : []);
     }
   };
 
@@ -245,15 +246,20 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
     void loadRelTargets(tab);
   };
 
+  const resolveRelationType = () => (relType === '其他' ? relCustom.trim() || '其他' : relType);
+
   const handleAddRelation = async () => {
     if (!relTargetId) {
       toast.show('请先选择关联对象', 'info');
       return;
     }
     const target = relTargets.find((t) => t.id === relTargetId);
-    if (!target) return;
+    if (!target) {
+      toast.show('关联对象已失效，请重新选择', 'info');
+      return;
+    }
     const targetName = target.self ? characterName.trim() || '未命名人物' : target.name;
-    const relationType = relType === '其他' ? relCustom.trim() || '其他' : relType;
+    const relationType = resolveRelationType();
     if (!savedId) {
       if (pendingRelations.some((p) => p.target.id === target.id && p.relationType === relationType)) {
         toast.show('该关系已在待保存列表', 'info');
@@ -269,30 +275,35 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
       return;
     }
     setAddingRel(true);
-    const res = await addRelation({
-      fromType: 'sheet',
-      fromId: savedId,
-      fromName: characterName.trim() || '未命名人物',
-      toType: target.type,
-      toId: target.self ? savedId : target.id,
-      toName: targetName,
-      relationType,
-      note: '',
-    });
-    setAddingRel(false);
-    if (res.ok) {
-      toast.show('关系已添加', 'success');
-      setRelTargetId(null);
-      setRelCustom('');
-      try {
-        const rels = await fetchRelations();
-        setRelations(rels.filter((r) => r.fromId === savedId || r.toId === savedId));
-      } catch {
-        // 忽略刷新失败
+    try {
+      const res = await addRelation({
+        fromType: 'sheet',
+        fromId: savedId,
+        fromName: characterName.trim() || '未命名人物',
+        toType: target.type,
+        toId: target.self ? savedId : target.id,
+        toName: targetName,
+        relationType,
+        note: '',
+      });
+      if (res.ok) {
+        toast.show('关系已添加', 'success');
+        setRelTargetId(null);
+        setRelCustom('');
+        try {
+          const rels = await fetchRelations();
+          setRelations(rels.filter((r) => r.fromId === savedId || r.toId === savedId));
+        } catch {
+          // 忽略刷新失败
+        }
+        void loadRelTargets(relTab);
+      } else {
+        toast.show(res.message || '添加失败，请重试', 'error');
       }
-      void loadRelTargets(relTab);
-    } else {
-      toast.show(res.message || '添加失败，请重试', 'error');
+    } catch (err) {
+      toast.show((err as Error)?.message || '添加失败，请重试', 'error');
+    } finally {
+      setAddingRel(false);
     }
   };
 
@@ -330,42 +341,68 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
       return;
     }
     setSaving(true);
-    const res = await saveSheet({
-      id: savedId ?? undefined,
-      characterName: name,
-      race,
-      gender: gender || undefined,
-      candidateId,
-      occupation: occupation.trim(),
-      office: office.trim(),
-      hometown: hometown.trim(),
-      hometownCandidateId,
-      nickname: nickname.trim(),
-      contractTitle: contractTitle.trim(),
-      note: note.trim(),
-    });
-    if (res.ok) {
-      let failed = 0;
-      for (const pending of pendingRelations) {
-        const relRes = await addRelation({
-          fromType: 'sheet',
-          fromId: res.id,
-          fromName: name,
-          toType: pending.target.type,
-          toId: pending.target.self ? res.id : pending.target.id,
-          toName: pending.target.self ? name : pending.target.name,
-          relationType: pending.relationType,
-          note: pending.note,
-        });
-        if (!relRes.ok) failed += 1;
+    try {
+      const res = await saveSheet({
+        id: savedId ?? undefined,
+        characterName: name,
+        race,
+        gender: gender || undefined,
+        candidateId,
+        occupation: occupation.trim(),
+        office: office.trim(),
+        hometown: hometown.trim(),
+        hometownCandidateId,
+        nickname: nickname.trim(),
+        contractTitle: contractTitle.trim(),
+        note: note.trim(),
+      });
+      if (!res.ok) {
+        toast.show(res.message || '保存失败，请重试', 'error');
+        return;
       }
-      setSaving(false);
+      // 已选好目标但还没点「添加关系」时，保存一并写入，避免「关联自己」看起来没生效
+      const queued = [...pendingRelations];
+      const selected = relTargetId ? relTargets.find((t) => t.id === relTargetId) : undefined;
+      if (selected) {
+        const relationType = resolveRelationType();
+        const toId = selected.self ? res.id : selected.id;
+        const addedAlready =
+          relations.some((r) => r.fromId === res.id && r.toId === toId && r.relationType === relationType) ||
+          queued.some((p) => p.target.self === selected.self && (selected.self || p.target.id === selected.id) && p.relationType === relationType);
+        if (!addedAlready) {
+          queued.push({
+            key: `selected-${Date.now()}`,
+            target: { ...selected, name: selected.self ? name : selected.name },
+            relationType,
+            note: '',
+          });
+        }
+      }
+      let failed = 0;
+      for (const pending of queued) {
+        try {
+          const relRes = await addRelation({
+            fromType: 'sheet',
+            fromId: res.id,
+            fromName: name,
+            toType: pending.target.type,
+            toId: pending.target.self ? res.id : pending.target.id,
+            toName: pending.target.self ? name : pending.target.name,
+            relationType: pending.relationType,
+            note: pending.note,
+          });
+          if (!relRes.ok) failed += 1;
+        } catch {
+          failed += 1;
+        }
+      }
       if (failed > 0) toast.show(`设定已保存，${failed} 条关系添加失败`, 'error');
       else toast.show('设定已保存', 'success');
       onSaved();
-    } else {
+    } catch (err) {
+      toast.show((err as Error)?.message || '保存失败，请重试', 'error');
+    } finally {
       setSaving(false);
-      toast.show(res.message || '保存失败，请重试', 'error');
     }
   };
 
