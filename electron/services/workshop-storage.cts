@@ -6,9 +6,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
-  extractSectionMarkdown,
   nameCharCount,
-  OVERVIEW_HEADING,
   parseCandidatesMarkdown,
   parseGraphMarkdown,
   parsePreferencesMarkdown,
@@ -42,6 +40,7 @@ export type { Candidate, CandidateFilters, EntityType, GraphLayout, GraphPoint, 
 /** .workshop 目录内的固定文件名（项目数据分类保存） */
 export const PROJECT_FILES = {
   project: 'project.md',
+  overview: 'overview.md',
   candidates: 'candidates.md',
   sheets: 'sheets.md',
   relations: 'relations.md',
@@ -322,11 +321,11 @@ export class WorkshopStorage {
     await this.writeText(PROJECT_FILES.sheetsIni, serializeSheetsIni(candidates, sheets));
   }
 
-  /** 读取 `project.md` 中「## 总览」小节的正文（不含标题），用于设置页只读展示。 */
+  /** 读取 `overview.md` 全文（去首尾空白），用于设置页只读展示；文件不存在或为空时返回空字符串。 */
   public projectOverview(): Promise<string> {
     return this.enqueue(async () => {
-      const text = await this.readText(PROJECT_FILES.project);
-      return extractSectionMarkdown(text, OVERVIEW_HEADING);
+      const text = await this.readText(PROJECT_FILES.overview);
+      return text.trim();
     });
   }
 

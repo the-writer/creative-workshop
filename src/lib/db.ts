@@ -90,7 +90,7 @@ export async function removeRecentProject(path: string): Promise<{ ok: boolean; 
   return api().projects.removeRecent(path);
 }
 
-/** 读取当前项目 `.workshop/project.md` 中「## 总览」小节的 Markdown 正文 */
+/** 读取当前项目 `.workshop/overview.md` 的 Markdown 正文（文件不存在时为空） */
 export async function fetchProjectOverview(): Promise<string> {
   return api().projects.overview();
 }

@@ -1,4 +1,4 @@
-// 设置页：项目切换、VS Code 打开项目目录、project.md 总览只读展示与应用信息
+// 设置页：项目切换、VS Code 打开项目目录、overview.md 总览只读展示与应用信息
 
 import { useCallback, useEffect, useState } from 'react';
 import { Code2, FolderOpen, Loader2, RefreshCw } from 'lucide-react';
@@ -17,19 +17,17 @@ export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
   const [opening, setOpening] = useState(false);
   const [overview, setOverview] = useState('');
   const [overviewLoading, setOverviewLoading] = useState(true);
-  const [overviewError, setOverviewError] = useState('');
 
   const loadOverview = useCallback(async () => {
     setOverviewLoading(true);
     try {
       setOverview(await fetchProjectOverview());
-      setOverviewError('');
     } catch (err) {
-      setOverviewError((err as Error)?.message || '读取项目总览失败');
+      toast.show((err as Error)?.message || '读取项目总览失败', 'error');
     } finally {
       setOverviewLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void loadOverview();
@@ -77,40 +75,36 @@ export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
           </div>
         </div>
 
-        <SectionTitle
-          right={
-            <button
-              type="button"
-              className="icon-btn"
-              title="刷新总览"
-              aria-label="刷新总览"
-              data-testid="settings-overview-refresh"
-              disabled={overviewLoading}
-              onClick={() => void loadOverview()}
+        {overview.trim() ? (
+          <>
+            <SectionTitle
+              right={
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title="刷新总览"
+                  aria-label="刷新总览"
+                  data-testid="settings-overview-refresh"
+                  disabled={overviewLoading}
+                  onClick={() => void loadOverview()}
+                >
+                  <RefreshCw size={15} className={cn(overviewLoading && 'spin')} />
+                </button>
+              }
             >
-              <RefreshCw size={15} className={cn(overviewLoading && 'spin')} />
-            </button>
-          }
-        >
-          总览
-        </SectionTitle>
-        <div className="settings-card settings-overview-card">
-          {overviewError ? (
-            <p className="settings-desc settings-overview-error" data-testid="settings-overview-error">
-              {overviewError}
-            </p>
-          ) : overviewLoading ? (
-            <p className="settings-desc" data-testid="settings-overview-loading">
-              正在读取项目总览…
-            </p>
-          ) : overview.trim() ? (
-            <MarkdownView markdown={overview} testId="settings-overview" />
-          ) : (
-            <p className="settings-desc" data-testid="settings-overview-empty">
-              暂无总览。可在项目 `.workshop/project.md` 中添加 `## 总览` 小节，内容会在这里只读展示。
-            </p>
-          )}
-        </div>
+              总览
+            </SectionTitle>
+            <div className="settings-card settings-overview-card">
+              {overviewLoading ? (
+                <p className="settings-desc" data-testid="settings-overview-loading">
+                  正在读取项目总览…
+                </p>
+              ) : (
+                <MarkdownView markdown={overview} testId="settings-overview" />
+              )}
+            </div>
+          </>
+        ) : null}
 
         <SectionTitle>关于</SectionTitle>
         <div className="settings-card">

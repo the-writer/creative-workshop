@@ -38,7 +38,7 @@ flowchart TD
   - `[创作工坊] 项目数据目录：<项目目录>/.workshop`
 - 设置页「切换项目」只把渲染层项目置空并回到项目门；没有关闭项目的 IPC，主进程内当前项目在下次 `open`/`create` 时被替换。
 - **从最近列表移除**：项目门每条最近项目右侧有删除图标按钮（`data-testid="project-delete-<项目名>"`），二次确认（`project-remove-confirm`）后调用 `projects.removeRecent(path)`。该操作只从 `projects.json` 的 `recentProjects` 删除对应条目，**不删除项目目录或 `.workshop` 文件**；若移除的是当前项目，主进程同时关闭数据服务并清空当前项目。
-- 设置页「总览」为只读 Markdown 视图：调用 `projects.overview()` 读取当前项目 `.workshop/project.md` 中 `## 总览` 小节的正文并渲染（不含标题行），可点击刷新（`settings-overview-refresh`）；小节缺失或为空时显示编辑引导，不写盘。
+- 设置页「总览」为只读 Markdown 视图：调用 `projects.overview()` 直接读取当前项目 `.workshop/overview.md` 全文并渲染，可点击刷新（`settings-overview-refresh`）；文件不存在或正文为空时**整块「总览」区域（标题、刷新按钮与提示）都不渲染**，不写盘。
 
 ### 7.2 项目登记文件 `userData/projects.json`
 
@@ -85,6 +85,7 @@ flowchart TD
 │   └── 第一章.md              # 空目录初始化时创建
 └── .workshop/                 # 目录名来自 creationWorkshop.project.dataDirName，默认 .workshop
     ├── project.md             # 项目名称、格式版本、创建时间
+    ├── overview.md            # 项目总览（可选，应用不自动创建；设置页只读展示）
     ├── candidates.md          # 名称候选
     ├── sheets.md              # 设定卡
     ├── relations.md           # 人物与地名关系
@@ -104,11 +105,11 @@ flowchart TD
         └── .workshop/…
 ```
 
-`WorkshopStorage.open(projectPath)` 会创建缺失的 `.workshop` 目录与六个 Markdown 文件（空数据骨架）；已存在的文件不会被覆盖。缺失文件在读取时按空数据处理。`sheets.ini` 不读取、每次打开时按当前数据重新生成并覆盖。
+`WorkshopStorage.open(projectPath)` 会创建缺失的 `.workshop` 目录与六个 Markdown 文件（空数据骨架）；已存在的文件不会被覆盖；`overview.md` 不在此列，永远不会被自动创建。缺失文件在读取时按空数据处理。`sheets.ini` 不读取、每次打开时按当前数据重新生成并覆盖。
 
 ### 7.4 `.workshop` Markdown 格式
 
-所有文件是「`#` 总标题 + `##` 分节 + `- 字段: 值` 字段行」的可读 Markdown。解析器按行工作，**容错读取**：跳过不完整或无法识别的条目，不因单个坏条目导致整份文件读取失败。
+所有文件是「`#` 总标题 + `##` 分节 + `- 字段: 值` 字段行」的可读 Markdown（`overview.md` 除外，为自由格式）。解析器按行工作，**容错读取**：跳过不完整或无法识别的条目，不因单个坏条目导致整份文件读取失败。
 
 通用规则（`electron/services/workshop-markdown.cts`）：
 
@@ -132,13 +133,6 @@ flowchart TD
 
 - 格式版本: 1
 - 创建时间: 2026-10-26T05:57:48.000Z
-
-## 总览
-
-### 世界观
-
-- 北境终年积雪
-- 魔法源于血脉
 ```
 
 | 字段     | 说明                                                  |
@@ -146,11 +140,10 @@ flowchart TD
 | 一级标题 | `# 项目：<名称>`；名称缺失时回退为项目目录名          |
 | 格式版本 | 固定 `SCHEMA_VERSION = 1`；读取仅供记录，不做版本升级 |
 | 创建时间 | 首次创建时写入；已有文件在打开时保持原值              |
-| 总览     | 可选的 `## 总览` 小节，正文由设置页只读渲染           |
 
-`open()` 仅在 `project.md` 不存在或内容为空时写入；因此重命名标题可手动修改项目名，重新打开后登记列表名称随之更新。新建项目的模板会在字段行后写入空的 `## 总览` 小节；已有文件不会被自动补写该小节。
+`open()` 仅在 `project.md` 不存在或内容为空时写入；因此重命名标题可手动修改项目名，重新打开后登记列表名称随之更新。新建项目的模板到字段行为止；已有文件不会被自动补写内容。
 
-`project.md` 的 `## 总览` 小节正文由 `extractSectionMarkdown(text, '总览')`（`electron/services/workshop-markdown.cts`）提取：取该 `##` 标题后到下一个 `##` 标题前的所有行并去除首尾空白，**不含小节标题本身**；小节不存在时返回空字符串。设置页通过 `projects.overview()` 获取该文本并用只读 Markdown 视图渲染，不写盘。
+项目总览保存在独立文件 `overview.md`（可选、自由格式 Markdown，不使用 `project.md` 小节）：整个文件内容去除首尾空白后即总览正文，由设置页通过 `projects.overview()` 读取并只读渲染。应用不创建、不修改该文件（手动用编辑器维护即可）；文件不存在或正文为空时设置页**整块隐藏「总览」区域**（标题、刷新按钮与提示都不渲染），不写盘。
 
 #### 7.4.2 `candidates.md`
 
@@ -405,7 +398,7 @@ flowchart TD
 | `projects.create({ parentDir, name })` | `workshop:projects:create`         | 写项目文件 + `projects.json`                                                         | 创建项目目录与 `.workshop`、补齐分类文件、设为当前项目                                                                    |
 | `projects.pickDirectory(kind)`         | `workshop:projects:pick-directory` | 不写盘                                                                               | `kind='open'` 选择项目目录（允许在对话框内新建目录），`kind='parent'` 选择存放位置；返回 `{ ok, canceled?, path? }`       |
 | `projects.removeRecent(path)`          | `workshop:projects:remove-recent`  | 写 `projects.json`                                                                   | 仅从最近项目列表移除该路径，**不删除项目文件**；不在列表时返回 `{ ok: false, message }`                                   |
-| `projects.overview()`                  | `workshop:project:overview`        | 不写盘                                                                               | 要求已打开项目；返回 `project.md` 中 `## 总览` 小节的 Markdown 正文（不含标题），缺失时为空字符串                         |
+| `projects.overview()`                  | `workshop:project:overview`        | 不写盘                                                                               | 要求已打开项目；返回 `.workshop/overview.md` 全文（去首尾空白），文件不存在或为空时为空字符串                             |
 | `projects.openInVSCode()`              | `workshop:projects:open-vscode`    | 不写盘                                                                               | 用 VS Code 打开当前项目目录；未安装时回退文件管理器；返回 `{ ok, message? }`                                              |
 | `rules.open()`                         | `workshop:rules:open`              | 不写盘                                                                               | 以主窗口为 parent 打开模态规则设置子窗口；已打开则聚焦现有窗口                                                            |
 | `rules.close()`                        | `workshop:rules:close`             | 不写盘                                                                               | 关闭规则设置子窗口                                                                                                        |

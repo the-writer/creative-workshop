@@ -464,22 +464,24 @@ test('removes a project from the recent list without deleting files', async () =
   assert.equal((await manager.removeRecent(first)).ok, false, '重复移除应失败');
 });
 
-test('extracts the overview section from project.md and seeds it for new projects', async () => {
+test('reads the project overview from overview.md and hides it when missing', async () => {
   const { storage, projectDir, workshopDir } = await createStorage();
-  assert.match(await readFile(join(workshopDir, 'project.md'), 'utf8'), /## 总览/);
+  // overview.md 不会自动创建；project.md 模板也不再包含 ## 总览 小节
+  assert.ok(!existsSync(join(workshopDir, 'overview.md')), 'overview.md 不应被自动创建');
+  assert.doesNotMatch(await readWorkshopFile(workshopDir, 'project.md'), /## 总览/);
   assert.equal(await storage.projectOverview(), '');
 
-  await writeFile(
-    join(workshopDir, 'project.md'),
-    ['# 项目：测试', '', '## 总览', '', '### 世界观', '', '- 北境终年积雪', '- 魔法源于血脉', ''].join('\n'),
-    'utf8',
-  );
+  await writeFile(join(workshopDir, 'overview.md'), ['# 世界观', '', '### 北境', '', '- 北境终年积雪', '- 魔法源于血脉', ''].join('\n'), 'utf8');
   const overview = await storage.projectOverview();
-  assert.match(overview, /### 世界观/);
+  assert.match(overview, /### 北境/);
   assert.match(overview, /北境终年积雪/);
-  assert.ok(!overview.includes('## 总览'), '不应包含小节标题');
+
+  // 删除文件后回退为空字符串（设置页据此隐藏总览块）
+  await rm(join(workshopDir, 'overview.md'));
+  assert.equal(await storage.projectOverview(), '');
 
   const reopened = new WorkshopStorage({ dataDirName: '.workshop' });
   await reopened.open(projectDir);
+  await writeFile(join(workshopDir, 'overview.md'), '- 魔法源于血脉', 'utf8');
   assert.match(await reopened.projectOverview(), /魔法源于血脉/);
 });
