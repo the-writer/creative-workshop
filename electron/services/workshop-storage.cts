@@ -127,6 +127,7 @@ function asNumber(value: unknown, fallback = 0): number {
 }
 
 function asRace(value: unknown): RaceKey {
+  if (value === 'mixed' || value === '混血') return 'mixed';
   return value === 'elf' || value === 'demon' ? 'elf' : 'human';
 }
 
@@ -198,6 +199,9 @@ export class WorkshopStorage {
       const info = parseProjectMarkdown(projectText, fallbackName);
       if (!projectText.trim()) await this.writeText(PROJECT_FILES.project, serializeProjectMarkdown(fallbackName));
       this.projectName = info.name || fallbackName;
+      // 打开项目时把 relations.md 的关系摘要补写回 sheets.md，避免旧数据或外部编辑后缺失
+      const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
+      if (sheets.length > 0 && relations.length > 0) await this.writeSheets(sheets, relations);
       await this.refreshSheetsIni();
       return { path: resolved, name: this.projectName, workshopPath };
     });

@@ -235,7 +235,7 @@ export function graphNodeTypeLabel(kind: GraphKind): string {
 }
 
 export function raceOfTypeLabel(): Record<RaceKey, string> {
-  return { human: '人族', elf: '精灵族' };
+  return { human: '人族', elf: '精灵族', mixed: '混血' };
 }
 
 export type { NameTypeKey };

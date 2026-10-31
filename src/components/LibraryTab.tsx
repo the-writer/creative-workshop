@@ -249,6 +249,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
                     ['all', '全部'],
                     ['human', '人族'],
                     ['elf', '精灵族'],
+                    ['mixed', '混血'],
                   ] as Array<[RaceKey | 'all', string]>
                 ).map(([k, label]) => (
                   <Chip key={k} selected={filters.race === k} tone="neutral" onClick={() => setFilter({ race: k })} dataTestId={`filter-race-${k}`}>

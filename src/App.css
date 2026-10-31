@@ -219,6 +219,10 @@ body {
   background: var(--app-indigo);
 }
 
+.seal-mixed {
+  background: var(--app-pine);
+}
+
 /* ============ Chip / 通用按钮 ============ */
 
 .app-chip {
@@ -244,6 +248,12 @@ body {
 .app-chip-selected.chip-tone-elf {
   background: var(--app-indigo);
   border-color: var(--app-indigo);
+  color: var(--app-paper);
+}
+
+.app-chip-selected.chip-tone-mixed {
+  background: var(--app-pine);
+  border-color: var(--app-pine);
   color: var(--app-paper);
 }
 
@@ -421,6 +431,11 @@ body {
 .tag-race-elf {
   border-color: rgba(62, 74, 90, 0.35);
   color: var(--app-indigo);
+}
+
+.tag-race-mixed {
+  border-color: rgba(74, 124, 89, 0.4);
+  color: var(--app-pine);
 }
 
 .tag-gender {

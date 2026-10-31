@@ -238,6 +238,7 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
                 ['all', '全族'],
                 ['human', '人族'],
                 ['elf', '精灵族'],
+                ['mixed', '混血'],
               ] as Array<[RaceKey | 'all', string]>
             ).map(([k, label]) => (
               <Chip key={k} selected={raceFilter === k} tone="neutral" onClick={() => setRaceFilter(k)} dataTestId={`graph-race-${k}`}>

@@ -1,6 +1,6 @@
 // 规范业务对象与枚举定义（内部 key 与中文展示 label 分离）
 
-export type RaceKey = 'human' | 'elf';
+export type RaceKey = 'human' | 'elf' | 'mixed';
 export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
 export type NameGender = 'any' | 'male' | 'female' | 'neutral';
 export type RarityTier = 'S' | 'SS' | 'SSS' | 'SSSR';
@@ -76,15 +76,17 @@ export interface CandidateFilters {
   sort: SortKey;
 }
 
-export const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族' };
-export const RACE_KEYS: RaceKey[] = ['human', 'elf'];
+export const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族', mixed: '混血' };
+export const RACE_KEYS: RaceKey[] = ['human', 'elf', 'mixed'];
 
 // 旧版本曾使用 demon 作为妖族内部 key，读取旧偏好 / 旧数据时统一迁移为 elf。
 export function normalizeRaceKey(raw: unknown): RaceKey {
+  if (raw === 'mixed' || raw === '混血') return 'mixed';
   return raw === 'elf' || raw === 'demon' ? 'elf' : 'human';
 }
 
 export function normalizeRaceFilter(raw: unknown): RaceKey | 'all' {
+  if (raw === 'mixed' || raw === '混血') return 'mixed';
   if (raw === 'elf' || raw === 'demon') return 'elf';
   return raw === 'human' ? 'human' : 'all';
 }
@@ -109,7 +111,7 @@ export const TYPE_KEYS: NameTypeKey[] = ['person', 'place', 'office', 'nickname'
 
 export const RARITY_TIERS: RarityTier[] = ['S', 'SS', 'SSS', 'SSSR'];
 
-export const RELATION_TYPES = ['师徒', '父子', '同僚', '敌对', '隶属', '契约', '男主', '女主', '女配', '男配', '其他'] as const;
+export const RELATION_TYPES = ['师徒', '父子', '同僚', '敌对', '隶属', '契约', '配偶', '仰慕者', '暗恋', '男主', '女主', '女配', '男配', '其他'] as const;
 
 // 新建尚未保存的设定卡关联自身时使用的临时目标 ID，保存后替换为真实设定卡 ID。
 export const SELF_RELATION_TARGET_ID = '__self__';

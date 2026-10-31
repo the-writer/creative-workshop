@@ -1,10 +1,10 @@
-// 设定工作台：设定卡列表 + 新建/编辑入口 + 删除（级联解除关系）
+// 设定工作台：设定卡列表 + 新建/编辑入口（删除移至编辑界面顶部）
 import { useCallback, useEffect, useState } from 'react';
-import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { deleteSheet, fetchSheets } from '@/lib/db';
+import { Pencil, Plus, RefreshCw } from 'lucide-react';
+import { fetchSheets } from '@/lib/db';
 import type { Sheet } from '@/lib/types';
 import { GENDER_LABELS, RACE_LABELS } from '@/lib/types';
-import { ConfirmDialog, EmptyState, Seal, useAppToast } from '@/components/common';
+import { EmptyState, Seal } from '@/components/common';
 import { cn } from '@/lib/utils';
 import type { EditorPrefill } from '@/components/GenerateTab';
 
@@ -14,13 +14,10 @@ interface SheetsTabProps {
 }
 
 export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
-  const toast = useAppToast();
   const [items, setItems] = useState<Sheet[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState<Sheet | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   const reload = useCallback(async (opts?: { silent?: boolean }) => {
     if (opts?.silent) setRefreshing(true);
@@ -40,20 +37,6 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
   useEffect(() => {
     void reload();
   }, [reload, refreshKey]);
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    const res = await deleteSheet(deleteTarget.id);
-    setDeleting(false);
-    setDeleteTarget(null);
-    if (res.ok) {
-      toast.show('已删除设定并解除全部关系', 'success');
-      void reload({ silent: true });
-    } else {
-      toast.show(res.message || '删除失败，请重试', 'error');
-    }
-  };
 
   return (
     <div className="page-shell sheets-page">
@@ -113,9 +96,6 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
                     <button type="button" className="icon-btn" title="编辑" data-testid={`sheet-edit-${s.id}`} onClick={() => onOpenEditor(undefined, s.id)}>
                       <Pencil size={15} />
                     </button>
-                    <button type="button" className="icon-btn" title="删除" data-testid={`sheet-del-${s.id}`} onClick={() => setDeleteTarget(s)}>
-                      <Trash2 size={15} />
-                    </button>
                   </div>
                 </div>
                 {s.occupation || s.office || s.hometown || s.nickname || s.contractTitle ? (
@@ -133,17 +113,6 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
           </div>
         )}
       </div>
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="删除这张设定卡？"
-        description={`删除「${deleteTarget?.characterName ?? ''}」将同时解除其全部关系连线，此操作不可撤销。`}
-        confirmText={deleting ? '删除中…' : '删除'}
-        destructive
-        testId="sheets-delete-confirm"
-        onConfirm={() => void handleDelete()}
-      />
     </div>
   );
 }

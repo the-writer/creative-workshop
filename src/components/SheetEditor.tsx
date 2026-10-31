@@ -1,7 +1,7 @@
 // 设定卡编辑器（全屏子页）：人物来源三选、绑定项、关系管理（保存后可用）
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, RefreshCw, Trash2, X } from 'lucide-react';
-import { addRelation, fetchCandidates, fetchRelations, fetchSheets, removeRelation, saveSheet } from '@/lib/db';
+import { addRelation, deleteSheet, fetchCandidates, fetchRelations, fetchSheets, removeRelation, saveSheet } from '@/lib/db';
 import { LEXICON } from '@/data/lexicon';
 import { DEFAULT_GEN_PARAMS, genOffice, genPerson } from '@/lib/generator';
 import type { Candidate, NameGender, RaceKey, Relation } from '@/lib/types';
@@ -44,7 +44,9 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
   const [savedId, setSavedId] = useState<string | null>(sheetId);
   const [dirty, setDirty] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loadError, setLoadError] = useState('');
 
   const [characterName, setCharacterName] = useState(prefill?.characterName ?? '');
@@ -307,6 +309,20 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
     }
   };
 
+  const handleDelete = async () => {
+    if (!savedId) return;
+    setDeleting(true);
+    const res = await deleteSheet(savedId);
+    setDeleting(false);
+    setConfirmDelete(false);
+    if (res.ok) {
+      toast.show('已删除设定并解除全部关系', 'success');
+      onSaved();
+    } else {
+      toast.show(res.message || '删除失败，请重试', 'error');
+    }
+  };
+
   const handleSave = async () => {
     const name = characterName.trim();
     if (!name) {
@@ -374,15 +390,11 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
           <ArrowLeft size={20} />
         </button>
         <p className="editor-title">{sheetId ? '编辑设定卡' : '新建设定卡'}</p>
-        <button
-          type="button"
-          className="editor-save-btn"
-          data-testid="editor-save"
-          disabled={saving || !!loadError || !loaded}
-          onClick={() => void handleSave()}
-        >
-          {saving ? '保存中…' : '保存'}
-        </button>
+        {savedId ? (
+          <button type="button" className="editor-save-btn" data-testid="editor-delete" onClick={() => setConfirmDelete(true)}>
+            删除
+          </button>
+        ) : null}
       </div>
 
       {loadError ? (
@@ -785,6 +797,17 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
           {saving ? '正在保存…' : '保存设定'}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(false)}
+        title="删除这张设定卡？"
+        description={`删除「${characterName.trim() || '未命名人物'}」将同时解除其全部关系连线，此操作不可撤销。`}
+        confirmText={deleting ? '删除中…' : '删除'}
+        destructive
+        testId="editor-delete-confirm"
+        onConfirm={() => void handleDelete()}
+      />
 
       <ConfirmDialog
         open={confirmLeave}

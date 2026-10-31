@@ -156,6 +156,16 @@ describe('generation', () => {
     });
   });
 
+  it('merges human and elf pools for mixed race', () => {
+    expect(new Set(SYLLABLES.mixed).size).toBe(SYLLABLES.mixed.length);
+    expect(SYLLABLES.mixed.every((syllable) => SYLLABLES.human.includes(syllable) || SYLLABLES.elf.includes(syllable))).toBe(true);
+    expect(SURNAMES.mixed.length).toBeGreaterThan(0);
+    types.forEach((type) => {
+      const result = generateBatch('mixed', [type], { ...DEFAULT_GEN_PARAMS, count: 5 });
+      expect(result.candidates).toHaveLength(5);
+    });
+  });
+
   it('keeps nickname length between two and eight characters', () => {
     races.forEach((race) => {
       for (let length = 2; length <= 8; length += 1) {

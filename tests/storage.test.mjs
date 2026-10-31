@@ -260,15 +260,22 @@ test('supports self relations and counts them once per sheet', async () => {
   const sheets = await storage.sheetsList();
   assert.equal(sheets[0]?.relationCount, 1, '自关联只计一次');
   assert.match(await readWorkshopFile(workshopDir, 'relations.md'), /契约/);
+  assert.match(await readWorkshopFile(workshopDir, 'sheets.md'), /- 关系: 自己（契约）/);
   const graphMd = await readWorkshopFile(workshopDir, 'graph.md');
   assert.match(graphMd, /连线数: 0/, '自关联不应进入图谱快照');
   assert.doesNotMatch(graphMd, /契约/);
+
+  // 模拟旧数据：relations.md 有自关联，但 sheets.md 缺少派生的关系摘要
+  const sheetsWithoutRelation = (await readWorkshopFile(workshopDir, 'sheets.md')).replace(/^- 关系:.*\n/m, '');
+  assert.doesNotMatch(sheetsWithoutRelation, /- 关系:/);
+  await writeFile(join(workshopDir, 'sheets.md'), sheetsWithoutRelation, 'utf8');
 
   const reopened = new WorkshopStorage({ dataDirName: '.workshop' });
   await reopened.open(join(workshopDir, '..'));
   const reloaded = await reopened.relationsList();
   assert.equal(reloaded.length, 1, '自关联应能从 Markdown 重新解析');
   assert.equal(reloaded[0].fromId, reloaded[0].toId);
+  assert.match(await readWorkshopFile(workshopDir, 'sheets.md'), /- 关系: 自己（契约）/, '打开项目时应补写关系摘要');
 });
 
 test('tolerates malformed Markdown entries and starts from empty data', async () => {

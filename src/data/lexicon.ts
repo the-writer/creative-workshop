@@ -1,4 +1,4 @@
-// 内置词根音系库：人族/精灵族音节块、职业/地形/职权/绰号等词根、构词规则配置、组合量公式
+// 内置词根音系库：人族/精灵族/混血音节块、职业/地形/职权/绰号等词根、构词规则配置、组合量公式
 // 音节块为用户给定数据完整预置；词根为按用户规则扩展的代表性预置
 // v4：音节扩充至四倍，并加入性别音系偏好与人口权重姓氏
 
@@ -7,7 +7,7 @@ import { ELF_COMMON_SURNAMES, ELF_LEXICON, ELF_RARE_SURNAMES, ELF_SYLLABLE_GENDE
 
 // 每个字符串都是一个独立音节块；每行保留多个条目，避免资料表被格式化器拆成单列。
 // prettier-ignore
-export const SYLLABLES: Record<RaceKey, string[]> = {
+const BASE_SYLLABLES: Record<'human' | 'elf', string[]> = {
   human: [
     '雷', '恩', '托', '瓦', '德', '罗', '卡', '尔', '玛', '伦',
     '奥', '伊', '萨', '维', '兰', '蒂', '诺', '琳', '凯', '安',
@@ -29,7 +29,12 @@ export const SYLLABLES: Record<RaceKey, string[]> = {
   elf: ELF_SYLLABLES,
 };
 
-export const SYLLABLE_GENDER_BIAS: Record<RaceKey, Record<Exclude<NameGender, 'any'>, string[]>> = {
+export const SYLLABLES: Record<RaceKey, string[]> = {
+  ...BASE_SYLLABLES,
+  mixed: Array.from(new Set([...BASE_SYLLABLES.human, ...BASE_SYLLABLES.elf])),
+};
+
+const BASE_SYLLABLE_GENDER_BIAS: Record<'human' | 'elf', Record<Exclude<NameGender, 'any'>, string[]>> = {
   human: {
     male: [
       '雷',
@@ -107,6 +112,15 @@ export const SYLLABLE_GENDER_BIAS: Record<RaceKey, Record<Exclude<NameGender, 'a
   elf: ELF_SYLLABLE_GENDER_BIAS,
 };
 
+export const SYLLABLE_GENDER_BIAS: Record<RaceKey, Record<Exclude<NameGender, 'any'>, string[]>> = {
+  ...BASE_SYLLABLE_GENDER_BIAS,
+  mixed: {
+    male: Array.from(new Set([...BASE_SYLLABLE_GENDER_BIAS.human.male, ...BASE_SYLLABLE_GENDER_BIAS.elf.male])),
+    female: Array.from(new Set([...BASE_SYLLABLE_GENDER_BIAS.human.female, ...BASE_SYLLABLE_GENDER_BIAS.elf.female])),
+    neutral: Array.from(new Set([...BASE_SYLLABLE_GENDER_BIAS.human.neutral, ...BASE_SYLLABLE_GENDER_BIAS.elf.neutral])),
+  },
+};
+
 export interface WeightedSurname {
   name: string;
   populationShare: number;
@@ -151,9 +165,14 @@ function createSurnamePool(common: string[], rare: string[]): WeightedSurname[] 
   return pool.map((surname) => ({ ...surname, rarity: rarityByName.get(surname.name) ?? 'S' }));
 }
 
-export const SURNAMES: Record<RaceKey, WeightedSurname[]> = {
+const BASE_SURNAMES: Record<'human' | 'elf', WeightedSurname[]> = {
   human: createSurnamePool(HUMAN_COMMON_SURNAMES, HUMAN_RARE_SURNAMES),
   elf: createSurnamePool(ELF_COMMON_SURNAMES, ELF_RARE_SURNAMES),
+};
+
+export const SURNAMES: Record<RaceKey, WeightedSurname[]> = {
+  ...BASE_SURNAMES,
+  mixed: Array.from(new Map([...BASE_SURNAMES.human, ...BASE_SURNAMES.elf].map((surname) => [surname.name, surname])).values()),
 };
 
 /**
@@ -190,7 +209,7 @@ export interface LexiconRoots {
   titleWords: string[]; // 封号尊称（人名后缀·封号）
 }
 
-export const LEXICON: Record<RaceKey, LexiconRoots> = {
+const BASE_LEXICON: Record<'human' | 'elf', LexiconRoots> = {
   human: {
     professions: [
       '剑修',
@@ -1864,6 +1883,12 @@ export const LEXICON: Record<RaceKey, LexiconRoots> = {
   elf: ELF_LEXICON,
 };
 
+// 混血复用人类通用词根；音节与姓氏在各自表中合并人族 / 精灵族。
+export const LEXICON: Record<RaceKey, LexiconRoots> = {
+  ...BASE_LEXICON,
+  mixed: BASE_LEXICON.human,
+};
+
 // 排列数：从 n 个互异块中取 k 个有序排列。使用 bigint，避免大规模词库组合量越过安全整数。
 function perm(n: bigint, k: number): bigint {
   let r = 1n;
@@ -1929,14 +1954,15 @@ export function computeCombinationTotals(): {
 } {
   const human = computeRaceCombinations('human');
   const elf = computeRaceCombinations('elf');
+  const mixed = computeRaceCombinations('mixed');
   return {
-    perRace: { human, elf },
-    grandTotal: human.total + elf.total,
+    perRace: { human, elf, mixed },
+    grandTotal: human.total + elf.total + mixed.total,
     detail: {
-      person: human.person + elf.person,
-      place: human.place + elf.place,
-      office: human.office + elf.office,
-      nickname: human.nickname + elf.nickname,
+      person: human.person + elf.person + mixed.person,
+      place: human.place + elf.place + mixed.place,
+      office: human.office + elf.office + mixed.office,
+      nickname: human.nickname + elf.nickname + mixed.nickname,
     },
   };
 }

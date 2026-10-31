@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { fetchStats, type StatsData } from '@/lib/db';
 import { computeCombinationTotals, formatCombination } from '@/data/lexicon';
-import { RELATION_TYPES, RACE_LABELS, TYPE_LABELS, TYPE_KEYS } from '@/lib/types';
+import { RACE_KEYS, RELATION_TYPES, RACE_LABELS, TYPE_LABELS, TYPE_KEYS } from '@/lib/types';
 import { EmptyState, SectionTitle } from '@/components/common';
 import { cn } from '@/lib/utils';
 
@@ -117,7 +117,13 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
             {/* 分布 */}
             <div className="stat-chart-card">
               <SectionTitle>族群分布</SectionTitle>
-              <BarChart data={stats.raceDist} order={['human', 'elf']} labels={RACE_LABELS} color="#B23A2E" colorMap={{ human: '#B23A2E', elf: '#3E4A5A' }} />
+              <BarChart
+                data={stats.raceDist}
+                order={RACE_KEYS}
+                labels={RACE_LABELS}
+                color="#B23A2E"
+                colorMap={{ human: '#B23A2E', elf: '#3E4A5A', mixed: '#4A7C59' }}
+              />
             </div>
             <div className="stat-chart-card">
               <SectionTitle>类型分布</SectionTitle>
@@ -151,6 +157,10 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
               <div className="lexicon-row">
                 <span>精灵族组合量</span>
                 <strong>{formatCombination(combo.perRace.elf.total)}</strong>
+              </div>
+              <div className="lexicon-row">
+                <span>混血组合量</span>
+                <strong>{formatCombination(combo.perRace.mixed.total)}</strong>
               </div>
               <div className="lexicon-row lexicon-row-total">
                 <span>理论组合总量</span>
