@@ -253,8 +253,10 @@
    - **PATCH**（`x.y.Z`）：向后兼容的问题修复，以及文档/样式等无行为变化的微调。
    - 判断依据：`git log <上一个 tag>..HEAD`（或与上次发版对比）的提交内容；递增某一位后，低位归零（如 `4.1.3` 有新增功能 → `4.2.0`；有破坏性变更 → `5.0.0`）。
    - 若无法明确归类，**先向用户确认**，不要擅自决定。
-3. **单独提交版本 commit**：代码改动已在前一步作为独立 commit 提交后，本 commit **只包含版本与文档信息**——`package.json` 版本号与 PRD 版本号。**版本 commit 的统一提交信息为 `Bump vX.Y.Z`**，tag 指向这个 commit。**该 commit 不得包含任何业务代码改动**（如确需附带，先说明）。
-4. 按「PRD 维护（项目相关）」同步更新文档中的版本号。
+3. **同步插件版本**：仓库内含 `vscode-extension/` 时，把 `vscode-extension/package.json` 的 `version` 一并改成与主应用相同的版本号，保持两个版本号同步。
+4. **单独提交版本 commit**：代码改动已在前一步作为独立 commit 提交后，本 commit **只包含版本与文档信息**——根 `package.json`、`vscode-extension/package.json` 版本号与 PRD 版本号。**版本 commit 的统一提交信息为 `Bump vX.Y.Z`**，tag 指向这个 commit。**该 commit 不得包含任何业务代码改动**（如确需附带，先说明）。
+5. 按「PRD 维护（项目相关）」同步更新文档中的版本号。
+6. **创建对应 tag**：`git tag vX.Y.Z`（指向上述版本提交）。tag 默认只创建在本地，不自动 push。
 5. **创建对应 tag**：`git tag vX.Y.Z`（指向上述版本提交）。tag 默认只创建在本地，不自动 push。
 
 未经用户明确要求，不要 `push`（tag 会随 bump 创建，但默认不 push）。
