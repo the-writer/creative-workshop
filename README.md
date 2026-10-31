@@ -1,3 +1,3 @@
-![创作工坊应用图标](assets/imgs/app-icon.png)
+![创作工坊应用图标](src/assets/imgs/app-icon.png)
 
 创作工坊是一款面向小说创作者与世界观设定者的桌面命名工具，用于生成并整理人名、地名、官职与绰号。

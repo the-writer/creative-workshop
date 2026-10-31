@@ -16,4 +16,4 @@
 | ---- | --------------------------------------------------------------------- |
 | 分享 | 已整体删除：设置页不再包含「更多 / 分享」卡片与按钮，也不存在分享弹窗 |
 
-删除范围为渲染层 UI 与文案（`src/components/SettingsTab.tsx`）；主进程从未注册分享相关 IPC 通道，`electron/preload.cts` 的 `window.workshop` 白名单亦无分享接口，故无接口兼容性影响。导出功能（JSON / TXT / Markdown / PNG）同样不提供。
+删除范围为渲染层 UI 与文案（`src/components/SettingsTab.tsx`）；主进程从未注册分享相关 IPC 通道，`src/electron/preload.cts` 的 `window.workshop` 白名单亦无分享接口，故无接口兼容性影响。导出功能（JSON / TXT / Markdown / PNG）同样不提供。

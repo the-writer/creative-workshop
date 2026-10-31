@@ -30,7 +30,7 @@ vscode-extension/
 
 VSIX 文件名由构建脚本自动拼接当前插件版本：`type-stats-v<version>.vsix`；产物不参与源码提交，执行 `pnpm dist:mac` 时会同时复制到 `release/`。
 
-插件与应用共用同一应用图标：构建时从根目录 `assets/imgs/app-icon.png` 复制到 `vscode-extension/assets/imgs/app-icon.png`，并通过 `package.json` 的 `icon` 字段打包进 VSIX；复制产物不参与源码提交。安装：
+插件与应用共用同一应用图标：构建时从根目录 `src/assets/imgs/app-icon.png` 复制到 `vscode-extension/assets/imgs/app-icon.png`，并通过 `package.json` 的 `icon` 字段打包进 VSIX；复制产物不参与源码提交。安装：
 
 ```bash
 pnpm run install:extension

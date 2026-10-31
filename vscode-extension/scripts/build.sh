@@ -10,7 +10,7 @@ ARTIFACT="type-stats-v${VERSION}.vsix"
 
 echo "==> Syncing application icon"
 mkdir -p assets/imgs
-cp "$REPO/assets/imgs/app-icon.png" assets/imgs/app-icon.png
+cp "$REPO/src/assets/imgs/app-icon.png" assets/imgs/app-icon.png
 
 echo "==> Type checking"
 pnpm run typecheck

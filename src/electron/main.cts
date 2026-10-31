@@ -50,7 +50,7 @@ const titleBarStyle = config.window?.titleBarStyle ?? DEFAULT_TITLE_BAR_STYLE;
 const windowAlwaysOnTop = config.window?.alwaysOnTop ?? false;
 const windowAlwaysOnTopLevel = config.window?.alwaysOnTopLevel ?? DEFAULT_ALWAYS_ON_TOP_LEVEL;
 const projectConfig = config.project ?? {};
-const trayIconFile = config.tray?.iconFile ?? 'assets/imgs/trayTemplate.png';
+const trayIconFile = config.tray?.iconFile ?? 'src/assets/imgs/trayTemplate.png';
 
 const WINDOW_COLLECTION_BEHAVIOR = { visibleOnFullScreen: true, skipTransformProcessType: true } as const;
 

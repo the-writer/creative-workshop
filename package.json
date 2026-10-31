@@ -67,7 +67,7 @@
       "maxRecentProjects": 10
     },
     "tray": {
-      "iconFile": "assets/imgs/trayTemplate.png"
+      "iconFile": "src/assets/imgs/trayTemplate.png"
     }
   },
   "build": {
@@ -89,7 +89,7 @@
     "files": [
       "release/renderer/**/*",
       "release/electron/**/*",
-      "assets/imgs/trayTemplate*.png",
+      "src/assets/imgs/trayTemplate*.png",
       "package.json"
     ],
     "mac": {
@@ -106,7 +106,7 @@
           ]
         }
       ],
-      "icon": "assets/imgs/app-icon.icns"
+      "icon": "src/assets/imgs/app-icon.icns"
     },
     "pkg": {
       "scripts": "../scripts/pkg-scripts",

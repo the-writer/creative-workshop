@@ -112,7 +112,7 @@ flowchart TD
 
 所有文件是「`#` 总标题 + `##` 分节 + `- 字段: 值` 字段行」的可读 Markdown（`overview.md` 除外，为自由格式）。解析器按行工作，**容错读取**：跳过不完整或无法识别的条目，不因单个坏条目导致整份文件读取失败。
 
-通用规则（`electron/services/workshop-markdown.cts`）：
+通用规则（`src/electron/services/workshop-markdown.cts`）：
 
 - 分节以 `## ` 开头；每条候选/设定/关系是一个 `##` 分节。
 - 字段行格式 `- 字段: 值`；分隔优先匹配 `": "`，否则按第一个 `:` 拆分。
@@ -328,7 +328,7 @@ flowchart TD
 
 #### 7.4.7 `sheets.ini`
 
-由 `serializeSheetsIni(candidates, sheets)`（`electron/services/workshop-markdown.cts`）根据当前设定卡与候选生成；**不读取**，每次数据变化或打开项目时整体覆盖。文件使用 INI 分组：
+由 `serializeSheetsIni(candidates, sheets)`（`src/electron/services/workshop-markdown.cts`）根据当前设定卡与候选生成；**不读取**，每次数据变化或打开项目时整体覆盖。文件使用 INI 分组：
 
 ```ini
 [人物]
@@ -472,5 +472,5 @@ await window.workshop.graph.saveLayout({ [`s:${result.id}`]: { x: 120, y: 88.5 }
 - 种族 key 当前为 `human` / `elf`；旧的 `demon`（妖族）在读取候选、设定、偏好与迁移时统一归一为 `elf`。
 - 渲染层不能提交任意文件路径；项目路径只能来自系统目录选择或登记文件。
 - 偏好键白名单仅 `generator`、`libraryFilters`；新增偏好键需同步更新主进程白名单、预加载类型与本章节。
-- 新增 IPC 通道必须在预加载白名单（`electron/preload.cts`）、类型声明（`src/workshop.d.ts`）、主进程处理器（`electron/ipc/workshop-ipc.cts`）与本章节同时登记。
+- 新增 IPC 通道必须在预加载白名单（`src/electron/preload.cts`）、类型声明（`src/workshop.d.ts`）、主进程处理器（`src/electron/ipc/workshop-ipc.cts`）与本章节同时登记。
 - 项目数据目录名可通过 `creationWorkshop.project.dataDirName` 改名；改名后旧项目目录需要手动重命名，否则会被判定为「不是创作工坊项目」。
