@@ -18,6 +18,7 @@ import {
   serializePreferencesMarkdown,
   serializeProjectMarkdown,
   serializeRelationsMarkdown,
+  serializeSheetsIni,
   serializeSheetsMarkdown,
   type Candidate,
   type CandidateFilters,
@@ -44,6 +45,7 @@ export const PROJECT_FILES = {
   relations: 'relations.md',
   graph: 'graph.md',
   preferences: 'preferences.md',
+  sheetsIni: 'sheets.ini',
 } as const;
 
 export interface ProjectConfig {
@@ -195,6 +197,7 @@ export class WorkshopStorage {
       const info = parseProjectMarkdown(projectText, fallbackName);
       if (!projectText.trim()) await this.writeText(PROJECT_FILES.project, serializeProjectMarkdown(fallbackName));
       this.projectName = info.name || fallbackName;
+      await this.refreshSheetsIni();
       return { path: resolved, name: this.projectName, workshopPath };
     });
   }
@@ -306,6 +309,12 @@ export class WorkshopStorage {
     await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown(layout, candidates, sheets, relations));
   }
 
+  /** 数据变化后重建 sheets.ini（设定卡 + 候选的分组清单） */
+  private async refreshSheetsIni(): Promise<void> {
+    const [candidates, sheets] = await Promise.all([this.loadCandidates(), this.loadSheets()]);
+    await this.writeText(PROJECT_FILES.sheetsIni, serializeSheetsIni(candidates, sheets));
+  }
+
   /* ---------------- 偏好 ---------------- */
 
   public preferencesGet(key: string): Promise<unknown> {
@@ -383,6 +392,7 @@ export class WorkshopStorage {
       candidates.unshift(candidate);
       await this.writeCandidates(candidates);
       await this.refreshGraph();
+      await this.refreshSheetsIni();
       return { ok: true, duplicate: false, id };
     });
   }
@@ -396,6 +406,7 @@ export class WorkshopStorage {
       if (typeof patch.note === 'string') candidate.note = patch.note;
       candidate.updatedAt = Date.now();
       await this.writeCandidates(candidates);
+      await this.refreshSheetsIni();
       return { ok: true };
     });
   }
@@ -429,6 +440,7 @@ export class WorkshopStorage {
       if (before === remaining.length) return { ok: false, refs, message: '未找到该名称' };
       await this.writeCandidates(remaining);
       await this.refreshGraph();
+      await this.refreshSheetsIni();
       return { ok: true, refs };
     });
   }
@@ -471,12 +483,14 @@ export class WorkshopStorage {
         Object.assign(sheet, normalized);
         await this.writeSheets(sheets);
         await this.refreshGraph();
+        await this.refreshSheetsIni();
         return { ok: true, id: sheet.id };
       }
       const id = randomUUID();
       sheets.unshift({ id, ...normalized, createdAt: now });
       await this.writeSheets(sheets);
       await this.refreshGraph();
+      await this.refreshSheetsIni();
       return { ok: true, id };
     });
   }
@@ -493,6 +507,7 @@ export class WorkshopStorage {
       await this.writeSheets(remaining);
       await this.writeRelations(nextRelations);
       await this.refreshGraph();
+      await this.refreshSheetsIni();
       return { ok: true };
     });
   }
@@ -679,6 +694,7 @@ export class WorkshopStorage {
       await this.writeRelations(relations);
       await this.writePreferences(preferences);
       await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown({}, candidates, sheets, relations));
+      await this.refreshSheetsIni();
       return { candidates: candidates.length, sheets: sheets.length, relations: relations.length };
     });
   }

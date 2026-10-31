@@ -12,7 +12,7 @@
 
 - 命名由本地词库、性别音系倾向与人口权重规则组合产生，不依赖网络或 AI 服务；人名只保留一个「·」，姓氏固定在后。
 - 规则设置通过模态子窗口调整，与主界面共享并持久化生成偏好。
-- 应用以「项目」为单位组织数据：每个项目目录下的 `.workshop` 中按类别保存 `project.md`、`candidates.md`、`sheets.md`、`relations.md`、`graph.md`、`preferences.md`；项目登记与最近项目记录保存在 `userData/projects.json`。
+- 应用以「项目」为单位组织数据：每个项目目录下的 `.workshop` 中按类别保存 `project.md`、`candidates.md`、`sheets.md`、`relations.md`、`graph.md`、`preferences.md`，并根据设定卡与候选自动生成 `sheets.ini`；项目登记与最近项目记录保存在 `userData/projects.json`。
 - 启动时只驻留系统托盘，不打开主窗口；用户点击托盘后才显示项目门，选定项目后进入主界面。项目门只提供最近项目与「打开项目」，打开时会自动创建目录、自动初始化缺失的 `.workshop`。
 - 渲染进程开启 `contextIsolation`，关闭 `nodeIntegration`；文件与数据能力只通过白名单预加载桥开放。
 - 应用常驻系统托盘；关闭主窗口只隐藏窗口，点击托盘图标在当前桌面重新打开主界面。最近一次打开的项目排在最近列表第一位并显示「上次」TAG。

@@ -45,10 +45,10 @@ flowchart TD
   H --> I{确认解除引用并删除}
   I -- 是 --> J[清空设定引用与地名关系]
   J --> F
-  F --> K[写回 candidates.md 并刷新 graph.md 快照]
+  F --> K[写回 candidates.md 并刷新 graph.md 快照与 sheets.ini]
 ```
 
-查询引用不会修改数据；只有用户在确认弹窗中再次确认后才执行删除。`force=false` 且存在引用时主进程拒绝删除并返回引用情况。删除成功后级联清空 `sheets.md` 中对应 `候选关联` / `籍贯候选`，移除以该候选为端点（`place`）的 `relations.md` 记录，并刷新 `graph.md` 快照。
+查询引用不会修改数据；只有用户在确认弹窗中再次确认后才执行删除。`force=false` 且存在引用时主进程拒绝删除并返回引用情况。删除成功后级联清空 `sheets.md` 中对应 `候选关联` / `籍贯候选`，移除以该候选为端点（`place`）的 `relations.md` 记录，并刷新 `graph.md` 快照与 `sheets.ini`。
 
 ### 3.5 AI 入口
 

@@ -86,6 +86,8 @@ export const SCHEMA_VERSION = 1;
 
 const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族' };
 const TYPE_LABELS: Record<NameTypeKey, string> = { person: '人名', place: '地名', office: '官职', nickname: '绰号' };
+const INI_TYPE_GROUPS: Record<NameTypeKey, string> = { person: '人物', place: '地名', office: '官职', nickname: '绰号' };
+const INI_GROUP_ORDER = ['人物', '地名', '官职', '绰号'];
 const GENDER_LABELS: Record<NameGender, string> = { any: '不限', male: '男性', female: '女性', neutral: '中性' };
 const ENTITY_LABELS: Record<EntityType, string> = { sheet: '设定卡', place: '地名' };
 
@@ -397,6 +399,60 @@ export function serializeSheetsMarkdown(sheets: Sheet[]): string {
     out.push(`- 更新时间: ${timestamp(sheet.updatedAt)}`);
     out.push('');
   });
+  return out.join('\n');
+}
+
+/* ---------------- 设定集 INI ---------------- */
+
+function iniText(value: string): string {
+  return String(value ?? '')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+}
+
+function sheetSummary(sheet: Sheet): string {
+  const note = iniText(sheet.note);
+  if (note) return note;
+  return [sheet.occupation, sheet.office, sheet.hometown, sheet.nickname, sheet.contractTitle].map(iniText).filter(Boolean).join('，');
+}
+
+function candidateSummary(candidate: Candidate): string {
+  const note = iniText(candidate.note);
+  if (note) return note;
+  return candidate.structure
+    .map((part) => `${iniText(part.label)}：${iniText(part.word)}`)
+    .filter((part) => part !== '：')
+    .join('，');
+}
+
+/** 生成 `.workshop/sheets.ini`：已设定的设定卡与候选按类型分组，全部候选另在 `[候选]` 中以注释重复列出。 */
+export function serializeSheetsIni(candidates: Candidate[], sheets: Sheet[]): string {
+  const groups = new Map<string, Map<string, string>>();
+  const add = (group: string, name: string, summary: string): void => {
+    const key = iniText(name);
+    if (!key) return;
+    if (!groups.has(group)) groups.set(group, new Map());
+    const entries = groups.get(group);
+    if (entries && !entries.has(key)) entries.set(key, summary);
+  };
+  sheets.forEach((sheet) => add('人物', sheet.characterName, sheetSummary(sheet)));
+  candidates.forEach((candidate) => add(INI_TYPE_GROUPS[candidate.nameType], candidate.nameText, candidateSummary(candidate)));
+
+  const out: string[] = [];
+  INI_GROUP_ORDER.forEach((group) => {
+    const entries = groups.get(group);
+    if (!entries || entries.size === 0) return;
+    out.push(`[${group}]`);
+    entries.forEach((summary, name) => out.push(`${name} = ${summary}`));
+    out.push('');
+  });
+  out.push('[候选]');
+  candidates.forEach((candidate) => {
+    const name = iniText(candidate.nameText);
+    if (!name) return;
+    out.push(`; ${name} = ${iniText(candidateSummary(candidate))}`);
+  });
+  out.push('');
   return out.join('\n');
 }
 

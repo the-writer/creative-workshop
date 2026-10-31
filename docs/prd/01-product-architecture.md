@@ -138,7 +138,7 @@ flowchart TD
 ### 1.7 数据位置
 
 - 项目登记：`<userData>/projects.json`（`ProjectManager` 启动日志输出绝对路径）。
-- 项目数据：用户选择的项目目录下 `.workshop/` 内的六个 Markdown 文件（详见 §7）。
+- 项目数据：用户选择的项目目录下 `.workshop/` 内的六个 Markdown 文件与自动生成的 `sheets.ini`（详见 §7）。
 - 迁移来源：`<userData>/workshop.json`（仅首次升级读取一次，迁移后保留原文件）。
 - `userData` 由 Electron 按应用名与平台确定；渲染层不感知具体绝对路径。
 

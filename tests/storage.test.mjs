@@ -27,7 +27,7 @@ afterEach(async () => {
 
 test('creates .workshop files and persists preferences/candidate as Markdown', async () => {
   const { storage, workshopDir } = await createStorage();
-  for (const fileName of ['project.md', 'candidates.md', 'sheets.md', 'relations.md', 'graph.md', 'preferences.md']) {
+  for (const fileName of ['project.md', 'candidates.md', 'sheets.md', 'relations.md', 'graph.md', 'preferences.md', 'sheets.ini']) {
     assert.ok((await readWorkshopFile(workshopDir, fileName)).length > 0, `${fileName} 应已创建`);
   }
   await storage.preferencesSet('generator', { race: 'elf', count: 20 });
@@ -63,6 +63,32 @@ test('creates .workshop files and persists preferences/candidate as Markdown', a
   assert.equal(list[0].charCount, 5, '字数应排除「·」分隔符');
   assert.equal(list[0].gender, 'neutral');
   assert.equal(list[0].rarity, 'SSSR');
+});
+
+test('writes sheets.ini grouped by type with candidate comments', async () => {
+  const { storage, workshopDir } = await createStorage();
+  await storage.candidateCreate({ race: 'human', nameType: 'person', nameText: '林深', structure: [], source: 'manual', note: '男主名字' });
+  await storage.candidateCreate({ race: 'human', nameType: 'place', nameText: '边界城', structure: [], source: 'manual', note: '边境主城' });
+  await storage.sheetSave({
+    characterName: '林深',
+    race: 'human',
+    candidateId: '',
+    occupation: '剑修',
+    office: '',
+    hometown: '',
+    hometownCandidateId: '',
+    nickname: '',
+    contractTitle: '',
+    note: '',
+  });
+  const ini = await readWorkshopFile(workshopDir, 'sheets.ini');
+  assert.match(ini, /\[人物\]/);
+  assert.match(ini, /林深 = 剑修/);
+  assert.match(ini, /\[地名\]/);
+  assert.match(ini, /边界城 = 边境主城/);
+  assert.match(ini, /\[候选\]/);
+  assert.match(ini, /; 林深 = 男主名字/);
+  assert.match(ini, /; 边界城 = 边境主城/);
 });
 
 test('rejects duplicate candidate names', async () => {
