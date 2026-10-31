@@ -204,7 +204,7 @@ function openRulesWindow(): void {
     url.searchParams.set('window', RULES_WINDOW_QUERY);
     void child.loadURL(url.toString());
   } else {
-    void child.loadFile(join(app.getAppPath(), 'dist', 'index.html'), { query: { window: RULES_WINDOW_QUERY } });
+    void child.loadFile(join(app.getAppPath(), 'release', 'renderer', 'index.html'), { query: { window: RULES_WINDOW_QUERY } });
   }
   child.once('ready-to-show', () => {
     if (!child.isDestroyed()) {
@@ -308,7 +308,7 @@ function createWindow(): BrowserWindow {
   if (devUrl) {
     void mainWindow.loadURL(devUrl);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
-  } else void mainWindow.loadFile(join(app.getAppPath(), 'dist', 'index.html'));
+  } else void mainWindow.loadFile(join(app.getAppPath(), 'release', 'renderer', 'index.html'));
 
   // 启动时不显示窗口；只有用户点击托盘/菜单后才创建并显示
   mainWindow.once('ready-to-show', () => {

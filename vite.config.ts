@@ -13,5 +13,6 @@ export default defineConfig({
   build: {
     target: 'chrome138',
     sourcemap: false,
+    outDir: 'release/renderer',
   },
 });

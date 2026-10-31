@@ -74,7 +74,7 @@ flowchart TD
 | 应用名         | 创作工坊                   | `package.json` → `productName`；`app.setName`                                             |
 | 拖拽标题栏高度 | 32 px                      | `src/App.css` → `.desktop-titlebar`                                                       |
 
-应用加载 `dist/index.html`；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务，并在该模式下自动打开独立 DevTools。
+应用加载 `release/renderer/index.html`（主进程为 `release/electron/main.cjs`）；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务，并在该模式下自动打开独立 DevTools。
 
 启动完成后没有窗口；用户首次点击托盘时 `createWindow` 创建窗口，`ready-to-show` 后再调用 `showMainWindow()`，因此不会闪白屏。主窗口系统关闭按钮只隐藏窗口（`close` 事件阻止默认并 `hide()`），应用继续由托盘驻留；托盘左键与右键菜单「打开主界面」、应用菜单「窗口 → 显示主界面」重新打开。托盘右键菜单提供「打开主界面」和「退出创作工坊」。应用无 Dock 图标，因此 `activate`（点击 Dock）不是常规入口。
 

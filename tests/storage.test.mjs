@@ -4,8 +4,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
-import { WorkshopStorage } from '../dist-electron/services/workshop-storage.cjs';
-import { ProjectManager } from '../dist-electron/services/project-manager.cjs';
+import { WorkshopStorage } from '../release/electron/services/workshop-storage.cjs';
+import { ProjectManager } from '../release/electron/services/project-manager.cjs';
 
 const tempDirs = [];
 

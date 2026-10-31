@@ -14,13 +14,13 @@ VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `p
 | `pnpm test`         | 运行 Vitest 单测 + 编译 Electron + Markdown 存储测试（`tests/storage.test.mjs`） |
 | `pnpm dist:mac`     | 清理旧产物、重新构建并生成 macOS arm64 PKG，同时把 VSIX 复制到 `release/`         |
 
-源码构建输出：
+源码构建输出统一放在 `release/`：
 
-- `dist/`：渲染层。
-- `dist-electron/`：主进程与预加载脚本。
+- `release/renderer/`：渲染层（`vite.config.ts` → `build.outDir`）。
+- `release/electron/`：主进程与预加载脚本（`tsconfig.electron.json` → `outDir`）。
 - `vscode-extension/dist/extension.js`：插件运行时代码。
 - `vscode-extension/type-stats-v<version>.vsix`：插件安装包。
-- `release/`：应用打包产物（PKG），`dist:mac` 后同时包含插件 VSIX，不参与源码提交。
+- `release/`：同时作为 electron-builder 输出目录；`dist:mac` 后只保留应用 PKG 与插件 VSIX。整个目录不参与源码提交。
 
 ### 8.2 打包配置
 
@@ -33,14 +33,14 @@ VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `p
 - `asar`: 启用
 - `afterPack`: `scripts/after-pack.cjs`
 - 未提供 `CSC_LINK` / `CSC_NAME` / `APPLE_ID` 时由 `dist-mac.sh` 关闭证书自动发现，避免误用钥匙串中的无效身份；`.app` 由后处理执行 ad-hoc 签名
-- `files` 明确包含 `assets/imgs/trayTemplate*.png`，保证打包后托盘图标可加载
+- `files` 明确包含 `release/renderer/**/*`、`release/electron/**/*`、`assets/imgs/trayTemplate*.png` 与 `package.json`，保证打包后主进程、渲染层与托盘图标可加载
 - `mac.extendInfo`：`NSHighResolutionCapable: true`、`LSUIElement: true`（应用为菜单栏常驻应用，打包后不显示 Dock 图标，见 §1.4）
 - 安装位置：固定 `/Applications`，禁止安装到任意位置或当前用户 Home
 - `isRelocatable=false`，避免 macOS Installer 把新版本重定位到旧路径
 - 产物名：`creation-workshop-v<version>-<arch>.pkg`
 
-`dist:mac` 执行 `scripts/dist-mac.sh`：先删除 `dist`、`dist-electron` 与 `release`，再重新构建并调用
-`electron-builder --mac --arm64 --publish never`。PKG 成功后删除 `release/` 中的 `mac-arm64`、调试元数据与组件
+`dist:mac` 执行 `scripts/dist-mac.sh`：先删除整个 `release`，再重新构建（渲染层与主进程分别写入 `release/renderer`、`release/electron`）并调用
+`electron-builder --mac --arm64 --publish never`。PKG 成功后删除 `release/` 中的 `renderer`、`electron`、`mac-arm64`、调试元数据与组件
 plist，仅保留 `.pkg`，随后把 `vscode-extension/type-stats-v<version>.vsix` 复制到 `release/`。发布目录最终包含应用 PKG 与插件 VSIX；脚本不会生成 DMG 或 ZIP。
 
 PKG 安装脚本目录为 `scripts/pkg-scripts`：
@@ -81,6 +81,6 @@ pnpm run build
 ```
 
 涉及桌面窗口、托盘或 IPC 的改动还需进行一次 Electron 启动验证，并在同一轮检查：启动时只有托盘且不弹主窗口、点击托盘后出现项目门与「上次」TAG、打开目录自动初始化 `.workshop`、主界面、规则设置模态子窗口、托盘图标加载与桌面切换不跟随。
-打包变更还应确认 `release/` 中只有 `.pkg` 与 `type-stats-v<version>.vsix`，并检查安装脚本已被打入安装包。
+构建变更还应确认 `pnpm run build` 后存在 `release/renderer/index.html` 与 `release/electron/main.cjs`；打包变更还应确认 `release/` 中只有 `.pkg` 与 `type-stats-v<version>.vsix`，并检查安装脚本已被打入安装包。
 
 插件改动还需确认 `pnpm run build:extension` 通过，且 `vscode-extension/type-stats-v<version>.vsix` 包含 `package.json`、`README.md`、`LICENSE.txt`、`assets/imgs/app-icon.png` 与 `dist/extension.js`，不包含 `src/` 与 `scripts/`。

@@ -6,7 +6,7 @@
   "productName": "创作工坊",
   "author": "stdout.com.cn",
   "description": "面向小说世界观创作的人名、地名、官职与绰号生成工具",
-  "main": "dist-electron/main.cjs",
+  "main": "release/electron/main.cjs",
   "scripts": {
     "start": "pnpm run build && electron .",
     "dev:renderer": "vite",
@@ -87,8 +87,8 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
-      "dist-electron/**/*",
+      "release/renderer/**/*",
+      "release/electron/**/*",
       "assets/imgs/trayTemplate*.png",
       "package.json"
     ],
