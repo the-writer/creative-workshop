@@ -28,6 +28,7 @@ flowchart TD
 ```
 
 - 「打开项目」与最近项目点击都走 `projects.open(path)`：目录不存在时自动 `mkdir`；目录存在但缺少 `.workshop` 时自动初始化；已有 `.workshop` 时直接打开。因此项目门不再区分「新建项目」与「打开已有项目」，也不再提供刷新按钮。
+- **协议打开**：外部程序可通过 `workshop://project/open?name=<项目名称>` 打开项目。主进程在最近项目中按展示名或目录名匹配（忽略大小写），命中后调用 `ProjectManager.openByName(name)`，等价于 `projects.open(path)`；未命中时显示主窗口与错误对话框。详见 §1.9。
 - **空目录初始化**：目录原本为空（或不存在、刚被创建）时，额外创建 `README.md`（首行 `# <目录名>`）与 `第一卷/第一章.md`；已有内容或已有 `.workshop` 的目录不会补写。
 - 项目展示名优先取 `README.md` 第一行（去掉 `#` 前缀），无 README / 首行为空时回退登记名称；`listRecent()` 与 `open()` 都会读取。
 - 项目门最近项目按 `lastOpenedAt` 倒序，第一条显示「上次」TAG（`ProjectGate.tsx`）。
@@ -394,6 +395,7 @@ flowchart TD
 | -------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
 | `projects.listRecent()`                | `workshop:projects:list-recent`    | 不写盘                                                                               | 返回 `ProjectSummary[]`，过滤已不存在的项目目录                                                                           |
 | `projects.current()`                   | `workshop:projects:current`        | 不写盘                                                                               | 返回当前项目 `ProjectSummary` 或 `null`（启动时为 `null`）                                                                |
+| `projects.onChanged(callback)`         | 事件 `workshop:projects:changed`   | 不写盘                                                                               | 订阅外部协议打开项目后的当前项目变更；回调参数为 `ProjectSummary`；返回取消订阅函数                                      |
 | `projects.open(path)`                  | `workshop:projects:open`           | 写项目文件 + `projects.json`（重复打开同一项目时不重写）                             | 目录不存在时创建；缺少 `.workshop` 时自动初始化；打开项目并更新最近项目；返回 `{ ok, project?, message? }`                |
 | `projects.create({ parentDir, name })` | `workshop:projects:create`         | 写项目文件 + `projects.json`                                                         | 创建项目目录与 `.workshop`、补齐分类文件、设为当前项目                                                                    |
 | `projects.pickDirectory(kind)`         | `workshop:projects:pick-directory` | 不写盘                                                                               | `kind='open'` 选择项目目录（允许在对话框内新建目录），`kind='parent'` 选择存放位置；返回 `{ ok, canceled?, path? }`       |

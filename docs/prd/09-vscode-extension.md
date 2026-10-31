@@ -108,9 +108,10 @@ pnpm run install:extension
 
 ### 9.8 与创作工坊的集成
 
-- 「在工坊中打开」通过 `open` 启动 `/Applications/创作工坊.app`（创作工坊 PKG 固定安装到 `/Applications`，见 §8.2）；应用不存在或启动失败时以错误提示反馈。
+- 「在工坊中打开」不再直接启动应用，而是用工作区根目录名构造系统协议链接 `workshop://project/open?name=<encodeURIComponent(工作区目录名)>`，通过 VS Code 的 `env.openExternal` 交给系统处理（`src/extension.ts`）。应用未安装 / 协议未注册时以错误提示反馈；未打开工作区时提示先打开项目文件夹。
+- 创作工坊收到协议后按名称匹配最近项目并加载，同时自动把应用与主窗口置于前台（见 §1.9），无需插件关心应用安装路径。
 - 插件只读取工作区 `.workshop/sheets.ini` 与 `.workshop/sheets.md`，不写入任何文件；由创作工坊在项目目录中生成并维护这两个文件（见 §4）。
-- 插件与主应用无 IPC 或网络通信，二者通过工作区文件解耦。
+- 插件与主应用无 IPC 或网络通信，二者通过系统协议与工作区文件解耦。
 
 ### 9.9 常见陷阱
 

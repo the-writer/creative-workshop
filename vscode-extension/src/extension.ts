@@ -1,24 +1,21 @@
-import { execFile } from 'child_process';
-import { promises as fs } from 'fs';
 import * as vscode from 'vscode';
 import { OpenSheetTarget, SheetsTreeProvider } from './explorer';
 import { hasSheetsFile, SheetHighlighter } from './sheets';
 import { WritingStats } from './stats';
 
-const WORKSHOP_APP_PATH = '/Applications/创作工坊.app';
+const WORKSHOP_PROTOCOL = 'workshop://project/open';
 
 const openWorkshop = async (): Promise<void> => {
-  try {
-    await fs.access(WORKSHOP_APP_PATH);
-  } catch {
-    void vscode.window.showErrorMessage(`Type Stats: 未找到创作工坊应用（${WORKSHOP_APP_PATH}）。`);
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!folder) {
+    void vscode.window.showErrorMessage('Type Stats: 请先打开创作工坊项目文件夹。');
     return;
   }
-  execFile('open', [WORKSHOP_APP_PATH], (error) => {
-    if (error) {
-      void vscode.window.showErrorMessage(`Type Stats: 无法启动创作工坊（${error.message}）。`);
-    }
-  });
+  const link = vscode.Uri.parse(`${WORKSHOP_PROTOCOL}?name=${encodeURIComponent(folder.name)}`);
+  const opened = await vscode.env.openExternal(link);
+  if (!opened) {
+    void vscode.window.showErrorMessage('Type Stats: 无法打开创作工坊，请确认已安装并注册 workshop:// 协议。');
+  }
 };
 
 const openSheetEntry = async (target: OpenSheetTarget): Promise<void> => {

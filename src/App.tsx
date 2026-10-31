@@ -98,8 +98,10 @@ function App() {
       .catch(() => {
         if (active) setProject(null);
       });
+    const unsubscribe = window.workshop.projects.onChanged((next) => setProject(next));
     return () => {
       active = false;
+      unsubscribe();
     };
   }, []);
 

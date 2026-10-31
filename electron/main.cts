@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { app, BrowserWindow, Menu, Tray, nativeImage, session, type MenuItemConstructorOptions } from 'electron';
-import { registerWorkshopIpc } from './ipc/workshop-ipc.cjs';
+import { join, resolve } from 'node:path';
+import { app, BrowserWindow, Menu, Tray, nativeImage, dialog, session, type MenuItemConstructorOptions } from 'electron';
+import { IPC, registerWorkshopIpc } from './ipc/workshop-ipc.cjs';
 import { ProjectManager } from './services/project-manager.cjs';
 import { WorkshopStorage } from './services/workshop-storage.cjs';
 
@@ -36,6 +36,9 @@ const DEFAULT_ALWAYS_ON_TOP_LEVEL = 'floating';
 const SPACE_BIND_DELAY_MS = 60;
 const RULES_WINDOW_SIZE_RATIO = 0.8;
 const RULES_WINDOW_QUERY = 'rules';
+const PROTOCOL_SCHEME = 'workshop';
+const PROTOCOL_HOST = 'project';
+const PROTOCOL_OPEN_PATH = '/open';
 
 const packageJson = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as {
   creationWorkshop?: CreationWorkshopConfig;
@@ -60,6 +63,10 @@ let isQuitting = false;
 let isReadyToShow = false;
 // 显示 / 隐藏之间短暂切换时用于把窗口重新绑定到当前桌面
 let desktopBindTimer: NodeJS.Timeout | null = null;
+let projectManager: ProjectManager | null = null;
+let protocolReady = false;
+// 应用尚未完成初始化时收到的项目链接，等初始化完成后补处理
+let pendingProjectName: string | null = null;
 
 /**
  * 隐藏 Dock 图标（macOS）。
@@ -111,9 +118,10 @@ function cancelDesktopBind(): void {
  * - 启动时不创建窗口，只有托盘/菜单触发本函数时才创建并显示；
  * - 窗口原本隐藏时，先临时加入所有桌面让窗口能在当前 Space 浮出，取得焦点后再绑定回当前桌面，
  *   因此「关闭后从另一个桌面打开」会出现在新桌面，而打开期间切换桌面不会跟随；
- * - 窗口已显示时只抬高并聚焦，不改变桌面归属，也不反复抢焦点。
+ * - 窗口已显示时只抬高并聚焦，不改变桌面归属，也不反复抢焦点；
+ * - `forceForeground` 用于外部协议等需要主动置前的场景，窗口已显示时也会抢回应用焦点。
  */
-function showMainWindow(): void {
+function showMainWindow(forceForeground = false): void {
   const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
   if (win.isMinimized()) win.restore();
   // 页面尚未渲染完成：先返回，`ready-to-show` 会再次调用本函数完成显示（避免白屏闪烁）
@@ -129,6 +137,7 @@ function showMainWindow(): void {
   win.show();
   win.moveTop();
   if (alreadyVisible) {
+    if (forceForeground && process.platform === 'darwin') app.focus({ steal: true });
     win.focus();
     return;
   }
@@ -216,10 +225,10 @@ function createTray(): Tray {
 
   const nextTray = new Tray(icon);
   nextTray.setToolTip(APP_NAME);
-  nextTray.on('click', showMainWindow);
+  nextTray.on('click', () => showMainWindow());
   nextTray.on('right-click', () => {
     nextTray.popUpContextMenu(
-      Menu.buildFromTemplate([{ label: '打开主界面', click: showMainWindow }, { type: 'separator' }, { label: `退出${APP_NAME}`, click: () => app.quit() }]),
+      Menu.buildFromTemplate([{ label: '打开主界面', click: () => showMainWindow() }, { type: 'separator' }, { label: `退出${APP_NAME}`, click: () => app.quit() }]),
     );
   });
   return nextTray;
@@ -254,7 +263,7 @@ function createApplicationMenu(): void {
     {
       label: '窗口',
       submenu: [
-        { label: '显示主界面', click: showMainWindow },
+        { label: '显示主界面', click: () => showMainWindow() },
         { role: 'minimize', label: '最小化' },
         { role: 'close', label: '关闭窗口' },
       ],
@@ -329,11 +338,96 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
+/** 解析 `workshop://project/open?name=xxx`，返回项目名称；格式不符时返回 null。 */
+function parseProjectLink(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== `${PROTOCOL_SCHEME}:`) return null;
+    if (url.hostname !== PROTOCOL_HOST || url.pathname !== PROTOCOL_OPEN_PATH) return null;
+    const name = (url.searchParams.get('name') ?? '').trim();
+    return name || null;
+  } catch {
+    return null;
+  }
+}
+
+function findProjectLink(args: string[]): string | undefined {
+  const prefix = `${PROTOCOL_SCHEME}://`;
+  return args.find((arg) => arg.startsWith(prefix));
+}
+
+async function openProjectByName(name: string): Promise<void> {
+  if (!projectManager || !protocolReady) {
+    pendingProjectName = name;
+    return;
+  }
+  const result = await projectManager.openByName(name);
+  if (!result.ok) {
+    showMainWindow(true);
+    void dialog.showMessageBox({
+      type: 'error',
+      title: APP_NAME,
+      message: result.message ?? `无法打开项目「${name}」`,
+    });
+    return;
+  }
+  showMainWindow(true);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(IPC.projectsChanged, result.project ?? null);
+  }
+}
+
+function handleProjectLink(rawUrl: string): void {
+  const name = parseProjectLink(rawUrl);
+  if (!name) {
+    console.warn(`[${APP_NAME}] 无法识别的项目链接：${rawUrl}`);
+    return;
+  }
+  if (!projectManager || !protocolReady) {
+    pendingProjectName = name;
+    return;
+  }
+  void openProjectByName(name);
+}
+
+function registerProtocol(): void {
+  const entry = process.argv[1];
+  const registered =
+    process.defaultApp && entry
+      ? app.setAsDefaultProtocolClient(PROTOCOL_SCHEME, process.execPath, [resolve(entry)])
+      : app.setAsDefaultProtocolClient(PROTOCOL_SCHEME);
+  if (!registered) console.warn(`[${APP_NAME}] 未能注册系统协议：${PROTOCOL_SCHEME}://`);
+}
+
+const singleInstanceLock = app.requestSingleInstanceLock();
+if (!singleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const link = findProjectLink(argv);
+    if (link) handleProjectLink(link);
+    else showMainWindow(true);
+  });
+}
+
+registerProtocol();
+
+// macOS 通过 `open-url` 投递协议链接；Windows / Linux 通过启动参数传入。
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleProjectLink(url);
+});
+
+const startupProjectLink = findProjectLink(process.argv);
+if (startupProjectLink) handleProjectLink(startupProjectLink);
+
 app.whenReady().then(async () => {
+  if (!singleInstanceLock) return;
   // 启动即隐藏 Dock 图标（macOS）：应用只驻留托盘，启动时不打开主窗口
   hideDockIcon();
   const storage = new WorkshopStorage({ dataDirName: projectConfig.dataDirName });
   const projects = new ProjectManager(app.getPath('userData'), storage, projectConfig);
+  projectManager = projects;
   await projects.initialize();
   console.info(`[${APP_NAME}] 项目登记文件：${projects.registryFilePath}`);
   registerWorkshopIpc(storage, projects, {
@@ -347,6 +441,12 @@ app.whenReady().then(async () => {
   createApplicationMenu();
   tray = createTray();
   console.info(`[${APP_NAME}] 托盘已就绪`);
+  protocolReady = true;
+  if (pendingProjectName) {
+    const name = pendingProjectName;
+    pendingProjectName = null;
+    void openProjectByName(name);
+  }
 });
 
 app.on('before-quit', () => {

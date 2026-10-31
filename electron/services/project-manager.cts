@@ -140,6 +140,22 @@ export class ProjectManager {
     }
   }
 
+  /**
+   * 按项目名称打开最近项目：先匹配展示名（README 首行），再匹配目录名，均忽略大小写。
+   * 仅搜索 `projects.json` 中登记且目录仍存在的项目。
+   */
+  public async openByName(projectName: string): Promise<ProjectResult> {
+    const name = String(projectName ?? '').trim();
+    if (!name) return { ok: false, message: '缺少项目名称' };
+    const normalized = name.toLocaleLowerCase();
+    const recent = await this.listRecent();
+    const match = recent.find(
+      (project) => project.name.toLocaleLowerCase() === normalized || basename(project.path).toLocaleLowerCase() === normalized,
+    );
+    if (!match) return { ok: false, message: `未找到项目「${name}」，请先在创作工坊中打开该项目` };
+    return this.open(match.path);
+  }
+
   public async create(input: { parentDir: string; name: string }): Promise<ProjectResult> {
     const parentDir = resolve(String(input.parentDir ?? ''));
     const name = String(input.name ?? '').trim();

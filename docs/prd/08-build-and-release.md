@@ -28,6 +28,7 @@ VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `p
 
 - `appId`: `cn.com.stdout.creation-workshop`
 - `productName`: `创作工坊`
+- `protocols`: 声明系统协议 `workshop`（`schemes: ["workshop"]`），打包后写入 `Info.plist` 的 URL Types，供 §1.9 的项目链接使用
 - macOS target：仅 arm64 PKG，不生成 DMG、ZIP 或 blockmap
 - `asar`: 启用
 - `afterPack`: `scripts/after-pack.cjs`

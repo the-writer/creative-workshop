@@ -439,6 +439,36 @@ test('uses the first line of README.md as the project display name', async () =>
   assert.equal(recent[0]?.name, '星河纪事');
 });
 
+test('opens a recent project by display name or directory name', async () => {
+  const baseDir = await mkdtemp(join(tmpdir(), 'creation-workshop-open-name-'));
+  tempDirs.push(baseDir);
+  const storage = new WorkshopStorage({ dataDirName: '.workshop' });
+  const manager = new ProjectManager(join(baseDir, 'userData'), storage, {
+    dataDirName: '.workshop',
+    registryFileName: 'projects.json',
+    legacyDataFileName: 'workshop.json',
+    maxRecentProjects: 10,
+  });
+  await manager.initialize();
+  const first = join(baseDir, '目录甲');
+  const second = join(baseDir, '目录乙');
+  await manager.open(first);
+  await writeFile(join(first, 'README.md'), '# 星河纪事\n', 'utf8');
+  await manager.open(second);
+
+  const byDisplayName = await manager.openByName('星河纪事');
+  assert.equal(byDisplayName.ok, true);
+  assert.equal(byDisplayName.project?.path, first);
+
+  const byDirectoryName = await manager.openByName('目录乙');
+  assert.equal(byDirectoryName.ok, true);
+  assert.equal(byDirectoryName.project?.path, second);
+
+  const missing = await manager.openByName('不存在的项目');
+  assert.equal(missing.ok, false);
+  assert.match(missing.message, /未找到项目/);
+});
+
 test('removes a project from the recent list without deleting files', async () => {
   const baseDir = await mkdtemp(join(tmpdir(), 'creation-workshop-remove-'));
   tempDirs.push(baseDir);

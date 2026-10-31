@@ -18,6 +18,7 @@ export const IPC = {
   projectsRemoveRecent: 'workshop:projects:remove-recent',
   projectsOverview: 'workshop:project:overview',
   projectsOpenInVSCode: 'workshop:projects:open-vscode',
+  projectsChanged: 'workshop:projects:changed',
   rulesOpen: 'workshop:rules:open',
   rulesClose: 'workshop:rules:close',
   rulesChanged: 'workshop:rules:changed',

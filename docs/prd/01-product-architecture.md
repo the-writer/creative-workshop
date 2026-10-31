@@ -151,3 +151,16 @@ flowchart TD
 - 应用内 SVG 图标通过 `lucide-react` 组件使用，不新增手写 SVG 标签。
 - 图标资源仍随安装包分发：`package.json` → `build.files` 显式包含 `assets/imgs/trayTemplate*.png`。
 - README 只包含应用图标与一句概述，功能细节以本 PRD 为准。
+
+### 1.9 系统协议 `workshop://`
+
+应用注册 `workshop` 协议，用于从 VS Code 插件等外部程序直接打开指定项目（`electron/main.cts`）：
+
+- 链接格式：`workshop://project/open?name=<项目名称>`，只接受 host 为 `project`、路径为 `/open` 且带非空 `name` 的链接；其余格式记录警告并忽略。
+- 协议在打包配置 `package.json` → `build.protocols` 中声明（`schemes: ["workshop"]`），运行期通过 `app.setAsDefaultProtocolClient('workshop')` 注册；开发模式下把 Electron 入口脚本作为参数注册。
+- `name` 按 URL 解码后，在 `userData/projects.json` 的最近项目中匹配：先比项目展示名（README 首行），再比项目目录名，均忽略大小写；仅匹配目录仍存在的登记项目。
+- 匹配成功：调用 `ProjectManager.openByName` 打开项目（与 `projects.open(path)` 相同的初始化与最近项目更新逻辑），显示主窗口，并向渲染层发送 `workshop:projects:changed` 事件（见 §7.7）。
+- 协议调用会强制把应用与主窗口置于前台：窗口原本隐藏或未创建时正常显示；窗口已显示时仍通过 `app.focus({ steal: true })` 抢回焦点（`showMainWindow(true)`），确保从 VS Code 等其它应用切换回来。
+- 匹配失败：显示主窗口与错误对话框「未找到项目…」，不改变当前项目。
+- 应用未启动时由系统拉起；`app.whenReady` 完成初始化前收到的链接先缓存，初始化完成后补处理。macOS 通过 `open-url` 接收，Windows / Linux 通过启动参数接收。
+- 应用使用单实例锁；第二次启动会把链接转交给已有实例，没有链接时只显示主窗口。

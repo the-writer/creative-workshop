@@ -73,6 +73,14 @@
   "build": {
     "appId": "cn.com.stdout.creation-workshop",
     "productName": "创作工坊",
+    "protocols": [
+      {
+        "name": "创作工坊项目链接",
+        "schemes": [
+          "workshop"
+        ]
+      }
+    ],
     "asar": true,
     "afterPack": "scripts/after-pack.cjs",
     "directories": {
