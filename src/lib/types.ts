@@ -1,6 +1,6 @@
 // 规范业务对象与枚举定义（内部 key 与中文展示 label 分离）
 
-export type RaceKey = 'human' | 'elf' | 'mixed';
+export type RaceKey = 'human' | 'elf' | 'yaogui' | 'mixed';
 export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
 export type NameGender = 'any' | 'male' | 'female' | 'neutral';
 export type RarityTier = 'S' | 'SS' | 'SSS' | 'SSSR';
@@ -76,17 +76,20 @@ export interface CandidateFilters {
   sort: SortKey;
 }
 
-export const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族', mixed: '混血' };
-export const RACE_KEYS: RaceKey[] = ['human', 'elf', 'mixed'];
+export const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族', yaogui: '妖鬼', mixed: '混血' };
+export const RACE_KEYS: RaceKey[] = ['human', 'elf', 'yaogui', 'mixed'];
 
-// 旧版本曾使用 demon 作为妖族内部 key，读取旧偏好 / 旧数据时统一迁移为 elf。
+// 旧版本曾使用 demon 作为妖族内部 key，读取旧偏好 / 旧数据时统一迁移为 elf；
+// 妖鬼使用独立 key yaogui，避免与历史 demon 数据混淆。
 export function normalizeRaceKey(raw: unknown): RaceKey {
   if (raw === 'mixed' || raw === '混血') return 'mixed';
+  if (raw === 'yaogui' || raw === '妖鬼') return 'yaogui';
   return raw === 'elf' || raw === 'demon' ? 'elf' : 'human';
 }
 
 export function normalizeRaceFilter(raw: unknown): RaceKey | 'all' {
   if (raw === 'mixed' || raw === '混血') return 'mixed';
+  if (raw === 'yaogui' || raw === '妖鬼') return 'yaogui';
   if (raw === 'elf' || raw === 'demon') return 'elf';
   return raw === 'human' ? 'human' : 'all';
 }

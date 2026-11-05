@@ -56,11 +56,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 /* ---------------- 族群印章 ---------------- */
 
 export function Seal({ race, size = 28, className }: { race: RaceKey; size?: number; className?: string }) {
-  const label = race === 'elf' ? '精灵族' : race === 'mixed' ? '混血' : '人族';
-  const mark = race === 'elf' ? '灵' : race === 'mixed' ? '混' : '人';
+  const label = race === 'elf' ? '精灵族' : race === 'yaogui' ? '妖鬼' : race === 'mixed' ? '混血' : '人族';
+  const mark = race === 'elf' ? '灵' : race === 'yaogui' ? '妖' : race === 'mixed' ? '混' : '人';
   return (
     <span
-      className={cn('seal-fallback', race === 'elf' && 'seal-elf', race === 'mixed' && 'seal-mixed', className)}
+      className={cn('seal-fallback', race === 'elf' && 'seal-elf', race === 'yaogui' && 'seal-yaogui', race === 'mixed' && 'seal-mixed', className)}
       style={{ width: size, height: size, fontSize: Math.max(11, size * 0.46) }}
       data-testid={`seal-${race}-${size}`}
       aria-label={label}
@@ -87,7 +87,7 @@ export function Chip({
   selected?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
-  tone?: 'human' | 'elf' | 'mixed' | 'neutral';
+  tone?: 'human' | 'elf' | 'yaogui' | 'mixed' | 'neutral';
   className?: string;
   dataTestId?: string;
 }) {
@@ -139,6 +139,7 @@ export function EmptyState({ title, desc, actions, testId }: { title: string; de
       <div className="empty-seal-row">
         <Seal race="human" size={34} />
         <Seal race="elf" size={34} />
+        <Seal race="yaogui" size={34} />
         <Seal race="mixed" size={34} />
       </div>
       <p className="empty-title">{title}</p>

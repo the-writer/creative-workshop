@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LEXICON, SURNAMES, SURNAME_RARE_POPULATION_SHARE, SYLLABLE_GENDER_BIAS, SYLLABLES, computeCombinationTotals, formatCombination } from '@/data/lexicon';
 import { ELF_LEXICON, ELF_SYLLABLE_GENDER_BIAS, ELF_SYLLABLES } from '@/data/lexicon-elf';
+import { YAOGUI_LEXICON, YAOGUI_SYLLABLE_GENDER_BIAS, YAOGUI_SYLLABLES } from '@/data/lexicon-yaogui';
 import {
   DEFAULT_GEN_PARAMS,
   GEN_PREFS_SCHEMA_VERSION,
@@ -19,7 +20,7 @@ import {
 } from '@/lib/generator';
 import { GENDER_KEYS, RARITY_TIERS, type NameTypeKey, type RaceKey } from '@/lib/types';
 
-const races: RaceKey[] = ['human', 'elf'];
+const races: RaceKey[] = ['human', 'elf', 'yaogui'];
 const types: NameTypeKey[] = ['person', 'place', 'office', 'nickname'];
 
 describe('lexicon', () => {
@@ -62,6 +63,20 @@ describe('lexicon', () => {
     expect(pickSurname('human', 100, 0.999999).rare).toBe(true);
   });
 
+  it('keeps the rare-bias slider gentle at middle values', () => {
+    const rareShare = (bias: number) => {
+      const choices = getSurnameChoices('human', bias);
+      const total = choices.reduce((sum, surname) => sum + surname.selectionWeight, 0);
+      const rare = choices.filter((surname) => surname.rarity === 'SSSR').reduce((sum, surname) => sum + surname.selectionWeight, 0);
+      return rare / total;
+    };
+    expect(rareShare(50)).toBeCloseTo(0.1, 6);
+    // 70 只温和偏向稀有，不应像旧曲线那样接近必出 SSSR。
+    expect(rareShare(70)).toBeGreaterThan(0.2);
+    expect(rareShare(70)).toBeLessThan(0.26);
+    expect(rareShare(100)).toBeGreaterThan(rareShare(70));
+  });
+
   it('keeps the elf lexicon free of demonic vocabulary', () => {
     const forbidden = /[妖魔怪鬼尸骨血咒蛊毒瘟疫魇魑魍魅煞烬墟冥邪恶灾祸噬蚀腐锈枯骸骷髅獠祟瘴蜃魃虬蟒蛛蝎]/;
     const words = [...ELF_SYLLABLES, ...Object.values(ELF_LEXICON).flat(), ...SURNAMES.elf.map((surname) => surname.name)];
@@ -76,6 +91,23 @@ describe('lexicon', () => {
       expect(new Set(pool).size).toBe(pool.length);
       expect(pool.every((syllable) => ELF_SYLLABLES.includes(syllable))).toBe(true);
     });
+  });
+
+  it('keeps the yaogui lexicon comparable to elf and mostly dark', () => {
+    expect(YAOGUI_SYLLABLES).toHaveLength(160);
+    expect(SURNAMES.yaogui).toHaveLength(80);
+    expect(YAOGUI_LEXICON.professions).toHaveLength(160);
+    expect(YAOGUI_LEXICON.abilities).toHaveLength(120);
+    expect(YAOGUI_LEXICON.nickProfession).toHaveLength(104);
+    Object.values(YAOGUI_SYLLABLE_GENDER_BIAS).forEach((pool) => {
+      expect(pool.every((syllable) => YAOGUI_SYLLABLES.includes(syllable))).toBe(true);
+    });
+    // 少量古体 / 不常用字与极低比例的光明优雅词应同时存在，但后者不能成规模。
+    expect(YAOGUI_SYLLABLES.some((syllable) => /[魑魅魍魉魃魈鬾鬽鬿]/.test(syllable))).toBe(true);
+    const lightWords = [...Object.values(YAOGUI_LEXICON).flat()].filter((word) => /月华|清辉|玉面|星岚|守灯|星契/.test(word));
+    const allWords = Object.values(YAOGUI_LEXICON).flat().length;
+    expect(lightWords.length).toBeGreaterThan(0);
+    expect(lightWords.length / allWords).toBeLessThan(0.01);
   });
 
   it('avoids mechanical prefix repetition in elf word lists', () => {

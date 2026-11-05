@@ -1,7 +1,7 @@
 // 项目 .workshop 目录下的 Markdown 读写：分门别类保存候选、设定、关系、图谱与偏好。
 // 文件为「标题 + 字段行」的可读 Markdown；解析时容错，跳过不完整条目。
 
-export type RaceKey = 'human' | 'elf' | 'mixed';
+export type RaceKey = 'human' | 'elf' | 'yaogui' | 'mixed';
 export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
 export type NameGender = 'any' | 'male' | 'female' | 'neutral';
 export type RarityTier = 'S' | 'SS' | 'SSS' | 'SSSR';
@@ -85,7 +85,7 @@ export interface CandidateFilters {
 
 export const SCHEMA_VERSION = 1;
 
-const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族', mixed: '混血' };
+const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族', yaogui: '妖鬼', mixed: '混血' };
 const TYPE_LABELS: Record<NameTypeKey, string> = { person: '人名', place: '地名', office: '官职', nickname: '绰号' };
 const INI_PEOPLE_GROUP = '人物';
 const GENDER_LABELS: Record<NameGender, string> = { any: '不限', male: '男性', female: '女性', neutral: '中性' };
@@ -93,6 +93,7 @@ const ENTITY_LABELS: Record<EntityType, string> = { sheet: '设定卡', place: '
 
 function parseRace(value: string): RaceKey {
   if (value === '混血' || value === 'mixed') return 'mixed';
+  if (value === '妖鬼' || value === 'yaogui') return 'yaogui';
   if (value === '人族' || value === 'human') return 'human';
   if (value === '精灵族' || value === 'elf' || value === 'demon' || value === '妖族') return 'elf';
   return 'human';

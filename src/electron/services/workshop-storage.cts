@@ -129,6 +129,7 @@ function asNumber(value: unknown, fallback = 0): number {
 
 function asRace(value: unknown): RaceKey {
   if (value === 'mixed' || value === '混血') return 'mixed';
+  if (value === 'yaogui' || value === '妖鬼') return 'yaogui';
   return value === 'elf' || value === 'demon' ? 'elf' : 'human';
 }
 

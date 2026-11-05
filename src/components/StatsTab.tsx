@@ -122,7 +122,7 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
                 order={RACE_KEYS}
                 labels={RACE_LABELS}
                 color="#B23A2E"
-                colorMap={{ human: '#B23A2E', elf: '#3E4A5A', mixed: '#4A7C59' }}
+                colorMap={{ human: '#B23A2E', elf: '#3E4A5A', yaogui: '#5A4468', mixed: '#4A7C59' }}
               />
             </div>
             <div className="stat-chart-card">
@@ -157,6 +157,10 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
               <div className="lexicon-row">
                 <span>精灵族组合量</span>
                 <strong>{formatCombination(combo.perRace.elf.total)}</strong>
+              </div>
+              <div className="lexicon-row">
+                <span>妖鬼组合量</span>
+                <strong>{formatCombination(combo.perRace.yaogui.total)}</strong>
               </div>
               <div className="lexicon-row">
                 <span>混血组合量</span>

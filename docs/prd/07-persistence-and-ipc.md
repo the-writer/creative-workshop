@@ -122,7 +122,7 @@ flowchart TD
 - 备注、名称等普通文本原样保存；空字段行写为空值（如 `- 备注: `）。
 - 时间：写出为 ISO 8601（`toISOString()`）；读取无法解析时回退为当前时间。
 - 字数不信任文件：读取时按名称重新计算并忽略 `·` 分隔符，写出的 `- 字数` 仅供人阅读。
-- 枚举接受中文标签或英文 key：族群「人族/human」「精灵族/elf」「混血/mixed」，旧值 `demon`、`妖族` 归一为 `elf`；类型「人名/person」「地名/place」「官职/office」「绰号/nickname」；性别「不限/any」「男性/male」「女性/female」「中性/neutral」；`来源` 只有「手动」视为 `manual`，其余为 `generated`；`收藏` 为「是/true/1」时视为真；`来源类型`/`目标类型` 只有「地名/place」视为地名，其余视为设定卡。
+- 枚举接受中文标签或英文 key：族群「人族/human」「精灵族/elf」「妖鬼/yaogui」「混血/mixed」，旧值 `demon`、`妖族` 归一为 `elf`；类型「人名/person」「地名/place」「官职/office」「绰号/nickname」；性别「不限/any」「男性/male」「女性/female」「中性/neutral」；`来源` 只有「手动」视为 `manual`，其余为 `generated`；`收藏` 为「是/true/1」时视为真；`来源类型`/`目标类型` 只有「地名/place」视为地名，其余视为设定卡。
 - 未知字段、未知分节、无法解析的字段行会被忽略；缺少必需字段的条目被跳过。
 
 #### 7.4.1 `project.md`
@@ -469,7 +469,7 @@ await window.workshop.graph.saveLayout({ [`s:${result.id}`]: { x: 120, y: 88.5 }
 ### 7.9 兼容与约束
 
 - 对外字段采用 camelCase；迁移旧 JSON 数据时兼容 snake_case 字段；Markdown 读取兼容中文标签与部分英文 key（如 `id`、`nameText`、`createdAt`）。
-- 种族 key 当前为 `human` / `elf`；旧的 `demon`（妖族）在读取候选、设定、偏好与迁移时统一归一为 `elf`。
+- 种族 key 当前为 `human` / `elf` / `yaogui` / `mixed`；旧的 `demon`（妖族）在读取候选、设定、偏好与迁移时统一归一为 `elf`，不复用为妖鬼，避免历史数据语义改变。
 - 渲染层不能提交任意文件路径；项目路径只能来自系统目录选择或登记文件。
 - 偏好键白名单仅 `generator`、`libraryFilters`；新增偏好键需同步更新主进程白名单、预加载类型与本章节。
 - 新增 IPC 通道必须在预加载白名单（`src/electron/preload.cts`）、类型声明（`src/workshop.d.ts`）、主进程处理器（`src/electron/ipc/workshop-ipc.cts`）与本章节同时登记。

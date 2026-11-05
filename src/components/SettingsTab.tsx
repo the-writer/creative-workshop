@@ -1,8 +1,9 @@
 // 设置页：项目切换、VS Code 打开项目目录、overview.md 总览只读展示与应用信息
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Code2, FolderOpen, Loader2, RefreshCw } from 'lucide-react';
 import { fetchProjectOverview, openProjectInVSCode, type ProjectSummary } from '@/lib/db';
+import { computeCombinationTotals, formatCombination } from '@/data/lexicon';
 import { cn } from '@/lib/utils';
 import { SectionTitle, useAppToast } from '@/components/common';
 import { MarkdownView } from '@/components/MarkdownView';
@@ -17,6 +18,7 @@ export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
   const [opening, setOpening] = useState(false);
   const [overview, setOverview] = useState('');
   const [overviewLoading, setOverviewLoading] = useState(true);
+  const lexiconScale = useMemo(() => computeCombinationTotals(), []);
 
   const loadOverview = useCallback(async () => {
     setOverviewLoading(true);
@@ -75,6 +77,17 @@ export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
           </div>
         </div>
 
+        <SectionTitle>关于</SectionTitle>
+        <div className="settings-card">
+          <p className="settings-about-name">创作工坊</p>
+          <p className="settings-desc">为小说世界观生成人名、地名、官职与绰号，并组织候选、设定卡、关系图谱与统计。</p>
+          <p className="settings-desc" data-testid="settings-lexicon-scale">
+            当前词库理论组合量：{formatCombination(lexiconScale.grandTotal)}（人名 {formatCombination(lexiconScale.detail.person)} · 地名{' '}
+            {formatCombination(lexiconScale.detail.place)} · 官职 {formatCombination(lexiconScale.detail.office)} · 绰号{' '}
+            {formatCombination(lexiconScale.detail.nickname)}）
+          </p>
+        </div>
+
         {overview.trim() ? (
           <>
             <SectionTitle
@@ -105,12 +118,6 @@ export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
             </div>
           </>
         ) : null}
-
-        <SectionTitle>关于</SectionTitle>
-        <div className="settings-card">
-          <p className="settings-about-name">创作工坊</p>
-          <p className="settings-desc">为小说世界观生成人名、地名、官职与绰号，并组织候选、设定卡、关系图谱与统计。</p>
-        </div>
       </div>
     </div>
   );
