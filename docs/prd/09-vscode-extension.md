@@ -2,7 +2,7 @@
 
 ### 9.1 定位与目录
 
-`vscode-extension/` 是创作工坊配套的 VS Code 插件 `type-stats`（publisher `border-writer`），面向中文长文写作场景：状态栏字数统计、码字计时/速率，以及 `.workshop/sheets.ini` 设定集关键词高亮。插件版本与主应用版本保持同步（当前 `1.12.0`）。插件作为 pnpm workspace 成员随主项目一起安装依赖，并在主项目构建时自动打包 VSIX。
+`vscode-extension/` 是创作工坊配套的 VS Code 插件 `type-stats`（publisher `border-writer`），面向中文长文写作场景：状态栏字数统计、码字计时/速率，以及 `.workshop/sheets.ini` 设定集关键词高亮。插件版本与主应用版本保持同步（当前 `1.13.0`）。插件作为 pnpm workspace 成员随主项目一起安装依赖，并在主项目构建时自动打包 VSIX。
 
 ```text
 vscode-extension/
