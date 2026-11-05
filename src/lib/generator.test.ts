@@ -26,7 +26,7 @@ const types: NameTypeKey[] = ['person', 'place', 'office', 'nickname'];
 describe('lexicon', () => {
   it('contains expanded and unique syllable, root and gender lists', () => {
     races.forEach((race) => {
-      expect(SYLLABLES[race]).toHaveLength(160);
+      expect(SYLLABLES[race]).toHaveLength(race === 'yaogui' ? 160 : 240);
       expect(new Set(SYLLABLES[race]).size).toBe(SYLLABLES[race].length);
       Object.values(LEXICON[race]).forEach((values) => {
         expect(new Set(values).size).toBe(values.length);
@@ -85,7 +85,7 @@ describe('lexicon', () => {
 
   it('keeps elf gender pools as subsets of the elf syllable table', () => {
     const pools = Object.values(ELF_SYLLABLE_GENDER_BIAS);
-    expect(ELF_SYLLABLES).toHaveLength(160);
+    expect(ELF_SYLLABLES).toHaveLength(240);
     pools.forEach((pool) => {
       expect(pool.length).toBeGreaterThanOrEqual(18);
       expect(new Set(pool).size).toBe(pool.length);
