@@ -10,6 +10,8 @@ const IPC = {
   projectsRemoveRecent: 'workshop:projects:remove-recent',
   projectsOverview: 'workshop:project:overview',
   projectsOpenInVSCode: 'workshop:projects:open-vscode',
+  projectsOpenInCLion: 'workshop:projects:open-clion',
+  projectsOpenInFinder: 'workshop:projects:open-finder',
   projectsChanged: 'workshop:projects:changed',
   rulesOpen: 'workshop:rules:open',
   rulesClose: 'workshop:rules:close',
@@ -44,6 +46,8 @@ contextBridge.exposeInMainWorld('workshop', {
     removeRecent: (path: string) => invoke(IPC.projectsRemoveRecent, path),
     overview: () => invoke(IPC.projectsOverview),
     openInVSCode: () => invoke(IPC.projectsOpenInVSCode),
+    openInCLion: () => invoke(IPC.projectsOpenInCLion),
+    openInFinder: () => invoke(IPC.projectsOpenInFinder),
     onChanged: (callback: (project: unknown) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, project: unknown) => callback(project);
       ipcRenderer.on(IPC.projectsChanged, listener);

@@ -18,6 +18,8 @@ export const IPC = {
   projectsRemoveRecent: 'workshop:projects:remove-recent',
   projectsOverview: 'workshop:project:overview',
   projectsOpenInVSCode: 'workshop:projects:open-vscode',
+  projectsOpenInCLion: 'workshop:projects:open-clion',
+  projectsOpenInFinder: 'workshop:projects:open-finder',
   projectsChanged: 'workshop:projects:changed',
   rulesOpen: 'workshop:rules:open',
   rulesClose: 'workshop:rules:close',
@@ -103,6 +105,8 @@ export function registerWorkshopIpc(storage: WorkshopStorage, projects: ProjectM
   registerHandler(IPC.projectsRemoveRecent, (_event, path: string) => projects.removeRecent(path));
   registerHandler(IPC.projectsOverview, () => storage.projectOverview());
   registerHandler(IPC.projectsOpenInVSCode, () => projects.openInVSCode());
+  registerHandler(IPC.projectsOpenInCLion, () => projects.openInCLion());
+  registerHandler(IPC.projectsOpenInFinder, () => projects.openInFinder());
   registerHandler(IPC.rulesOpen, () => rulesBridge?.openRulesWindow());
   registerHandler(IPC.rulesClose, () => rulesBridge?.closeRulesWindow());
   registerHandler(IPC.rulesChanged, (_event, value: unknown) => {

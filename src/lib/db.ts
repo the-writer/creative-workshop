@@ -99,6 +99,14 @@ export async function openProjectInVSCode(): Promise<{ ok: boolean; message?: st
   return api().projects.openInVSCode();
 }
 
+export async function openProjectInCLion(): Promise<{ ok: boolean; message?: string }> {
+  return api().projects.openInCLion();
+}
+
+export async function openProjectInFinder(): Promise<{ ok: boolean; message?: string }> {
+  return api().projects.openInFinder();
+}
+
 export async function openRulesWindow(): Promise<void> {
   await api().rules.open();
 }

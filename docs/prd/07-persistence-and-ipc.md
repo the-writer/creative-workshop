@@ -389,7 +389,7 @@ flowchart TD
 
 ### 7.7 IPC 清单（`window.workshop`）
 
-接口在 Electron 渲染进程中通过 `window.workshop` 使用，浏览器单独打开时不存在。以下操作均返回 Promise；除项目列表/打开/登记类接口（`projects.listRecent`、`current`、`open`、`create`、`pickDirectory`、`removeRecent`、`openInVSCode`）与 `clipboard.*` 外，业务接口要求已打开项目，否则抛错「尚未打开项目，请先选择项目」（`projects.overview()` 也要求已打开项目）。每次调用都会校验来源，非法来源抛错「不受信任的调用来源」。
+接口在 Electron 渲染进程中通过 `window.workshop` 使用，浏览器单独打开时不存在。以下操作均返回 Promise；除项目列表/打开/登记类接口（`projects.listRecent`、`current`、`open`、`create`、`pickDirectory`、`removeRecent`、`openInVSCode`、`openInCLion`、`openInFinder`）与 `clipboard.*` 外，业务接口要求已打开项目，否则抛错「尚未打开项目，请先选择项目」（`projects.overview()` 也要求已打开项目）。每次调用都会校验来源，非法来源抛错「不受信任的调用来源」。
 
 | 签名                                   | 通道                               | 持久性                                                                               | 副作用 / 返回                                                                                                             |
 | -------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
@@ -402,6 +402,8 @@ flowchart TD
 | `projects.removeRecent(path)`          | `workshop:projects:remove-recent`  | 写 `projects.json`                                                                   | 仅从最近项目列表移除该路径，**不删除项目文件**；不在列表时返回 `{ ok: false, message }`                                   |
 | `projects.overview()`                  | `workshop:project:overview`        | 不写盘                                                                               | 要求已打开项目；返回 `.workshop/overview.md` 全文（去首尾空白），文件不存在或为空时为空字符串                             |
 | `projects.openInVSCode()`              | `workshop:projects:open-vscode`    | 不写盘                                                                               | 用 VS Code 打开当前项目目录；未安装时回退文件管理器；返回 `{ ok, message? }`                                              |
+| `projects.openInCLion()`               | `workshop:projects:open-clion`     | 不写盘                                                                               | 用 CLion 打开当前项目目录；未安装时回退文件管理器；返回 `{ ok, message? }`                                                |
+| `projects.openInFinder()`              | `workshop:projects:open-finder`    | 不写盘                                                                               | 用系统文件管理器（macOS 为 Finder）打开当前项目目录；返回 `{ ok, message? }`                                              |
 | `rules.open()`                         | `workshop:rules:open`              | 不写盘                                                                               | 以主窗口为 parent 打开模态规则设置子窗口；已打开则聚焦现有窗口                                                            |
 | `rules.close()`                        | `workshop:rules:close`             | 不写盘                                                                               | 关闭规则设置子窗口                                                                                                        |
 | `rules.notifyChanged(prefs)`           | `workshop:rules:changed`           | 由调用方先写入 `preferences.md`                                                      | 主进程把子窗口的生成偏好转发给主窗口（事件 `workshop:rules:changed`）；返回 `true`                                        |

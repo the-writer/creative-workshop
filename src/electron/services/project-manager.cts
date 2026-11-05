@@ -1,4 +1,4 @@
-// 项目管理：维护最近项目列表（userData/projects.json），负责打开 / 新建项目与 VS Code 打开目录。
+// 项目管理：维护最近项目列表（userData/projects.json），负责打开 / 新建项目与 VS Code、CLion、Finder 打开目录。
 
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
@@ -149,9 +149,7 @@ export class ProjectManager {
     if (!name) return { ok: false, message: '缺少项目名称' };
     const normalized = name.toLocaleLowerCase();
     const recent = await this.listRecent();
-    const match = recent.find(
-      (project) => project.name.toLocaleLowerCase() === normalized || basename(project.path).toLocaleLowerCase() === normalized,
-    );
+    const match = recent.find((project) => project.name.toLocaleLowerCase() === normalized || basename(project.path).toLocaleLowerCase() === normalized);
     if (!match) return { ok: false, message: `未找到项目「${name}」，请先在创作工坊中打开该项目` };
     return this.open(match.path);
   }
@@ -186,6 +184,30 @@ export class ProjectManager {
     const fallbackError = await shell.openPath(project.path);
     if (fallbackError) return { ok: false, message: `未检测到 VS Code，且无法打开项目目录：${fallbackError}` };
     return { ok: true, message: '未检测到 VS Code，已在文件管理器中打开项目目录' };
+  }
+
+  /** 通过 CLion 打开当前项目目录；未安装 CLion 时回退到文件管理器 */
+  public async openInCLion(): Promise<{ ok: boolean; message?: string }> {
+    const project = this.currentProject;
+    if (!project) return { ok: false, message: '尚未打开项目' };
+    const binaryCandidates = ['/usr/local/bin/clion', '/opt/homebrew/bin/clion', '/Applications/CLion.app/Contents/MacOS/clion'];
+    const binary = binaryCandidates.find((candidate) => existsSync(candidate)) ?? 'clion';
+    if (await this.spawnDetached(binary, [project.path])) return { ok: true };
+    if (process.platform === 'darwin' && (await this.spawnDetached('/usr/bin/open', ['-a', 'CLion', project.path]))) {
+      return { ok: true };
+    }
+    const fallbackError = await shell.openPath(project.path);
+    if (fallbackError) return { ok: false, message: `未检测到 CLion，且无法打开项目目录：${fallbackError}` };
+    return { ok: true, message: '未检测到 CLion，已在 Finder 中打开项目目录' };
+  }
+
+  /** 在系统文件管理器（macOS 为 Finder）中打开当前项目目录 */
+  public async openInFinder(): Promise<{ ok: boolean; message?: string }> {
+    const project = this.currentProject;
+    if (!project) return { ok: false, message: '尚未打开项目' };
+    const error = await shell.openPath(project.path);
+    if (error) return { ok: false, message: `无法在 Finder 中打开项目目录：${error}` };
+    return { ok: true };
   }
 
   private async activate(opened: OpenedProject, displayName?: string): Promise<ProjectResult> {

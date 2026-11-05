@@ -8,16 +8,16 @@
 
 ### 1.2 进程结构
 
-| 层              | 目录 / 文件                               | 职责                                                                                |
-| --------------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
-| Electron 主进程 | `src/electron/main.cts`                       | 创建窗口、托盘、应用菜单、安全策略、读取 `creationWorkshop` 配置并注册 IPC          |
-| 项目管理        | `src/electron/services/project-manager.cts`   | `userData/projects.json` 最近项目、打开项目（自动初始化）、VS Code 打开、旧数据迁移 |
-| 项目数据服务    | `src/electron/services/workshop-storage.cts`  | 打开项目、读写 `.workshop` 分类文件、串行队列、级联规则、统计                       |
-| Markdown 读写   | `src/electron/services/workshop-markdown.cts` | 各类 Markdown 的解析与序列化、字段转义、容错读取、图谱快照                          |
-| 预加载桥        | `src/electron/preload.cts`                    | 通过 `contextBridge` 暴露白名单 `window.workshop`                                   |
-| IPC 边界        | `src/electron/ipc/workshop-ipc.cts`           | 校验调用来源、处理项目/数据/剪贴板请求                                              |
-| 渲染层          | `src/`                                    | React 界面、项目门与纯本地命名生成                                                  |
-| 打包脚本        | `scripts/`                                | 清理旧产物、打包后处理与安装脚本                                                    |
+| 层              | 目录 / 文件                                   | 职责                                                                                                 |
+| --------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Electron 主进程 | `src/electron/main.cts`                       | 创建窗口、托盘、应用菜单、安全策略、读取 `creationWorkshop` 配置并注册 IPC                           |
+| 项目管理        | `src/electron/services/project-manager.cts`   | `userData/projects.json` 最近项目、打开项目（自动初始化）、VS Code / CLion / Finder 打开、旧数据迁移 |
+| 项目数据服务    | `src/electron/services/workshop-storage.cts`  | 打开项目、读写 `.workshop` 分类文件、串行队列、级联规则、统计                                        |
+| Markdown 读写   | `src/electron/services/workshop-markdown.cts` | 各类 Markdown 的解析与序列化、字段转义、容错读取、图谱快照                                           |
+| 预加载桥        | `src/electron/preload.cts`                    | 通过 `contextBridge` 暴露白名单 `window.workshop`                                                    |
+| IPC 边界        | `src/electron/ipc/workshop-ipc.cts`           | 校验调用来源、处理项目/数据/剪贴板请求                                                               |
+| 渲染层          | `src/`                                        | React 界面、项目门与纯本地命名生成                                                                   |
+| 打包脚本        | `scripts/`                                    | 清理旧产物、打包后处理与安装脚本                                                                     |
 
 渲染进程禁止直接访问 Node.js、文件系统与子进程；`nodeIntegration=false`、`contextIsolation=true`、`sandbox=true`（`src/electron/main.cts`）。
 
@@ -53,27 +53,28 @@ flowchart TD
 - `projects.create({ parentDir, name })` IPC 仍保留以兼容旧调用，但项目门不再提供新建入口；日常新建项目通过「打开项目」选择一个新目录完成。
 - **从最近列表移除**：每条最近项目右侧提供删除图标按钮（`data-testid="project-delete-<项目名>"`），点击后弹出二次确认；确认后只调用 `projects.removeRecent(path)` 从 `projects.json` 最近项目列表中移除该条目，**不删除磁盘上的目录或任何文件**。
 - 设置页「切换项目」只回到项目门（渲染层将当前项目置空），不关闭主进程内的数据服务；再次打开项目时替换当前项目。
+- 设置页「当前项目」卡提供「在 VS Code 中打开」「在 CLion 中打开」「在 Finder 中打开」三个入口；前两者未检测到对应应用时回退到文件管理器，Finder 入口直接调用系统文件管理器打开项目目录。
 - 设置页分区自上而下为「当前项目 → 关于 → 总览」。关于卡展示应用名、简介与**当前词库规模**（`computeCombinationTotals().grandTotal`，含人名 / 地名 / 官职 / 绰号分类组合量，数值随词库实时计算）。
 - 设置页提供「总览」只读 Markdown 展示：直接读取当前项目 `.workshop/overview.md` 全文渲染，支持刷新；文件不存在或正文为空时整块「总览」区域（标题、刷新按钮与提示）都不显示。
 
 ### 1.4 窗口行为
 
-| 项目           | 值                         | 来源                                                                                      |
-| -------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
-| 窗口内容尺寸   | 800 × 600                  | `package.json` → `creationWorkshop.window.width/height`                                   |
+| 项目           | 值                         | 来源                                                                                          |
+| -------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
+| 窗口内容尺寸   | 800 × 600                  | `package.json` → `creationWorkshop.window.width/height`                                       |
 | 尺寸缺省回退   | 800 × 600                  | `src/electron/main.cts`（配置缺省时）                                                         |
-| 标题栏样式     | `hiddenInset`              | `package.json` → `creationWorkshop.window.titleBarStyle`                                  |
+| 标题栏样式     | `hiddenInset`              | `package.json` → `creationWorkshop.window.titleBarStyle`                                      |
 | 红绿灯位置     | `{ x: 12, y: 12 }`         | `src/electron/main.cts` → `trafficLightPosition`                                              |
 | 窗口类型       | 普通独立窗口（非 panel）   | `src/electron/main.cts` 不传 `type`                                                           |
-| 默认置顶       | 否                         | `creationWorkshop.window.alwaysOnTop`                                                     |
-| 置顶层级       | `floating`                 | `creationWorkshop.window.alwaysOnTopLevel`（仅置顶为真时生效）                            |
+| 默认置顶       | 否                         | `creationWorkshop.window.alwaysOnTop`                                                         |
+| 置顶层级       | `floating`                 | `creationWorkshop.window.alwaysOnTopLevel`（仅置顶为真时生效）                                |
 | 桌面归属       | 打开时所在桌面；切换不跟随 | `src/electron/main.cts` → `bindWindowToCurrentDesktop`                                        |
 | Dock 图标      | 不显示                     | `package.json` → `build.mac.extendInfo.LSUIElement`；`src/electron/main.cts` → `hideDockIcon` |
 | 可调整尺寸     | 否                         | `src/electron/main.cts` → `resizable/maximizable/fullscreenable`                              |
 | 使用内容尺寸   | 是                         | `src/electron/main.cts` → `useContentSize: true`                                              |
 | 窗口背景色     | `#f5efe2`                  | `src/electron/main.cts` → `backgroundColor`                                                   |
-| 应用名         | 创作工坊                   | `package.json` → `productName`；`app.setName`                                             |
-| 拖拽标题栏高度 | 32 px                      | `src/App.css` → `.desktop-titlebar`                                                       |
+| 应用名         | 创作工坊                   | `package.json` → `productName`；`app.setName`                                                 |
+| 拖拽标题栏高度 | 32 px                      | `src/App.css` → `.desktop-titlebar`                                                           |
 
 应用加载 `release/renderer/index.html`（主进程为 `release/electron/main.cjs`）；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务，并在该模式下自动打开独立 DevTools。
 
@@ -123,16 +124,16 @@ flowchart TD
 
 ### 1.6 配置项（`package.json` → `creationWorkshop`）
 
-| 配置键                       | 默认值 / 实际值                | 作用                             | 读取位置                                                   |
-| ---------------------------- | ------------------------------ | -------------------------------- | ---------------------------------------------------------- |
-| `project.dataDirName`        | `.workshop`                    | 项目内数据目录名                 | `src/electron/main.cts` → `ProjectManager` / `WorkshopStorage` |
-| `project.registryFileName`   | `projects.json`                | `userData` 下项目登记文件名      | `src/electron/main.cts` → `ProjectManager`                     |
-| `project.legacyDataFileName` | `workshop.json`                | 旧版单 JSON 数据文件名（迁移源） | `src/electron/main.cts` → `ProjectManager`                     |
-| `project.maxRecentProjects`  | `10`                           | 最近项目数量上限                 | `src/electron/main.cts` → `ProjectManager`                     |
-| `window.width` / `height`    | `800` / `600`                  | 窗口内容尺寸                     | `src/electron/main.cts`                                        |
-| `window.titleBarStyle`       | `hiddenInset`                  | 标题栏样式                       | `src/electron/main.cts`                                        |
-| `window.alwaysOnTopLevel`    | `floating`                     | 置顶时的窗口层级（仅置顶为真时） | `src/electron/main.cts`                                        |
-| `window.alwaysOnTop`         | `false`                        | 是否默认置顶                     | `src/electron/main.cts`                                        |
+| 配置键                       | 默认值 / 实际值                    | 作用                             | 读取位置                                                       |
+| ---------------------------- | ---------------------------------- | -------------------------------- | -------------------------------------------------------------- |
+| `project.dataDirName`        | `.workshop`                        | 项目内数据目录名                 | `src/electron/main.cts` → `ProjectManager` / `WorkshopStorage` |
+| `project.registryFileName`   | `projects.json`                    | `userData` 下项目登记文件名      | `src/electron/main.cts` → `ProjectManager`                     |
+| `project.legacyDataFileName` | `workshop.json`                    | 旧版单 JSON 数据文件名（迁移源） | `src/electron/main.cts` → `ProjectManager`                     |
+| `project.maxRecentProjects`  | `10`                               | 最近项目数量上限                 | `src/electron/main.cts` → `ProjectManager`                     |
+| `window.width` / `height`    | `800` / `600`                      | 窗口内容尺寸                     | `src/electron/main.cts`                                        |
+| `window.titleBarStyle`       | `hiddenInset`                      | 标题栏样式                       | `src/electron/main.cts`                                        |
+| `window.alwaysOnTopLevel`    | `floating`                         | 置顶时的窗口层级（仅置顶为真时） | `src/electron/main.cts`                                        |
+| `window.alwaysOnTop`         | `false`                            | 是否默认置顶                     | `src/electron/main.cts`                                        |
 | `tray.iconFile`              | `src/assets/imgs/trayTemplate.png` | 托盘模板图标                     | `src/electron/main.cts`                                        |
 
 四个 `project.*` 配置项缺省时回退到上表默认值；空字符串视为未配置。旧版 `creationWorkshop.storage.fileName` 已不存在。

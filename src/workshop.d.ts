@@ -38,6 +38,8 @@ export interface WorkshopApi {
     removeRecent: (path: string) => Promise<{ ok: boolean; message?: string }>;
     overview: () => Promise<string>;
     openInVSCode: () => Promise<{ ok: boolean; message?: string }>;
+    openInCLion: () => Promise<{ ok: boolean; message?: string }>;
+    openInFinder: () => Promise<{ ok: boolean; message?: string }>;
     onChanged: (callback: (project: ProjectSummary | null) => void) => () => void;
   };
   rules: {
