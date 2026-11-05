@@ -69,8 +69,7 @@ export function RulesWindow() {
   }, [prefs, ready]);
 
   const { race, types, params } = prefs;
-  const comboMode = types.length > 1;
-  const usesPerson = types.includes('person') || comboMode;
+  const usesPerson = types.includes('person');
   const hasPerson = types.includes('person');
   const showNickRules = types.includes('nickname') || (hasPerson && params.nicknamePrefix);
   const setParams = (patch: Partial<GenParams>) => setPrefs((current) => ({ ...current, params: { ...current.params, ...patch } }));
@@ -189,7 +188,7 @@ export function RulesWindow() {
             </div>
           ) : null}
 
-          {hasPerson && !comboMode ? (
+          {hasPerson ? (
             <>
               <div className="rule-row">
                 <span className="rule-label">人名后缀</span>
@@ -260,39 +259,37 @@ export function RulesWindow() {
             </>
           ) : null}
 
-          {!comboMode ? (
-            <div className="rule-row">
-              <span className="rule-label">人名全名字数</span>
-              <div className="range-inputs">
-                <input
-                  type="number"
-                  className="range-input"
-                  value={params.minChars}
-                  min={2}
-                  max={8}
-                  data-testid="chars-min"
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    if (!Number.isNaN(value)) setParams({ minChars: Math.max(2, Math.min(8, Math.round(value))) });
-                  }}
-                />
-                <span className="range-sep">至</span>
-                <input
-                  type="number"
-                  className="range-input"
-                  value={params.maxChars}
-                  min={2}
-                  max={8}
-                  data-testid="chars-max"
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    if (!Number.isNaN(value)) setParams({ maxChars: Math.max(2, Math.min(8, Math.round(value))) });
-                  }}
-                />
-                <span className="range-note">字（名字与外号最大均 8 字）</span>
-              </div>
+          <div className="rule-row">
+            <span className="rule-label">人名全名字数</span>
+            <div className="range-inputs">
+              <input
+                type="number"
+                className="range-input"
+                value={params.minChars}
+                min={2}
+                max={8}
+                data-testid="chars-min"
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  if (!Number.isNaN(value)) setParams({ minChars: Math.max(2, Math.min(8, Math.round(value))) });
+                }}
+              />
+              <span className="range-sep">至</span>
+              <input
+                type="number"
+                className="range-input"
+                value={params.maxChars}
+                min={2}
+                max={8}
+                data-testid="chars-max"
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  if (!Number.isNaN(value)) setParams({ maxChars: Math.max(2, Math.min(8, Math.round(value))) });
+                }}
+              />
+              <span className="range-note">字（名字与外号最大均 8 字）</span>
             </div>
-          ) : null}
+          </div>
 
           <button type="button" className="reset-rules" onClick={() => setParams({ ...DEFAULT_GEN_PARAMS, count: params.count })} data-testid="reset-rules">
             恢复默认规则

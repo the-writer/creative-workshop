@@ -61,7 +61,7 @@ export const GEN_PREFS_SCHEMA_VERSION = 2;
 export interface GenPrefs {
   schemaVersion: number;
   race: RaceKey;
-  types: NameTypeKey[];
+  types: NameTypeKey[]; // 名称类型单选，数组始终只保留一个元素
   params: GenParams;
 }
 
@@ -98,13 +98,12 @@ export function normalizeGenPrefs(raw: unknown): GenPrefs {
         ? Math.max(SURNAME_NATURAL_BIAS, Math.min(SURNAME_MAX_BIAS, Math.round(params.surnameBias)))
         : DEFAULT_GEN_PARAMS.surnameBias;
     if (isBeforeGenderPrefs && params.minChars === 4 && params.maxChars === 6) params.maxChars = DEFAULT_GEN_PARAMS.maxChars;
+    const validTypes = Array.isArray(parsed.types) ? parsed.types.filter((t) => NAME_TYPE_KEYS.includes(t)) : [];
     return {
       schemaVersion: GEN_PREFS_SCHEMA_VERSION,
       race: normalizeRaceKey(parsed.race),
-      types:
-        Array.isArray(parsed.types) && parsed.types.some((t) => NAME_TYPE_KEYS.includes(t))
-          ? parsed.types.filter((t) => NAME_TYPE_KEYS.includes(t))
-          : ['person'],
+      // 名称类型已改为单选：历史多选偏好只保留第一个有效项。
+      types: validTypes.length > 0 ? [validTypes[0]] : ['person'],
       params,
     };
   } catch {

@@ -1,6 +1,6 @@
 // 生成页：族群/类型/规则选择 + 批量生成引擎 + 名称笺结果区 + 单条保存/收藏/复制/换一批
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Badge, Check, Copy, MapPin, PenLine, Save, ScrollText, SlidersHorizontal, UserPlus, UserRound } from 'lucide-react';
 import {
   DEFAULT_GEN_PARAMS,
@@ -10,14 +10,13 @@ import {
   normalizeGenPrefs,
   type GenParams,
   type GenPrefs,
-  rerollCombo,
   rerollOne,
 } from '@/lib/generator';
-import { computeCombinationTotals, LEXICON, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
+import { LEXICON, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
 import { insertCandidate, onRulesChanged, openRulesWindow } from '@/lib/db';
 import type { Candidate, NameGender, NameTypeKey, RaceKey } from '@/lib/types';
 import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
-import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast, visibleStructureParts } from '@/components/common';
+import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 
 export interface EditorPrefill {
@@ -76,19 +75,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
 
   useEffect(() => onRulesChanged((raw) => setPrefs(normalizeGenPrefs(raw))), []);
 
-  const combination = useMemo(() => computeCombinationTotals(), []);
-  const comboFoot = useMemo(() => {
-    const raceInfo = combination.perRace[race];
-    const typeCount =
-      types.length > 0
-        ? types.reduce(
-            (sum, t) => sum + (t === 'person' ? raceInfo.person : t === 'place' ? raceInfo.place : t === 'office' ? raceInfo.office : raceInfo.nickname),
-            0n,
-          )
-        : 0n;
-    return typeCount;
-  }, [combination, race, types]);
-
   const setRace = (r: RaceKey) =>
     setPrefs((p) => ({
       ...p,
@@ -99,12 +85,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
         abilities: p.params.abilities.filter((value) => LEXICON[r].abilities.includes(value)),
       },
     }));
-  const toggleType = (t: NameTypeKey) =>
-    setPrefs((p) => {
-      const has = p.types.includes(t);
-      const next = has ? p.types.filter((x) => x !== t) : [...p.types, t];
-      return { ...p, types: next.length > 0 ? next : p.types };
-    });
+  const setType = (t: NameTypeKey) => setPrefs((p) => ({ ...p, types: [t] }));
   const setParams = (patch: Partial<GenParams>) => setPrefs((p) => ({ ...p, params: { ...p.params, ...patch } }));
 
   const toggleProfession = (p: string) =>
@@ -134,18 +115,14 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
       },
     }));
 
-  const batchKey = (c: Candidate) => (c.combo ? `${c.race}|combo|${c.nameText}` : `${c.race}|${c.nameType}|${c.nameText}`);
-
-  const comboMode = types.length > 1;
+  const batchKey = (c: Candidate) => `${c.race}|${c.nameType}|${c.nameText}`;
 
   const validate = (): string => {
-    if (types.length === 0) return '请至少选择一种名称类型';
+    if (types.length === 0) return '请选择一种名称类型';
     if (params.count < 5 || params.count > 100) return '生成数量需在 5 到 100 之间';
-    if (!comboMode) {
-      if (params.minChars > params.maxChars) return '全名字数范围冲突：最少字数不能大于最多字数';
-      if (params.nicknamePrefix && types.includes('person') && params.nicknameChars + 3 > params.maxChars) {
-        return '绰号前置时，绰号加至少 1 字姓氏和 2 字短名已超出全名字数上限，请调低绰号字数或放宽上限';
-      }
+    if (params.minChars > params.maxChars) return '全名字数范围冲突：最少字数不能大于最多字数';
+    if (params.nicknamePrefix && types.includes('person') && params.nicknameChars + 3 > params.maxChars) {
+      return '绰号前置时，绰号加至少 1 字姓氏和 2 字短名已超出全名字数上限，请调低绰号字数或放宽上限';
     }
     if (params.surnameBias < SURNAME_NATURAL_BIAS || params.surnameBias > SURNAME_MAX_BIAS) return '姓氏权重需在 0 到 100 之间';
     return '';
@@ -213,7 +190,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
       const item = next[index];
       if (!item) return prev;
       const excludes = new Set(prev.map(batchKey));
-      const got = item.combo ? rerollCombo(item.race, types, params, excludes) : rerollOne(item.race, item.nameType, params, excludes);
+      const got = rerollOne(item.race, item.nameType, params, excludes);
       if (!got) {
         toast.show('已穷尽组合，请调整规则', 'info');
         return prev;
@@ -229,8 +206,8 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
         nameText: got.name,
         charCount: nameCharCount(got.name),
         structure: got.structure,
-        gender: item.combo || item.nameType === 'person' ? got.gender : item.gender,
-        rarity: item.combo || item.nameType === 'person' ? got.rarity : item.rarity,
+        gender: item.nameType === 'person' ? got.gender : item.gender,
+        rarity: item.nameType === 'person' ? got.rarity : item.rarity,
         note: '',
         id: `tmp_${Date.now()}_${index}`,
       };
@@ -244,10 +221,9 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   };
 
   const addToSheet = (c: Candidate) => {
-    const anchor = c.combo ? (c.structure.find((part) => part.label.endsWith('人名'))?.word ?? c.structure[1]?.word ?? c.nameText) : c.nameText;
     const f = candidateToSheetFields(c);
     onOpenEditor({
-      characterName: anchor,
+      characterName: c.nameText,
       race: c.race,
       gender: c.gender && c.gender !== 'any' ? c.gender : undefined,
       candidateId: c.id.startsWith('tmp_') ? '' : c.id,
@@ -260,7 +236,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
     });
   };
 
-  const usesPerson = types.includes('person') || comboMode;
+  const usesPerson = types.includes('person');
 
   const openRules = async () => {
     try {
@@ -289,7 +265,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
         <SectionTitle>名称类型</SectionTitle>
         <div className="type-chip-row">
           {(Object.keys(TYPE_LABELS) as NameTypeKey[]).map((t) => (
-            <Chip key={t} selected={types.includes(t)} tone={race} onClick={() => toggleType(t)} dataTestId={`type-select-${t}`}>
+            <Chip key={t} selected={types[0] === t} tone={race} onClick={() => setType(t)} dataTestId={`type-select-${t}`}>
               {TYPE_ICONS[t]}
               {TYPE_LABELS[t]}
             </Chip>
@@ -369,8 +345,8 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                               <span className="result-name-text">{c.nameText}</span>
                             </div>
                           </td>
-                          <td>{c.combo ? '组合设定' : TYPE_LABELS[c.nameType]}</td>
-                          <td>{c.combo ? `${visibleStructureParts(c.structure).length}项` : `${c.charCount}字`}</td>
+                          <td>{TYPE_LABELS[c.nameType]}</td>
+                          <td>{c.charCount}字</td>
                           <td>
                             <StructureTags parts={c.structure} race={c.race} gender={c.gender} rarity={c.rarity} />
                           </td>

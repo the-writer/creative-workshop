@@ -161,6 +161,8 @@ describe('generation', () => {
     const current = normalizeGenPrefs({ ...legacy, params: { ...legacy.params, gender: 'any' } });
     expect(current.params.gender).toBe('any');
     expect(normalizeGenPrefs({ race: 'demon', types: ['bogus'] }).race).toBe('elf');
+    // 名称类型已改为单选，历史多选偏好只保留第一个有效项。
+    expect(normalizeGenPrefs({ ...legacy, types: ['place', 'office'] }).types).toEqual(['place']);
   });
 
   it('counts name characters without the composition separator', () => {
