@@ -2,7 +2,7 @@
 
 ### 9.1 定位与目录
 
-`vscode-extension/` 是创作工坊配套的 VS Code 插件 `type-stats`（publisher `border-writer`），面向中文长文写作场景：状态栏字数统计、码字计时/速率，以及 `.workshop/sheets.ini` 设定集关键词高亮。插件版本与主应用版本保持同步（当前 `1.13.0`）。插件作为 pnpm workspace 成员随主项目一起安装依赖，并在主项目构建时自动打包 VSIX。
+`vscode-extension/` 是创作工坊配套的 VS Code 插件 `type-stats`（publisher `border-writer`），面向中文长文写作场景：状态栏字数统计、码字计时/速率，以及 `.workshop/sheets.ini` 设定集关键词高亮。插件版本与主应用版本保持同步（当前 `1.14.0`）。插件作为 pnpm workspace 成员随主项目一起安装依赖，并在主项目构建时自动打包 VSIX。
 
 ```text
 vscode-extension/
@@ -20,13 +20,13 @@ vscode-extension/
 
 ### 9.2 构建与安装
 
-| 命令                              | 行为                                                         |
-| --------------------------------- | ------------------------------------------------------------ |
-| `pnpm run build:extension`        | 在 `vscode-extension/` 执行类型检查、esbuild 打包并生成 VSIX |
-| `pnpm run install:extension`      | 按当前版本号把生成的 VSIX 安装到 VS Code（`--force`）        |
-| `pnpm run build`                  | 主项目构建末尾自动调用 `build:extension`                     |
-| `pnpm --dir vscode-extension run typecheck` | 仅 TypeScript 类型检查                              |
-| `pnpm --dir vscode-extension run compile`   | 仅打包到 `vscode-extension/dist/extension.js`       |
+| 命令                                        | 行为                                                         |
+| ------------------------------------------- | ------------------------------------------------------------ |
+| `pnpm run build:extension`                  | 在 `vscode-extension/` 执行类型检查、esbuild 打包并生成 VSIX |
+| `pnpm run install:extension`                | 按当前版本号把生成的 VSIX 安装到 VS Code（`--force`）        |
+| `pnpm run build`                            | 主项目构建末尾自动调用 `build:extension`                     |
+| `pnpm --dir vscode-extension run typecheck` | 仅 TypeScript 类型检查                                       |
+| `pnpm --dir vscode-extension run compile`   | 仅打包到 `vscode-extension/dist/extension.js`                |
 
 VSIX 文件名由构建脚本自动拼接当前插件版本：`type-stats-v<version>.vsix`；产物不参与源码提交，执行 `pnpm dist:mac` 时会同时复制到 `release/`。
 
@@ -40,16 +40,16 @@ pnpm run install:extension
 
 ### 9.3 核心统计规则
 
-| 规则             | 实现                                                                 |
-| ---------------- | -------------------------------------------------------------------- |
-| 有效字符         | 排除 `[\s\u0000-\u001f\u007f-\u009f]`（`src/stats.ts` `EFFECTIVE_RE`） |
-| 中文             | `[\u4e00-\u9fff]`                                                    |
-| 英文             | `[A-Za-z]`                                                           |
-| 统计文件范围     | 仅 `file:` / `untitled:` 的 `.txt` / `.md`，且路径中不含 `.workshop` |
-| 计时触发         | 仅当文档全文的有效字符数发生实际增减时启动或重置                     |
-| 空闲暂停         | 连续 `typeStats.idlePauseSeconds`（默认 5 秒）无变动后暂停           |
-| 净输入           | `globalTypedCount = Σ(插入有效字符 - 删除有效字符)`，删除会减少净输入 |
-| 速率             | `round(globalTypedCount / (累计秒数 / 3600))`，单位「字/小时」        |
+| 规则         | 实现                                                                   |
+| ------------ | ---------------------------------------------------------------------- |
+| 有效字符     | 排除 `[\s\u0000-\u001f\u007f-\u009f]`（`src/stats.ts` `EFFECTIVE_RE`） |
+| 中文         | `[\u4e00-\u9fff]`                                                      |
+| 英文         | `[A-Za-z]`                                                             |
+| 统计文件范围 | 仅 `file:` / `untitled:` 的 `.txt` / `.md`，且路径中不含 `.workshop`   |
+| 计时触发     | 仅当文档全文的有效字符数发生实际增减时启动或重置                       |
+| 空闲暂停     | 连续 `typeStats.idlePauseSeconds`（默认 5 秒）无变动后暂停             |
+| 净输入       | `globalTypedCount = Σ(插入有效字符 - 删除有效字符)`，删除会减少净输入  |
+| 速率         | `round(globalTypedCount / (累计秒数 / 3600))`，单位「字/小时」         |
 
 字符差按「变更前文档全文 vs 变更后全文」的有效字符差计算，不使用 `rangeLength`（UTF-16 编码单元，与有效字符口径不一致）。计时使用墙钟时间累计，暂停时把运行区间累加进 `accumulatedMs`，避免 `setInterval` 漂移。
 
@@ -59,11 +59,11 @@ pnpm run install:extension
 
 配置项全部通过 VS Code 原生设置页修改，命令面板不暴露操作命令：
 
-| 配置                        | 类型    | 默认值 | 说明                                                               |
-| --------------------------- | ------- | ------ | ------------------------------------------------------------------ |
-| `typeStats.enabled`         | boolean | `true` | 启用状态栏统计与设定集高亮；仍需存在 `sheets.ini` 才生效           |
-| `typeStats.idlePauseSeconds` | number  | `5`    | 连续多少秒无文本变动后暂停计时，范围 1–600                         |
-| `typeStats.sheetsPath`      | string  | 空     | `sheets.ini` 路径，支持绝对路径、`file:` 等 URI 或相对工作区根路径；留空时逐根查找 `.workshop/sheets.ini` |
+| 配置                         | 类型    | 默认值 | 说明                                                                                                      |
+| ---------------------------- | ------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| `typeStats.enabled`          | boolean | `true` | 启用状态栏统计与设定集高亮；仍需存在 `sheets.ini` 才生效                                                  |
+| `typeStats.idlePauseSeconds` | number  | `5`    | 连续多少秒无文本变动后暂停计时，范围 1–600                                                                |
+| `typeStats.sheetsPath`       | string  | 空     | `sheets.ini` 路径，支持绝对路径、`file:` 等 URI 或相对工作区根路径；留空时逐根查找 `.workshop/sheets.ini` |
 
 ### 9.5 设定集解析与高亮
 
@@ -96,11 +96,11 @@ pnpm run install:extension
 
 状态栏条目（右侧，优先级 103 / 102 / 101）：
 
-| 条目 | 内容                                  | 点击行为                     |
-| ---- | ------------------------------------- | ---------------------------- |
-| 字符 | `字符 <有效字符数>`（仅支持的文件）   | 查看详细统计                 |
-| 计时 | `hh:mm:ss` 累计码字时间               | 打开操作菜单                 |
-| 速率 | `<净输入速率> 字/h`                   | 打开操作菜单                 |
+| 条目 | 内容                                | 点击行为     |
+| ---- | ----------------------------------- | ------------ |
+| 字符 | `字符 <有效字符数>`（仅支持的文件） | 查看详细统计 |
+| 计时 | `hh:mm:ss` 累计码字时间             | 打开操作菜单 |
+| 速率 | `<净输入速率> 字/h`                 | 打开操作菜单 |
 
 详细统计弹窗展示：有效字符、中文字数、英文字数、耗时、速率、净输入、打开时间、上次保存，并可一键复制到剪贴板。操作菜单提供：在工坊中打开、查看详细统计、重新加载设定集、重置计时与速率、打开 Type Stats 设置页。
 
