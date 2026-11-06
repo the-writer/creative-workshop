@@ -4,15 +4,16 @@
 
 VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `package.json` 与 `vscode-extension/package.json` 的 `version`，并同步更新文档中的版本引用。
 
-| 命令                | 行为                                                                             |
-| ------------------- | -------------------------------------------------------------------------------- |
-| `pnpm start`        | 构建渲染层与主进程后启动 Electron                                                |
-| `pnpm dev:renderer` | 启动 Vite 渲染层开发服务器                                                       |
-| `pnpm build`        | 类型检查、Vite 构建、Electron CommonJS 编译，并自动构建 VS Code 插件 VSIX        |
-| `pnpm build:extension` | 仅构建 `vscode-extension/`：类型检查、esbuild 打包、生成 `type-stats-v<version>.vsix`    |
-| `pnpm install:extension` | 按当前版本号把 `vscode-extension/type-stats-v<version>.vsix` 安装到 VS Code（`--force`） |
-| `pnpm test`         | 运行 Vitest 单测 + 编译 Electron + Markdown 存储测试（`tests/storage.test.mjs`） |
-| `pnpm dist:mac`     | 清理旧产物、重新构建并生成 macOS arm64 PKG，同时把 VSIX 复制到 `release/`         |
+| 命令                     | 行为                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `pnpm start`             | 构建渲染层与主进程后启动 Electron                                                                      |
+| `pnpm dev:renderer`      | 启动 Vite 渲染层开发服务器                                                                             |
+| `pnpm build`             | 类型检查、Vite 构建、Electron CommonJS 编译，并自动构建 VS Code 插件 VSIX                              |
+| `pnpm build:extension`   | 仅构建 `vscode-extension/`：类型检查、esbuild 打包、生成 `type-stats-v<version>.vsix`                  |
+| `pnpm install:extension` | 按当前版本号把 `vscode-extension/type-stats-v<version>.vsix` 安装到 VS Code（`--force`）               |
+| `pnpm test`              | 运行 Vitest 单测 + 编译 Electron + Markdown 存储测试（`tests/storage.test.mjs`）                       |
+| `pnpm dist:mac`          | 清理旧产物、重新构建并生成 macOS arm64 PKG，同时把 VSIX 复制到 `release/`                              |
+| `pnpm install:mac`       | 全新执行 `dist:mac`，自动安装 VS Code 插件，再用系统 `installer` 静默安装 PKG（非 root 时调用 `sudo`） |
 
 源码构建输出统一放在 `release/`：
 

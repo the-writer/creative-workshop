@@ -15,6 +15,7 @@
     "install:extension": "code --install-extension \"vscode-extension/type-stats-v$(node -p \"require('./vscode-extension/package.json').version\").vsix\" --force",
     "build": "pnpm run typecheck && vite build && tsc -p tsconfig.electron.json && pnpm run build:extension",
     "dist:mac": "sh scripts/dist-mac.sh",
+    "install:mac": "sh scripts/install-mac.sh",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test": "vitest run && pnpm run build:electron && node --test tests/storage.test.mjs",
     "format": "prettier --write \"{src,electron,tests,scripts}/**/*.{ts,tsx,cts,cjs,mjs,json,css,md}\" \"docs/**/*.md\" \"package.json\" \"*.config.js\"",
