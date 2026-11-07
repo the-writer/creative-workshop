@@ -57,6 +57,10 @@
     "window": {
       "width": 800,
       "height": 600,
+      "minWidth": 320,
+      "minHeight": 240,
+      "maxWidth": 1024,
+      "maxHeight": 768,
       "titleBarStyle": "hiddenInset",
       "alwaysOnTop": false,
       "alwaysOnTopLevel": "floating"

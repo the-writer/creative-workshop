@@ -6,8 +6,6 @@ import {
   DEFAULT_GEN_PARAMS,
   GEN_PREFS_SCHEMA_VERSION,
   genCombo,
-  genNickname,
-  genOffice,
   genPerson,
   genPlace,
   generateBatch,
@@ -21,7 +19,7 @@ import {
 import { GENDER_KEYS, RARITY_TIERS, type NameTypeKey, type RaceKey } from '@/lib/types';
 
 const races: RaceKey[] = ['human', 'elf', 'yaogui'];
-const types: NameTypeKey[] = ['person', 'place', 'office', 'nickname'];
+const types: NameTypeKey[] = ['person', 'place'];
 
 describe('lexicon', () => {
   it('contains expanded and unique syllable, root and gender lists', () => {
@@ -200,17 +198,8 @@ describe('generation', () => {
     });
   });
 
-  it('keeps nickname length between two and eight characters', () => {
-    races.forEach((race) => {
-      for (let length = 2; length <= 8; length += 1) {
-        const nickname = genNickname(race, length);
-        expect(Array.from(nickname.name)).toHaveLength(length);
-      }
-    });
-  });
-
   it('keeps exactly one middle dot and puts the surname last', () => {
-    const suffixes: PersonSuffix[] = ['father', 'place', 'profession', 'contract', 'blood', 'title'];
+    const suffixes: PersonSuffix[] = ['father', 'place', 'profession', 'blood', 'title'];
     suffixes.forEach((personSuffix) => {
       const name = genPerson('human', { ...DEFAULT_GEN_PARAMS, personSuffix });
       expect(name).not.toBeNull();
@@ -218,10 +207,6 @@ describe('generation', () => {
       expect(name!.name).not.toContain('··');
       expect(name!.name.endsWith(`·${name!.name.split('·').at(-1)}`)).toBe(true);
     });
-
-    const prefixed = genPerson('human', { ...DEFAULT_GEN_PARAMS, nicknamePrefix: true, nicknameChars: 4 });
-    expect(prefixed!.name.split('·')).toHaveLength(2);
-    expect(prefixed!.name.endsWith(`·${prefixed!.name.split('·').at(-1)}`)).toBe(true);
   });
 
   it('omits surname, short-name and patronymic structure tags', () => {
@@ -240,7 +225,7 @@ describe('generation', () => {
   });
 
   it('keeps combo name as short name plus surname and gender as candidate field', () => {
-    const combo = genCombo('human', ['person', 'place', 'office', 'nickname'], { ...DEFAULT_GEN_PARAMS, gender: 'female' });
+    const combo = genCombo('human', ['person', 'place'], { ...DEFAULT_GEN_PARAMS, gender: 'female' });
     expect(combo).not.toBeNull();
     expect(combo!.name.split('·')).toHaveLength(2);
     expect(combo!.name.endsWith(`·${combo!.name.split('·').at(-1)}`)).toBe(true);
@@ -285,15 +270,14 @@ describe('generation', () => {
       professions: ['剑修'],
       abilities: ['御火'],
     };
-    const result = genCombo('human', ['person', 'place', 'office', 'nickname'], params);
+    const result = genCombo('human', ['person', 'place'], params);
     expect(result?.structure.some((part) => part.word === '剑修')).toBe(true);
     expect(result?.structure.find((part) => part.label === '特殊能力')?.word).toContain('御火');
   });
 
-  it('creates structured place, office and person names', () => {
+  it('creates structured place and person names', () => {
     races.forEach((race) => {
       expect(genPlace(race).structure).toHaveLength(2);
-      expect(genOffice(race).structure).toHaveLength(3);
       expect(genPerson(race, DEFAULT_GEN_PARAMS)?.name.split('·')).toHaveLength(2);
     });
   });

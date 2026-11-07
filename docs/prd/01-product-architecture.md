@@ -2,7 +2,7 @@
 
 ### 1.1 产品定位
 
-创作工坊面向小说作者、世界观构建者与桌游设定作者，用于离线生成和整理人族、精灵族、妖鬼与混血的人名、地名、官职与绰号。应用不依赖远程业务页面、AI 服务或账号体系。
+创作工坊面向小说作者、世界观构建者与桌游设定作者，用于离线生成和整理人族、精灵族、妖鬼与混血的人名与地名。应用不依赖远程业务页面、AI 服务或账号体系。
 
 当前版本为 **1.14.0**（`package.json` → `version`）。
 
@@ -54,7 +54,7 @@ flowchart TD
 - **从最近列表移除**：每条最近项目右侧提供删除图标按钮（`data-testid="project-delete-<项目名>"`），点击后弹出二次确认；确认后只调用 `projects.removeRecent(path)` 从 `projects.json` 最近项目列表中移除该条目，**不删除磁盘上的目录或任何文件**。
 - 设置页「切换项目」只回到项目门（渲染层将当前项目置空），不关闭主进程内的数据服务；再次打开项目时替换当前项目。
 - 设置页「当前项目」卡提供「在 VS Code 中打开」「在 CLion 中打开」「在 Finder 中打开」三个入口；前两者未检测到对应应用时回退到文件管理器，Finder 入口直接调用系统文件管理器打开项目目录。
-- 设置页分区自上而下为「当前项目 → 关于 → 总览」。关于卡展示应用名、简介与**当前词库规模**（`computeCombinationTotals().grandTotal`，含人名 / 地名 / 官职 / 绰号分类组合量，数值随词库实时计算）。
+- 设置页分区自上而下为「当前项目 → 关于 → 统计 → 总览」。关于卡展示应用名、简介与**当前词库规模**（`computeCombinationTotals().grandTotal`，含人名 / 地名分类组合量，数值随词库实时计算）；「统计」区块直接嵌入设置页（§5.3）。
 - 设置页提供「总览」只读 Markdown 展示：直接读取当前项目 `.workshop/overview.md` 全文渲染，支持刷新；文件不存在或正文为空时整块「总览」区域（标题、刷新按钮与提示）都不显示。
 
 ### 1.4 窗口行为
@@ -62,6 +62,7 @@ flowchart TD
 | 项目           | 值                         | 来源                                                                                          |
 | -------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
 | 窗口内容尺寸   | 800 × 600                  | `package.json` → `creationWorkshop.window.width/height`                                       |
+| 尺寸范围       | 最小 320 × 240；最大 1024 × 768 | `package.json` → `creationWorkshop.window.minWidth/minHeight/maxWidth/maxHeight`          |
 | 尺寸缺省回退   | 800 × 600                  | `src/electron/main.cts`（配置缺省时）                                                         |
 | 标题栏样式     | `hiddenInset`              | `package.json` → `creationWorkshop.window.titleBarStyle`                                      |
 | 红绿灯位置     | `{ x: 12, y: 12 }`         | `src/electron/main.cts` → `trafficLightPosition`                                              |
@@ -70,7 +71,7 @@ flowchart TD
 | 置顶层级       | `floating`                 | `creationWorkshop.window.alwaysOnTopLevel`（仅置顶为真时生效）                                |
 | 桌面归属       | 打开时所在桌面；切换不跟随 | `src/electron/main.cts` → `bindWindowToCurrentDesktop`                                        |
 | Dock 图标      | 不显示                     | `package.json` → `build.mac.extendInfo.LSUIElement`；`src/electron/main.cts` → `hideDockIcon` |
-| 可调整尺寸     | 否                         | `src/electron/main.cts` → `resizable/maximizable/fullscreenable`                              |
+| 可调整尺寸     | 是（限制在 320×240 – 1024×768） | `src/electron/main.cts` → `resizable/minWidth/minHeight/maxWidth/maxHeight`                   |
 | 使用内容尺寸   | 是                         | `src/electron/main.cts` → `useContentSize: true`                                              |
 | 窗口背景色     | `#f5efe2`                  | `src/electron/main.cts` → `backgroundColor`                                                   |
 | 应用名         | 创作工坊                   | `package.json` → `productName`；`app.setName`                                                 |
@@ -80,7 +81,7 @@ flowchart TD
 
 启动完成后没有窗口；用户首次点击托盘时 `createWindow` 创建窗口，`ready-to-show` 后再调用 `showMainWindow()`，因此不会闪白屏。主窗口系统关闭按钮只隐藏窗口（`close` 事件阻止默认并 `hide()`），应用继续由托盘驻留；托盘左键与右键菜单「打开主界面」、应用菜单「窗口 → 显示主界面」重新打开。托盘右键菜单提供「打开主界面」和「退出创作工坊」。应用无 Dock 图标，因此 `activate`（点击 Dock）不是常规入口。
 
-主窗口是**普通独立窗口**（不是 macOS `panel`）：打开后绑定在显示时所在的桌面，**切换桌面时不会自动跟随**；关闭后从另一个桌面重新打开时，先临时加入所有桌面、显示聚焦后再绑定当前桌面，因此会出现在新桌面而不是旧桌面。窗口始终不置顶（`alwaysOnTop: false` 时不会调用任何 `setAlwaysOnTop`）。
+主窗口是**普通独立窗口**（不是 macOS `panel`）：打开后绑定在显示时所在的桌面，**切换桌面时不会自动跟随**；关闭后重新打开时先把窗口移动到鼠标所在显示器并居中，再临时加入所有桌面、显示聚焦后绑定当前桌面，因此会出现在鼠标当前所在的桌面，而不是关闭时的桌面。窗口始终不置顶（`alwaysOnTop: false` 时不会调用任何 `setAlwaysOnTop`）。
 
 `showMainWindow()`（`src/electron/main.cts`）是唯一的显示 / 抢焦点出口：
 
@@ -131,6 +132,8 @@ flowchart TD
 | `project.legacyDataFileName` | `workshop.json`                    | 旧版单 JSON 数据文件名（迁移源） | `src/electron/main.cts` → `ProjectManager`                     |
 | `project.maxRecentProjects`  | `10`                               | 最近项目数量上限                 | `src/electron/main.cts` → `ProjectManager`                     |
 | `window.width` / `height`    | `800` / `600`                      | 窗口内容尺寸                     | `src/electron/main.cts`                                        |
+| `window.minWidth` / `minHeight` | `320` / `240`                   | 窗口最小内容尺寸                 | `src/electron/main.cts`                                        |
+| `window.maxWidth` / `maxHeight` | `1024` / `768`                  | 窗口最大内容尺寸                 | `src/electron/main.cts`                                        |
 | `window.titleBarStyle`       | `hiddenInset`                      | 标题栏样式                       | `src/electron/main.cts`                                        |
 | `window.alwaysOnTopLevel`    | `floating`                         | 置顶时的窗口层级（仅置顶为真时） | `src/electron/main.cts`                                        |
 | `window.alwaysOnTop`         | `false`                            | 是否默认置顶                     | `src/electron/main.cts`                                        |
@@ -142,7 +145,7 @@ flowchart TD
 ### 1.7 数据位置
 
 - 项目登记：`<userData>/projects.json`（`ProjectManager` 启动日志输出绝对路径）。
-- 项目数据：用户选择的项目目录下 `.workshop/` 内的六个 Markdown 文件与自动生成的 `sheets.ini`（详见 §7）。
+- 项目数据：用户选择的项目目录下 `.workshop/` 内的分类 Markdown（含 `places.md`）与自动生成的 `sheets.ini`（详见 §7）。
 - 迁移来源：`<userData>/workshop.json`（仅首次升级读取一次，迁移后保留原文件）。
 - `userData` 由 Electron 按应用名与平台确定；渲染层不感知具体绝对路径。
 

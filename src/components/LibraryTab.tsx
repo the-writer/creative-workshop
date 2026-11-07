@@ -21,7 +21,7 @@ function normalizeFilters(parsed: Partial<CandidateFilters> | null | undefined):
     const p = parsed ?? {};
     const result: CandidateFilters = {
       race: normalizeRaceFilter(p.race),
-      nameType: ['person', 'place', 'office', 'nickname'].includes(p.nameType ?? '') ? (p.nameType as NameTypeKey) : 'all',
+      nameType: ['person', 'place'].includes(p.nameType ?? '') ? (p.nameType as NameTypeKey) : 'all',
       minChars: typeof p.minChars === 'number' ? Math.max(1, Math.min(FILTER_MAX_CHARS, Math.round(p.minChars))) : 1,
       maxChars: typeof p.maxChars === 'number' ? Math.max(1, Math.min(FILTER_MAX_CHARS, Math.round(p.maxChars))) : FILTER_MAX_CHARS,
       status: p.status === 'favorite' || p.status === 'referenced' ? p.status : 'all',
@@ -54,7 +54,7 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
   const [drawerNote, setDrawerNote] = useState('');
   const [aiUnavailableOpen, setAiUnavailableOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Candidate | null>(null);
-  const [blockedRefs, setBlockedRefs] = useState<{ asCharacter: boolean; asHometown: boolean; asPlace: boolean } | null>(null);
+  const [blockedRefs, setBlockedRefs] = useState<{ asCharacter: boolean } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const loadSeq = useRef(0);
 
@@ -163,22 +163,23 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
     setSelected(null);
   };
 
-  const saveNote = async () => {
+  const saveNote = async (value: string) => {
     if (!selected) return;
-    const res = await updateCandidate(selected.id, { note: drawerNote });
+    if (value === selected.note) return;
+    const res = await updateCandidate(selected.id, { note: value });
     if (!res.ok) {
       toast.show(res.message || '备注保存失败', 'error');
       return;
     }
-    setItems((prev) => prev.map((x) => (x.id === selected.id ? { ...x, note: drawerNote } : x)));
-    toast.show('备注已保存', 'success');
+    setItems((prev) => prev.map((x) => (x.id === selected.id ? { ...x, note: value } : x)));
+    setSelected((prev) => (prev ? { ...prev, note: value } : prev));
   };
 
   const startDelete = async (c: Candidate) => {
     try {
       const refs = await getCandidateReferences(c.id);
       setDeleteTarget(c);
-      setBlockedRefs(refs.asCharacter || refs.asHometown || refs.asPlace ? refs : null);
+      setBlockedRefs(refs.asCharacter ? refs : null);
     } catch (err) {
       toast.show((err as Error)?.message || '检查名称引用失败，请重试', 'error');
     }
@@ -267,8 +268,6 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
                     ['all', '全部'],
                     ['person', '人名'],
                     ['place', '地名'],
-                    ['office', '官职'],
-                    ['nickname', '绰号'],
                   ] as Array<[NameTypeKey | 'all', string]>
                 ).map(([k, label]) => (
                   <Chip key={k} selected={filters.nameType === k} tone="neutral" onClick={() => setFilter({ nameType: k })} dataTestId={`filter-type-${k}`}>
@@ -455,13 +454,11 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
                 className="detail-textarea"
                 value={drawerNote}
                 onChange={(e) => setDrawerNote(e.target.value)}
+                onBlur={(e) => void saveNote(e.target.value)}
                 data-testid="detail-note"
-                placeholder="写下这个命名的用途或灵感"
+                placeholder="写下这个命名的用途或灵感（失焦自动保存）"
                 rows={3}
               />
-              <button type="button" className="secondary-btn detail-note-save" onClick={() => void saveNote()} data-testid="detail-note-save">
-                保存备注
-              </button>
             </div>
             <div className="detail-ai">
               <button type="button" className="ai-card-btn" data-testid="detail-ai-gen" onClick={() => setAiUnavailableOpen(true)}>
@@ -489,10 +486,6 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
                     race: c.race,
                     candidateId: c.id,
                     occupation: f.occupation,
-                    office: f.office,
-                    hometown: f.hometown,
-                    nickname: f.nickname,
-                    contractTitle: f.contractTitle,
                     note: f.note,
                   });
                 }}
@@ -529,8 +522,6 @@ export function LibraryTab({ refreshKey, onOpenEditor, onGoGenerate }: LibraryTa
             「{deleteTarget?.nameText ?? ''}」正被用于：
             <ul className="ref-list">
               {blockedRefs?.asCharacter ? <li>人物设定（角色名）</li> : null}
-              {blockedRefs?.asHometown ? <li>人物设定（籍贯）</li> : null}
-              {blockedRefs?.asPlace ? <li>关系图谱（地名节点）</li> : null}
             </ul>
             解除引用后删除，将同时清除设定中的对应引用与相关图谱关系。
           </span>

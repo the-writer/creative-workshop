@@ -1,10 +1,10 @@
-// 设定工作台：设定卡列表 + 新建/编辑入口（删除移至编辑界面顶部）
-import { useCallback, useEffect, useState } from 'react';
-import { Pencil, Plus, RefreshCw } from 'lucide-react';
+// 设定工作台：紧凑表格 + 平铺筛选（族群与搜索）+ 新建/编辑入口（删除移至编辑界面顶部）
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pencil, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { fetchSheets } from '@/lib/db';
-import type { Sheet } from '@/lib/types';
-import { GENDER_LABELS, RACE_LABELS } from '@/lib/types';
-import { EmptyState, Seal } from '@/components/common';
+import type { RaceKey, Sheet } from '@/lib/types';
+import { GENDER_LABELS, RACE_KEYS, RACE_LABELS } from '@/lib/types';
+import { Chip, EmptyState, Seal } from '@/components/common';
 import { cn } from '@/lib/utils';
 import type { EditorPrefill } from '@/components/GenerateTab';
 
@@ -18,6 +18,8 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [race, setRace] = useState<RaceKey | 'all'>('all');
+  const [keyword, setKeyword] = useState('');
 
   const reload = useCallback(async (opts?: { silent?: boolean }) => {
     if (opts?.silent) setRefreshing(true);
@@ -38,6 +40,18 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
     void reload();
   }, [reload, refreshKey]);
 
+  const filtered = useMemo(() => {
+    const kw = keyword.trim().toLocaleLowerCase('zh-CN');
+    return items.filter((sheet) => {
+      if (race !== 'all' && sheet.race !== race) return false;
+      if (!kw) return true;
+      return [sheet.characterName, sheet.occupation, sheet.hometown, sheet.note]
+        .join(' ')
+        .toLocaleLowerCase('zh-CN')
+        .includes(kw);
+    });
+  }, [items, race, keyword]);
+
   return (
     <div className="page-shell sheets-page">
       <div className="app-scroll">
@@ -54,6 +68,33 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
           </div>
         </div>
 
+        {/* 平铺筛选：只保留族群与搜索 */}
+        <div className="sheets-filter-row" data-testid="sheets-filters">
+          <div className="filter-chips">
+            {(['all', ...RACE_KEYS] as Array<RaceKey | 'all'>).map((r) => (
+              <Chip key={r} selected={race === r} tone={r === 'all' ? 'neutral' : r} onClick={() => setRace(r)} dataTestId={`sheets-race-${r}`}>
+                {r === 'all' ? '全部' : RACE_LABELS[r]}
+              </Chip>
+            ))}
+          </div>
+          <div className="keyword-row sheets-search">
+            <Search size={14} className="search-icon" />
+            <input
+              type="text"
+              className="keyword-input"
+              placeholder="搜索人物名、职业、籍贯、备注"
+              value={keyword}
+              data-testid="sheets-search"
+              onChange={(e) => setKeyword(e.target.value)}
+            />
+            {keyword ? (
+              <button type="button" className="keyword-clear" data-testid="sheets-search-clear" onClick={() => setKeyword('')}>
+                <X size={14} />
+              </button>
+            ) : null}
+          </div>
+        </div>
+
         {error ? (
           <div className="error-bar" data-testid="sheets-error">
             {error}
@@ -65,51 +106,69 @@ export function SheetsTab({ refreshKey, onOpenEditor }: SheetsTabProps) {
 
         {loading ? (
           <div className="list-loading">正在翻阅设定…</div>
-        ) : items.length === 0 ? (
-          <EmptyState
-            title="还没有设定卡"
-            desc="为生成的命名建立人物设定，记录职业、官职、籍贯、绰号与人物关系"
-            testId="sheets-empty"
-            actions={
-              <button type="button" className="primary-btn" data-testid="sheets-empty-new" onClick={() => onOpenEditor()}>
-                新建设定
-              </button>
-            }
-          />
+        ) : filtered.length === 0 ? (
+          items.length === 0 ? (
+            <EmptyState
+              title="还没有设定卡"
+              desc="为生成的命名建立人物设定，记录职业、籍贯与人物关系"
+              testId="sheets-empty"
+              actions={
+                <button type="button" className="primary-btn" data-testid="sheets-empty-new" onClick={() => onOpenEditor()}>
+                  新建设定
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState title="没有符合筛选的设定卡" desc="试试切换族群或清空搜索关键词" testId="sheets-filter-empty" />
+          )
         ) : (
-          <div className="sheet-list">
+          <div className="data-table-wrap">
             <p className="list-count" data-testid="sheets-count">
-              共 {items.length} 张设定卡
+              共 {filtered.length} 张设定卡
             </p>
-            {items.map((s) => (
-              <div key={s.id} className="sheet-card" data-testid={`sheet-${s.id}`}>
-                <div className="sheet-card-top">
-                  <Seal race={s.race} size={24} />
-                  <div className="sheet-main">
-                    <p className="sheet-name">{s.characterName || '未命名人物'}</p>
-                    <p className="sheet-meta">
-                      {RACE_LABELS[s.race]}
-                      {s.gender ? ` · ${GENDER_LABELS[s.gender]}` : ''} · 关系 {s.relationCount}
-                    </p>
-                  </div>
-                  <div className="sheet-actions">
-                    <button type="button" className="icon-btn" title="编辑" data-testid={`sheet-edit-${s.id}`} onClick={() => onOpenEditor(undefined, s.id)}>
-                      <Pencil size={15} />
-                    </button>
-                  </div>
-                </div>
-                {s.occupation || s.office || s.hometown || s.nickname || s.contractTitle ? (
-                  <div className="sheet-tags">
-                    {s.occupation ? <span className="sheet-tag">职 · {s.occupation}</span> : null}
-                    {s.office ? <span className="sheet-tag">官 · {s.office}</span> : null}
-                    {s.hometown ? <span className="sheet-tag">籍 · {s.hometown}</span> : null}
-                    {s.nickname ? <span className="sheet-tag">号 · {s.nickname}</span> : null}
-                    {s.contractTitle ? <span className="sheet-tag">契 · {s.contractTitle}</span> : null}
-                  </div>
-                ) : null}
-                {s.note ? <p className="sheet-note">{s.note}</p> : null}
-              </div>
-            ))}
+            <table className="data-table sheets-table">
+              <thead>
+                <tr>
+                  <th>人物名</th>
+                  <th>族群</th>
+                  <th>性别</th>
+                  <th>职业</th>
+                  <th>籍贯</th>
+                  <th>关系</th>
+                  <th>备注</th>
+                  <th className="data-table-actions-head">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s) => (
+                  <tr key={s.id} data-testid={`sheet-${s.id}`}>
+                    <td>
+                      <div className="data-table-name">
+                        <Seal race={s.race} size={18} />
+                        <span>{s.characterName || '未命名人物'}</span>
+                      </div>
+                    </td>
+                    <td>{RACE_LABELS[s.race]}</td>
+                    <td>{s.gender ? GENDER_LABELS[s.gender] : '—'}</td>
+                    <td className="data-table-ellipsis" title={s.occupation || undefined}>
+                      {s.occupation || '—'}
+                    </td>
+                    <td className="data-table-ellipsis" title={s.hometown || undefined}>
+                      {s.hometown || '—'}
+                    </td>
+                    <td>{s.relationCount}</td>
+                    <td className="data-table-ellipsis data-table-note" title={s.note || undefined}>
+                      {s.note || '—'}
+                    </td>
+                    <td>
+                      <button type="button" className="icon-btn" title="编辑" data-testid={`sheet-edit-${s.id}`} onClick={() => onOpenEditor(undefined, s.id)}>
+                        <Pencil size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

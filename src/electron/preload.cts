@@ -25,6 +25,9 @@ const IPC = {
   sheetList: 'workshop:sheets:list',
   sheetSave: 'workshop:sheets:save',
   sheetDelete: 'workshop:sheets:delete',
+  placeList: 'workshop:places:list',
+  placeSave: 'workshop:places:save',
+  placeDelete: 'workshop:places:delete',
   relationList: 'workshop:relations:list',
   relationAdd: 'workshop:relations:add',
   relationRemove: 'workshop:relations:remove',
@@ -76,6 +79,11 @@ contextBridge.exposeInMainWorld('workshop', {
     list: () => invoke(IPC.sheetList),
     save: (input: unknown) => invoke(IPC.sheetSave, input),
     remove: (id: string) => invoke(IPC.sheetDelete, id),
+  },
+  places: {
+    list: () => invoke(IPC.placeList),
+    save: (input: unknown) => invoke(IPC.placeSave, input),
+    remove: (id: string) => invoke(IPC.placeDelete, id),
   },
   relations: {
     list: () => invoke(IPC.relationList),

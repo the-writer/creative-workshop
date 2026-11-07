@@ -326,8 +326,6 @@ export function shortNameCount(race: RaceKey): bigint {
 export interface TypeCombinationInfo {
   person: bigint;
   place: bigint;
-  office: bigint;
-  nickname: bigint;
   total: bigint;
 }
 
@@ -340,33 +338,17 @@ export function computeRaceCombinations(race: RaceKey): TypeCombinationInfo {
     BigInt(roots.placePrefix2.length) * BigInt(roots.placeSuffix2.length) +
     BigInt(roots.placePrefix1.length) * BigInt(roots.placeSuffix2.length);
 
-  // 绰号 2-8 字：2字=1词，3字=1词+补字，4字=2词，5字=2词+补字，6字=3词，7字=3词+补字，8字=4词
-  const nickTwo = BigInt(
-    roots.nickProfession.length + roots.nickAppearance.length + roots.nickDeed.length + roots.nickTerrain.length + roots.nickContract.length,
-  );
-  const nickSingles = BigInt(roots.nickSingles.length);
-  const nickThree = nickTwo * nickSingles;
-  const nickFour = nickTwo * nickTwo;
-  const nickFive = nickFour * nickSingles;
-  const nickSix = nickTwo * nickFour;
-  const nickSeven = nickSix * nickSingles;
-  const nickEight = nickFour * nickFour;
-  const nickTotal = nickTwo + nickThree + nickFour + nickFive + nickSix + nickSeven + nickEight;
-
   const personSuffixTotal =
     shortCount +
     placeVariants +
     BigInt(roots.professions.length) +
-    BigInt(roots.contractTitles.length) +
     BigInt(roots.bloodTitles.length) +
     BigInt(roots.titleWords.length);
   const surnameCount = BigInt(SURNAMES[race].length);
-  const person = (shortCount * personSuffixTotal + nickTotal * shortCount) * surnameCount;
+  const person = shortCount * personSuffixTotal * surnameCount;
   const place = placeVariants;
-  const office = BigInt(roots.officeTerritories.length) * BigInt(roots.officePowers.length) * BigInt(roots.officeLevels.length);
-  const nickname = nickTotal;
 
-  return { person, place, office, nickname, total: person + place + office + nickname };
+  return { person, place, total: person + place };
 }
 
 export function computeCombinationTotals(): {
@@ -384,8 +366,6 @@ export function computeCombinationTotals(): {
     detail: {
       person: human.person + elf.person + yaogui.person + mixed.person,
       place: human.place + elf.place + yaogui.place + mixed.place,
-      office: human.office + elf.office + yaogui.office + mixed.office,
-      nickname: human.nickname + elf.nickname + yaogui.nickname + mixed.nickname,
     },
   };
 }

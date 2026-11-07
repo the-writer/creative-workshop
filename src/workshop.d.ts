@@ -1,5 +1,5 @@
-import type { Candidate, CandidateFilters, NameGender, NameTypeKey, RaceKey, RarityTier, Relation, Sheet, SourceKey, StructurePart } from '@/lib/types';
-import type { GraphPoint, PickDirectoryResult, ProjectOpenResult, ProjectSummary, StatsData } from '@/lib/db';
+import type { Candidate, CandidateFilters, NameGender, NameTypeKey, Place, RaceKey, RarityTier, Relation, Sheet, SourceKey, StructurePart } from '@/lib/types';
+import type { GraphPoint, PickDirectoryResult, PlaceInput, ProjectOpenResult, ProjectSummary, StatsData } from '@/lib/db';
 
 export interface CandidateInput {
   race: RaceKey;
@@ -20,11 +20,8 @@ export interface SheetInput {
   gender?: NameGender;
   candidateId: string;
   occupation: string;
-  office: string;
   hometown: string;
-  hometownCandidateId: string;
-  nickname: string;
-  contractTitle: string;
+  hometownIds: string[];
   note: string;
 }
 
@@ -53,12 +50,17 @@ export interface WorkshopApi {
     get: (id: string) => Promise<Candidate | null>;
     create: (input: CandidateInput) => Promise<{ ok: boolean; duplicate: boolean; id: string; message?: string }>;
     update: (id: string, patch: { favorite?: boolean; note?: string }) => Promise<{ ok: boolean; message?: string }>;
-    references: (id: string) => Promise<{ asCharacter: boolean; asHometown: boolean; asPlace: boolean }>;
-    remove: (id: string, force: boolean) => Promise<{ ok: boolean; refs: { asCharacter: boolean; asHometown: boolean; asPlace: boolean }; message?: string }>;
+    references: (id: string) => Promise<{ asCharacter: boolean }>;
+    remove: (id: string, force: boolean) => Promise<{ ok: boolean; refs: { asCharacter: boolean }; message?: string }>;
   };
   sheets: {
     list: () => Promise<Sheet[]>;
     save: (input: SheetInput) => Promise<{ ok: boolean; id: string; message?: string }>;
+    remove: (id: string) => Promise<{ ok: boolean; message?: string }>;
+  };
+  places: {
+    list: () => Promise<Place[]>;
+    save: (input: PlaceInput) => Promise<{ ok: boolean; id: string; message?: string }>;
     remove: (id: string) => Promise<{ ok: boolean; message?: string }>;
   };
   relations: {

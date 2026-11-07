@@ -1,10 +1,10 @@
 // 图谱页：关系/全景视图、力导向布局、拖拽与缩放平移、节点/连线详情、布局持久化
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Home, Minus, Plus, RefreshCw, X } from 'lucide-react';
-import { fetchCandidates, fetchGraphLayout, fetchRelations, fetchSheets, saveGraphLayout } from '@/lib/db';
+import { fetchGraphLayout, fetchPlaces, fetchRelations, fetchSheets, saveGraphLayout } from '@/lib/db';
 import { buildGraphData, computeLayout, type GraphEdge, type GraphNode, type GraphViewMode, type NodeTypeFilter, type Position } from '@/lib/graph';
-import type { Candidate, RaceKey, Relation, Sheet } from '@/lib/types';
-import { FILTER_MAX_CHARS, normalizeRaceFilter, RACE_LABELS } from '@/lib/types';
+import type { Place, RaceKey, Relation, Sheet } from '@/lib/types';
+import { RACE_LABELS } from '@/lib/types';
 import { Chip, EmptyState, Seal, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
 
@@ -33,7 +33,7 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
   const toast = useAppToast();
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [relations, setRelations] = useState<Relation[]>([]);
-  const [places, setPlaces] = useState<Candidate[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState<GraphViewMode>('relation');
@@ -61,7 +61,7 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
       const [s, r, p, layout] = await Promise.all([
         fetchSheets(),
         fetchRelations(),
-        fetchCandidates({ race: 'all', nameType: 'place', minChars: 1, maxChars: FILTER_MAX_CHARS, status: 'all', keyword: '', sort: 'latest' }),
+        fetchPlaces(),
         // 布局读取失败不影响图谱主体展示，回退为自动布局
         fetchGraphLayout().catch(() => null),
       ]);
@@ -437,17 +437,14 @@ export function GraphTab({ refreshKey, onGoSheets }: GraphTabProps) {
                 {selectedNode.kind === 'person' && selectedNode.sheet ? (
                   <div className="graph-detail-fields">
                     {selectedNode.sheet.occupation ? <p>职业：{selectedNode.sheet.occupation}</p> : null}
-                    {selectedNode.sheet.office ? <p>官职：{selectedNode.sheet.office}</p> : null}
                     {selectedNode.sheet.hometown ? <p>籍贯：{selectedNode.sheet.hometown}</p> : null}
-                    {selectedNode.sheet.nickname ? <p>绰号：{selectedNode.sheet.nickname}</p> : null}
-                    {selectedNode.sheet.contractTitle ? <p>契约：{selectedNode.sheet.contractTitle}</p> : null}
                     {selectedNode.sheet.note ? <p className="graph-detail-note">{selectedNode.sheet.note}</p> : null}
                   </div>
                 ) : null}
-                {selectedNode.kind === 'place' && selectedNode.candidate ? (
+                {selectedNode.kind === 'place' && selectedNode.place ? (
                   <div className="graph-detail-fields">
-                    <p>{selectedNode.candidate.charCount}字</p>
-                    {selectedNode.candidate.note ? <p className="graph-detail-note">{selectedNode.candidate.note}</p> : null}
+                    <p>{Array.from(selectedNode.place.name.replace(/·/g, '')).length}字</p>
+                    {selectedNode.place.note ? <p className="graph-detail-note">{selectedNode.place.note}</p> : null}
                   </div>
                 ) : null}
               </div>

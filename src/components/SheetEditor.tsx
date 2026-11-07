@@ -1,20 +1,16 @@
-// 设定卡编辑器（全屏子页）：人物来源三选、绑定项、关系管理（保存后可用）
+// 设定卡编辑器（全屏子页）：手动填写人物名、绑定项与关系管理（保存后可用）
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, RefreshCw, Trash2, X } from 'lucide-react';
-import { addRelation, deleteSheet, fetchCandidates, fetchRelations, fetchSheets, removeRelation, saveSheet } from '@/lib/db';
+import { ArrowLeft, Trash2 } from 'lucide-react';
+import { addRelation, deleteSheet, fetchPlaces, fetchRelations, fetchSheets, removeRelation, saveSheet } from '@/lib/db';
 import { LEXICON } from '@/data/lexicon';
-import { DEFAULT_GEN_PARAMS, genOffice, genPerson } from '@/lib/generator';
-import type { Candidate, NameGender, RaceKey, Relation } from '@/lib/types';
+import type { NameGender, Place, RaceKey, Relation } from '@/lib/types';
 import {
-  FILTER_MAX_CHARS,
   GENDER_LABELS,
   RACE_KEYS,
   RACE_LABELS,
   RELATION_TYPES,
   SELF_RELATION_TARGET_ID,
   SHEET_GENDER_KEYS,
-  TYPE_LABELS,
-  candidateToSheetFields,
 } from '@/lib/types';
 import { Chip, ConfirmDialog, Seal, SectionTitle, useAppToast } from '@/components/common';
 import { cn } from '@/lib/utils';
@@ -27,13 +23,9 @@ interface SheetEditorProps {
   onSaved: () => void;
 }
 
-type SourceMode = 'manual' | 'pick' | 'quick';
-type PickKind = 'person' | 'place';
-
 interface RelTarget {
   id: string;
   name: string;
-  type: 'sheet' | 'place';
   race: RaceKey;
   self?: boolean;
 }
@@ -51,27 +43,17 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
 
   const [characterName, setCharacterName] = useState(prefill?.characterName ?? '');
   const [race, setRace] = useState<RaceKey>(prefill?.race ?? 'human');
-  const [gender, setGender] = useState<NameGender | ''>(prefill?.gender ?? '');
+  // 新建设定默认选中人权男性
+  const [gender, setGender] = useState<NameGender | ''>(prefill?.gender ?? 'male');
   const [candidateId, setCandidateId] = useState(prefill?.candidateId ?? '');
-  const [sourceMode, setSourceMode] = useState<SourceMode>('manual');
   const [occupation, setOccupation] = useState(prefill?.occupation ?? '');
-  const [office, setOffice] = useState(prefill?.office ?? '');
-  const [hometown, setHometown] = useState(prefill?.hometown ?? '');
-  const [hometownCandidateId, setHometownCandidateId] = useState('');
-  const [nickname, setNickname] = useState(prefill?.nickname ?? '');
-  const [contractTitle, setContractTitle] = useState(prefill?.contractTitle ?? '');
+  const [hometownIds, setHometownIds] = useState<string[]>([]);
   const [note, setNote] = useState(prefill?.note ?? '');
-
-  // 人物来源
-  const [picker, setPicker] = useState<PickKind | null>(null);
-  const [pickItems, setPickItems] = useState<Candidate[]>([]);
-  const [picking, setPicking] = useState(false);
-  const [quickOptions, setQuickOptions] = useState<Array<{ name: string; race: RaceKey }>>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
 
   // 关系
   const [relations, setRelations] = useState<Relation[]>([]);
   const [removeTarget, setRemoveTarget] = useState<Relation | null>(null);
-  const [relTab, setRelTab] = useState<'sheet' | 'place'>('sheet');
   const [relTargets, setRelTargets] = useState<RelTarget[]>([]);
   const [relTargetId, setRelTargetId] = useState<string | null>(null);
   const [relType, setRelType] = useState<string>('师徒');
@@ -82,10 +64,11 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
 
   // 初始加载：编辑模式回填；新建模式应用预填
   useEffect(() => {
-    if (sheetId) {
-      void (async () => {
-        try {
-          const [sheets, rels] = await Promise.all([fetchSheets(), fetchRelations()]);
+    void (async () => {
+      try {
+        const [placeList, sheets, rels] = await Promise.all([fetchPlaces(), fetchSheets(), fetchRelations()]);
+        setPlaces(placeList);
+        if (sheetId) {
           const s = sheets.find((x) => x.id === sheetId);
           if (!s) {
             setLoadError('未找到该设定卡');
@@ -96,164 +79,50 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
           setGender(s.gender ?? '');
           setCandidateId(s.candidateId);
           setOccupation(s.occupation);
-          setOffice(s.office);
-          setHometown(s.hometown);
-          setHometownCandidateId(s.hometownCandidateId);
-          setNickname(s.nickname);
-          setContractTitle(s.contractTitle);
+          setHometownIds(s.hometownIds);
           setNote(s.note);
           setRelations(rels.filter((r) => r.fromId === sheetId || r.toId === sheetId));
-        } catch (err) {
-          setLoadError((err as Error)?.message || '加载失败，请重试');
-        } finally {
-          setLoaded(true);
         }
-      })();
-    }
+        const selfTarget: RelTarget = {
+          id: sheetId ?? SELF_RELATION_TARGET_ID,
+          name: prefill?.characterName?.trim() || '未命名人物',
+          race: prefill?.race ?? 'human',
+          self: true,
+        };
+        setRelTargets([selfTarget, ...sheets.filter((s) => s.id !== sheetId).map((s) => ({ id: s.id, name: s.characterName || '未命名人物', race: s.race }))]);
+      } catch (err) {
+        setLoadError((err as Error)?.message || '加载失败，请重试');
+      } finally {
+        setLoaded(true);
+      }
+    })();
     // App 通过 key 保证每个 sheetId 单独挂载，仅需执行一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 现场生成选项（族群变化时换一批）
-  useEffect(() => {
-    const opts: Array<{ name: string; race: RaceKey }> = [];
-    const seen = new Set<string>();
-    let guard = 0;
-    while (opts.length < 3 && guard < 60) {
-      guard += 1;
-      const g = genPerson(race, DEFAULT_GEN_PARAMS);
-      if (g && !seen.has(g.name)) {
-        seen.add(g.name);
-        opts.push({ name: g.name, race });
-      }
-    }
-    setQuickOptions(opts);
-  }, [race]);
+  const selectedPlaces = useMemo(() => {
+    const byId = new Map(places.map((place) => [place.id, place]));
+    return hometownIds.map((id) => byId.get(id)).filter((place): place is Place => Boolean(place));
+  }, [hometownIds, places]);
 
-  const refreshQuick = () => {
-    const opts: Array<{ name: string; race: RaceKey }> = [];
-    const seen = new Set<string>();
-    let guard = 0;
-    while (opts.length < 3 && guard < 60) {
-      guard += 1;
-      const g = genPerson(race, DEFAULT_GEN_PARAMS);
-      if (g && !seen.has(g.name)) {
-        seen.add(g.name);
-        opts.push({ name: g.name, race });
-      }
-    }
-    setQuickOptions(opts);
-  };
-
-  const openPicker = async (kind: PickKind) => {
-    setPicker(kind);
-    setPicking(true);
-    try {
-      const list = await fetchCandidates({ race: 'all', nameType: kind, minChars: 1, maxChars: FILTER_MAX_CHARS, status: 'all', keyword: '', sort: 'latest' });
-      setPickItems(list.slice(0, 200));
-    } catch (err) {
-      toast.show((err as Error)?.message || '加载候选失败', 'error');
-      setPickItems([]);
-    } finally {
-      setPicking(false);
-    }
-  };
-
-  const pickFromCandidate = (c: Candidate) => {
-    if (c.nameType === 'place') {
-      setHometown(c.nameText);
-      setHometownCandidateId(c.id);
-    } else {
-      setCharacterName(c.nameText);
-      setRace(c.race);
-      if (c.gender && c.gender !== 'any') setGender(c.gender);
-      setCandidateId(c.id);
-      setSourceMode('pick');
-      // 候选库中除名字外的设定项（职业/官职/绰号/契约/能力等）一并带入，不覆盖已填内容
-      const f = candidateToSheetFields(c);
-      if (f.occupation && !occupation) setOccupation(f.occupation);
-      if (f.office && !office) setOffice(f.office);
-      if (f.hometown && !hometown) setHometown(f.hometown);
-      if (f.nickname && !nickname) setNickname(f.nickname);
-      if (f.contractTitle && !contractTitle) setContractTitle(f.contractTitle);
-      if (f.note && !note) setNote(f.note);
-    }
-    setDirty(true);
-    setPicker(null);
-  };
-
-  const nickPool = useMemo(() => {
-    const roots = LEXICON[race];
-    const arr = [...roots.nickProfession, ...roots.nickAppearance, ...roots.nickDeed, ...roots.nickTerrain, ...roots.nickContract];
-    return Array.from(new Set(arr)).slice(0, 40);
-  }, [race]);
-
-  const officeSuggestions = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (let i = 0; i < 24 && out.length < 8; i += 1) {
-      const g = genOffice(race);
-      if (!seen.has(g.name)) {
-        seen.add(g.name);
-        out.push(g.name);
-      }
-    }
-    return out;
-  }, [race]);
-
-  const loadRelTargets = async (tab: 'sheet' | 'place') => {
-    const selfTarget: RelTarget = {
+  const relTargetList = useMemo(() => {
+    const self: RelTarget = {
       id: savedId ?? SELF_RELATION_TARGET_ID,
       name: characterName.trim() || '未命名人物',
-      type: 'sheet',
       race,
       self: true,
     };
-    try {
-      if (tab === 'sheet') {
-        const sheets = await fetchSheets();
-        setRelTargets([
-          selfTarget,
-          ...sheets.filter((s) => s.id !== savedId).map((s) => ({ id: s.id, name: s.characterName || '未命名人物', type: 'sheet' as const, race: s.race })),
-        ]);
-      } else {
-        const list = await fetchCandidates({
-          race: 'all',
-          nameType: 'place',
-          minChars: 1,
-          maxChars: FILTER_MAX_CHARS,
-          status: 'all',
-          keyword: '',
-          sort: 'latest',
-        });
-        setRelTargets(list.slice(0, 200).map((c) => ({ id: c.id, name: c.nameText, type: 'place' as const, race: c.race })));
-      }
-    } catch {
-      // 读取其他设定失败时仍保留「自己」，确保关联自身可用
-      setRelTargets(tab === 'sheet' ? [selfTarget] : []);
-    }
-  };
-
-  // 初始加载人物目标，让「自己」与已有设定在进入编辑器时即可选择
-  useEffect(() => {
-    void loadRelTargets('sheet');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const switchRelTab = (tab: 'sheet' | 'place') => {
-    setRelTab(tab);
-    setRelTargetId(null);
-    void loadRelTargets(tab);
-  };
+    return [self, ...relTargets.filter((target) => !target.self)];
+  }, [relTargets, savedId, characterName, race]);
 
   const resolveRelationType = () => (relType === '其他' ? relCustom.trim() || '其他' : relType);
 
   const handleAddRelation = async () => {
     if (!relTargetId) {
-      toast.show('请先选择关联对象', 'info');
+      toast.show('请先选择关联人物', 'info');
       return;
     }
-    const target = relTargets.find((t) => t.id === relTargetId);
+    const target = relTargetList.find((t) => t.id === relTargetId);
     if (!target) {
       toast.show('关联对象已失效，请重新选择', 'info');
       return;
@@ -280,7 +149,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
         fromType: 'sheet',
         fromId: savedId,
         fromName: characterName.trim() || '未命名人物',
-        toType: target.type,
+        toType: 'sheet',
         toId: target.self ? savedId : target.id,
         toName: targetName,
         relationType,
@@ -296,7 +165,6 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
         } catch {
           // 忽略刷新失败
         }
-        void loadRelTargets(relTab);
       } else {
         toast.show(res.message || '添加失败，请重试', 'error');
       }
@@ -342,6 +210,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
     }
     setSaving(true);
     try {
+      const hometown = selectedPlaces.map((place) => place.name).join('、');
       const res = await saveSheet({
         id: savedId ?? undefined,
         characterName: name,
@@ -349,11 +218,8 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
         gender: gender || undefined,
         candidateId,
         occupation: occupation.trim(),
-        office: office.trim(),
-        hometown: hometown.trim(),
-        hometownCandidateId,
-        nickname: nickname.trim(),
-        contractTitle: contractTitle.trim(),
+        hometown,
+        hometownIds,
         note: note.trim(),
       });
       if (!res.ok) {
@@ -362,7 +228,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
       }
       // 已选好目标但还没点「添加关系」时，保存一并写入，避免「关联自己」看起来没生效
       const queued = [...pendingRelations];
-      const selected = relTargetId ? relTargets.find((t) => t.id === relTargetId) : undefined;
+      const selected = relTargetId ? relTargetList.find((t) => t.id === relTargetId) : undefined;
       if (selected) {
         const relationType = resolveRelationType();
         const toId = selected.self ? res.id : selected.id;
@@ -385,7 +251,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
             fromType: 'sheet',
             fromId: res.id,
             fromName: name,
-            toType: pending.target.type,
+            toType: 'sheet',
             toId: pending.target.self ? res.id : pending.target.id,
             toName: pending.target.self ? name : pending.target.name,
             relationType: pending.relationType,
@@ -414,11 +280,14 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
   const setRaceByClick = (r: RaceKey) => {
     setRace(r);
     setDirty(true);
-    if (candidateId) {
-      setCandidateId('');
-      setSourceMode('manual');
-    }
+    if (candidateId) setCandidateId('');
   };
+
+  const toggleHometown = (id: string) => {
+    setHometownIds((prev) => (prev.includes(id) ? prev.filter((placeId) => placeId !== id) : [...prev, id]));
+    setDirty(true);
+  };
+
 
   return (
     <div className="editor-page" data-testid="sheet-editor">
@@ -479,116 +348,15 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
               type="text"
               className="form-input"
               value={characterName}
-              placeholder="手动填写，或从下方来源选择"
+              placeholder="手动填写人物名"
               data-testid="editor-name"
               onChange={(e) => {
                 setCharacterName(e.target.value);
                 setCandidateId('');
-                setSourceMode('manual');
                 setDirty(true);
               }}
             />
           </div>
-          <div className="segmented source-seg">
-            {(
-              [
-                ['manual', '手动填写'],
-                ['pick', '候选库选择'],
-                ['quick', '现场生成'],
-              ] as Array<[SourceMode, string]>
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                className={cn('seg-btn', sourceMode === k && 'seg-btn-active')}
-                data-testid={`editor-source-${k}`}
-                onClick={() => setSourceMode(k)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {sourceMode === 'pick' ? (
-            <div className="source-block">
-              <button type="button" className="secondary-btn" data-testid="editor-open-person-picker" onClick={() => void openPicker('person')}>
-                从候选库选择人物
-              </button>
-              {candidateId ? (
-                <p className="source-selected">
-                  已选：{characterName}
-                  <button
-                    type="button"
-                    className="link-btn"
-                    data-testid="editor-pick-clear"
-                    onClick={() => {
-                      setCandidateId('');
-                      setSourceMode('manual');
-                      setDirty(true);
-                    }}
-                  >
-                    清除
-                  </button>
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
-          {sourceMode === 'quick' ? (
-            <div className="source-block">
-              <div className="quick-gen-row">
-                {quickOptions.map((o) => (
-                  <button
-                    key={o.name}
-                    type="button"
-                    className="quick-gen-option"
-                    data-testid={`editor-quick-${o.name}`}
-                    onClick={() => {
-                      setCharacterName(o.name);
-                      setRace(o.race);
-                      setCandidateId('');
-                      setSourceMode('quick');
-                      setDirty(true);
-                    }}
-                  >
-                    {o.name}
-                  </button>
-                ))}
-                <button type="button" className="icon-btn" title="换一批" data-testid="editor-quick-reroll" onClick={refreshQuick}>
-                  <RefreshCw size={15} />
-                </button>
-              </div>
-              <p className="source-hint">按当前规则现场成稿，选中后仍可手动修改</p>
-            </div>
-          ) : null}
-
-          {picker ? (
-            <div className="picker-panel" data-testid={`picker-${picker}`}>
-              <div className="picker-head">
-                <span>{picker === 'person' ? '候选库 · 人物' : '候选库 · 地名'}</span>
-                <button type="button" className="icon-btn" data-testid="picker-close" onClick={() => setPicker(null)}>
-                  <X size={15} />
-                </button>
-              </div>
-              {picking ? (
-                <p className="list-loading">正在翻谱…</p>
-              ) : pickItems.length === 0 ? (
-                <p className="source-hint">暂无候选，可先到生成页产出</p>
-              ) : (
-                <div className="picker-list">
-                  {pickItems.map((c) => (
-                    <button key={c.id} type="button" className="picker-row" data-testid={`picker-item-${c.id}`} onClick={() => pickFromCandidate(c)}>
-                      <Seal race={c.race} size={18} />
-                      <span className="picker-name">{c.nameText}</span>
-                      <span className="picker-meta">
-                        {TYPE_LABELS[c.nameType]} · {c.charCount}字
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
         </div>
 
         {/* 绑定项 */}
@@ -614,85 +382,28 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
               ))}
             </datalist>
           </div>
-          <div className="form-row">
-            <span className="form-label">官职</span>
-            <input
-              type="text"
-              list="editor-office-list"
-              className="form-input"
-              value={office}
-              placeholder="如 山岚执事"
-              data-testid="editor-office"
-              onChange={(e) => {
-                setOffice(e.target.value);
-                setDirty(true);
-              }}
-            />
-            <datalist id="editor-office-list">
-              {officeSuggestions.map((o) => (
-                <option key={o} value={o} />
-              ))}
-            </datalist>
-          </div>
-          <div className="form-row">
+          <div className="form-row form-row-top">
             <span className="form-label">籍贯</span>
-            <div className="form-inline">
-              <input
-                type="text"
-                className="form-input"
-                value={hometown}
-                placeholder="手动填写或从候选库选择地名"
-                data-testid="editor-hometown"
-                onChange={(e) => {
-                  setHometown(e.target.value);
-                  setHometownCandidateId('');
-                  setDirty(true);
-                }}
-              />
-              <button type="button" className="secondary-btn form-inline-btn" data-testid="editor-open-place-picker" onClick={() => void openPicker('place')}>
-                选地名
-              </button>
+            <div className="hometown-picker" data-testid="editor-hometown">
+              {places.length === 0 ? (
+                <p className="source-hint">暂无地名，可先到“地名”页添加</p>
+              ) : (
+                <div className="filter-chips">
+                  {places.map((place) => (
+                    <Chip
+                      key={place.id}
+                      selected={hometownIds.includes(place.id)}
+                      tone={race}
+                      dataTestId={`editor-hometown-${place.id}`}
+                      onClick={() => toggleHometown(place.id)}
+                    >
+                      {place.name}
+                    </Chip>
+                  ))}
+                </div>
+              )}
+              {selectedPlaces.length > 0 ? <p className="source-hint">已选：{selectedPlaces.map((place) => place.name).join('、')}</p> : null}
             </div>
-          </div>
-          <div className="form-row">
-            <span className="form-label">绰号</span>
-            <input
-              type="text"
-              list="editor-nick-list"
-              className="form-input"
-              value={nickname}
-              placeholder="如 白发、破军"
-              data-testid="editor-nickname"
-              onChange={(e) => {
-                setNickname(e.target.value);
-                setDirty(true);
-              }}
-            />
-            <datalist id="editor-nick-list">
-              {nickPool.map((n) => (
-                <option key={n} value={n} />
-              ))}
-            </datalist>
-          </div>
-          <div className="form-row">
-            <span className="form-label">契约称号</span>
-            <input
-              type="text"
-              list="editor-contract-list"
-              className="form-input"
-              value={contractTitle}
-              placeholder="如 血契、誓约"
-              data-testid="editor-contract"
-              onChange={(e) => {
-                setContractTitle(e.target.value);
-                setDirty(true);
-              }}
-            />
-            <datalist id="editor-contract-list">
-              {LEXICON[race].contractTitles.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
           </div>
           <div className="form-row">
             <span className="form-label">备注</span>
@@ -757,27 +468,9 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
             <p className="source-hint">暂无关系，可在下方添加{savedId ? '' : '（保存设定后一并写入）'}</p>
           )}
           <div className="relation-add">
-            <div className="segmented">
-              {(
-                [
-                  ['sheet', '关联人物'],
-                  ['place', '关联地名'],
-                ] as Array<['sheet' | 'place', string]>
-              ).map(([k, label]) => (
-                <button
-                  key={k}
-                  type="button"
-                  className={cn('seg-btn', relTab === k && 'seg-btn-active')}
-                  data-testid={`rel-tab-${k}`}
-                  onClick={() => switchRelTab(k)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {relTargets.length > 0 ? (
+            {relTargetList.length > 0 ? (
               <div className="relation-target-list">
-                {relTargets.map((t) => (
+                {relTargetList.map((t) => (
                   <button
                     key={t.id}
                     type="button"
@@ -791,7 +484,7 @@ export function SheetEditor({ sheetId, prefill, onBack, onSaved }: SheetEditorPr
                 ))}
               </div>
             ) : (
-              <p className="source-hint">{relTab === 'sheet' ? '暂无其他人物设定' : '暂无地名候选，可先到生成页产出地名'}</p>
+              <p className="source-hint">暂无其他人物设定</p>
             )}
             <div className="filter-chips">
               {RELATION_TYPES.map((t) => (

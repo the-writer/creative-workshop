@@ -9,12 +9,14 @@ import {
   nameCharCount,
   parseCandidatesMarkdown,
   parseGraphMarkdown,
+  parsePlacesMarkdown,
   parsePreferencesMarkdown,
   parseRelationsMarkdown,
   parseSheetsMarkdown,
   parseProjectMarkdown,
   serializeCandidatesMarkdown,
   serializeGraphMarkdown,
+  serializePlacesMarkdown,
   serializePreferencesMarkdown,
   serializeProjectMarkdown,
   serializeRelationsMarkdown,
@@ -27,6 +29,7 @@ import {
   type GraphPoint,
   type NameGender,
   type NameTypeKey,
+  type Place,
   type RarityTier,
   type Preferences,
   type RaceKey,
@@ -35,13 +38,14 @@ import {
   type StructurePart,
 } from './workshop-markdown.cjs';
 
-export type { Candidate, CandidateFilters, EntityType, GraphLayout, GraphPoint, NameGender, NameTypeKey, RaceKey, RarityTier, Relation, Sheet, StructurePart };
+export type { Candidate, CandidateFilters, EntityType, GraphLayout, GraphPoint, NameGender, NameTypeKey, Place, RaceKey, RarityTier, Relation, Sheet, StructurePart };
 
 /** .workshop 目录内的固定文件名（项目数据分类保存） */
 export const PROJECT_FILES = {
   project: 'project.md',
   overview: 'overview.md',
   candidates: 'candidates.md',
+  places: 'places.md',
   sheets: 'sheets.md',
   relations: 'relations.md',
   graph: 'graph.md',
@@ -73,12 +77,17 @@ export interface SheetInput {
   gender?: NameGender;
   candidateId: string;
   occupation: string;
-  office: string;
   hometown: string;
-  hometownCandidateId: string;
-  nickname: string;
-  contractTitle: string;
+  hometownIds: string[];
   note: string;
+}
+
+export interface PlaceInput {
+  id?: string;
+  name: string;
+  race: RaceKey;
+  structure?: StructurePart[];
+  note?: string;
 }
 
 export interface RelationInput {
@@ -94,14 +103,13 @@ export interface RelationInput {
 
 export interface CandidateReferences {
   asCharacter: boolean;
-  asHometown: boolean;
-  asPlace: boolean;
 }
 
 export interface StatsData {
   totalCandidates: number;
   totalFavorites: number;
   totalSheets: number;
+  totalPlaces: number;
   totalRelations: number;
   raceDist: Record<string, number>;
   typeDist: Record<string, number>;
@@ -134,7 +142,7 @@ function asRace(value: unknown): RaceKey {
 }
 
 function asNameType(value: unknown): NameTypeKey {
-  return value === 'place' || value === 'office' || value === 'nickname' ? value : 'person';
+  return value === 'place' ? 'place' : 'person';
 }
 
 function asGender(value: unknown): NameGender | undefined {
@@ -145,8 +153,8 @@ function asRarity(value: unknown): RarityTier | undefined {
   return value === 'S' || value === 'SS' || value === 'SSS' || value === 'SSSR' ? value : undefined;
 }
 
-function asEntityType(value: unknown): EntityType {
-  return value === 'place' ? 'place' : 'sheet';
+function asEntityType(_value: unknown): EntityType {
+  return 'sheet';
 }
 
 function normalizeStructure(value: unknown): StructurePart[] {
@@ -192,6 +200,7 @@ export class WorkshopStorage {
       this.workshopPath = workshopPath;
       await this.ensureFile(PROJECT_FILES.project, null);
       await this.ensureFile(PROJECT_FILES.candidates, serializeCandidatesMarkdown([]));
+      await this.ensureFile(PROJECT_FILES.places, serializePlacesMarkdown([]));
       await this.ensureFile(PROJECT_FILES.sheets, serializeSheetsMarkdown([]));
       await this.ensureFile(PROJECT_FILES.relations, serializeRelationsMarkdown([]));
       await this.ensureFile(PROJECT_FILES.preferences, serializePreferencesMarkdown(EMPTY_PREFERENCES));
@@ -201,6 +210,7 @@ export class WorkshopStorage {
       const info = parseProjectMarkdown(projectText, fallbackName);
       if (!projectText.trim()) await this.writeText(PROJECT_FILES.project, serializeProjectMarkdown(fallbackName));
       this.projectName = info.name || fallbackName;
+      await this.migrateLegacyPlaces();
       // 打开项目时把 relations.md 的关系摘要补写回 sheets.md，避免旧数据或外部编辑后缺失
       const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
       if (sheets.length > 0 && relations.length > 0) await this.writeSheets(sheets, relations);
@@ -278,6 +288,10 @@ export class WorkshopStorage {
     return parseCandidatesMarkdown(await this.readText(PROJECT_FILES.candidates));
   }
 
+  private async loadPlaces(): Promise<Place[]> {
+    return parsePlacesMarkdown(await this.readText(PROJECT_FILES.places));
+  }
+
   private async loadSheets(): Promise<Sheet[]> {
     return parseSheetsMarkdown(await this.readText(PROJECT_FILES.sheets));
   }
@@ -298,6 +312,10 @@ export class WorkshopStorage {
     await this.writeText(PROJECT_FILES.candidates, serializeCandidatesMarkdown(candidates));
   }
 
+  private async writePlaces(places: Place[]): Promise<void> {
+    await this.writeText(PROJECT_FILES.places, serializePlacesMarkdown(places));
+  }
+
   private async writeSheets(sheets: Sheet[], relations: Relation[]): Promise<void> {
     await this.writeText(PROJECT_FILES.sheets, serializeSheetsMarkdown(sheets, relations));
   }
@@ -312,8 +330,8 @@ export class WorkshopStorage {
 
   /** 数据变化后刷新 graph.md 中的快照，同时保留已保存的布局坐标 */
   private async refreshGraph(): Promise<void> {
-    const [layout, candidates, sheets, relations] = await Promise.all([this.loadLayout(), this.loadCandidates(), this.loadSheets(), this.loadRelations()]);
-    await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown(layout, candidates, sheets, relations));
+    const [layout, sheets, relations, places] = await Promise.all([this.loadLayout(), this.loadSheets(), this.loadRelations(), this.loadPlaces()]);
+    await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown(layout, sheets, relations, places));
   }
 
   /** 数据变化后重建 sheets.ini（设定卡 + 候选的分组清单） */
@@ -428,27 +446,21 @@ export class WorkshopStorage {
 
   public candidateReferences(id: string): Promise<CandidateReferences> {
     return this.enqueue(async () => {
-      const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
-      return this.collectReferences(id, sheets, relations);
+      const sheets = await this.loadSheets();
+      return this.collectReferences(id, sheets);
     });
   }
 
   public candidateDelete(id: string, force: boolean): Promise<{ ok: boolean; refs: CandidateReferences; message?: string }> {
     return this.enqueue(async () => {
       const [candidates, sheets, relations] = await Promise.all([this.loadCandidates(), this.loadSheets(), this.loadRelations()]);
-      const refs = this.collectReferences(id, sheets, relations);
-      const hasRefs = refs.asCharacter || refs.asHometown || refs.asPlace;
-      if (hasRefs && !force) return { ok: false, refs, message: '该名称已被设定引用' };
-      if (hasRefs) {
+      const refs = this.collectReferences(id, sheets);
+      if (refs.asCharacter && !force) return { ok: false, refs, message: '该名称已被设定引用' };
+      if (refs.asCharacter) {
         sheets.forEach((sheet) => {
           if (sheet.candidateId === id) sheet.candidateId = '';
-          if (sheet.hometownCandidateId === id) sheet.hometownCandidateId = '';
         });
-        const nextRelations = relations.filter(
-          (relation) => !(relation.fromType === 'place' && relation.fromId === id) && !(relation.toType === 'place' && relation.toId === id),
-        );
-        await this.writeSheets(sheets, nextRelations);
-        await this.writeRelations(nextRelations);
+        await this.writeSheets(sheets, relations);
       }
       const before = candidates.length;
       const remaining = candidates.filter((candidate) => candidate.id !== id);
@@ -457,6 +469,74 @@ export class WorkshopStorage {
       await this.refreshGraph();
       await this.refreshSheetsIni();
       return { ok: true, refs };
+    });
+  }
+
+  /* ---------------- 地名 ---------------- */
+
+  public placesList(): Promise<Place[]> {
+    return this.enqueue(async () => {
+      const places = await this.loadPlaces();
+      return clone([...places].sort((a, b) => b.createdAt - a.createdAt));
+    });
+  }
+
+  public placeSave(input: PlaceInput): Promise<{ ok: boolean; id: string; message?: string }> {
+    return this.enqueue(async () => {
+      const name = asString(input.name).trim();
+      if (!name) return { ok: false, id: '', message: '地名不能为空' };
+      const places = await this.loadPlaces();
+      const now = Date.now();
+      if (input.id) {
+        const place = places.find((item) => item.id === input.id);
+        if (!place) return { ok: false, id: '', message: '未找到该地名' };
+        place.name = name;
+        place.race = asRace(input.race);
+        place.structure = normalizeStructure(input.structure);
+        place.note = asString(input.note).trim();
+        place.updatedAt = now;
+        await this.writePlaces(places);
+        await this.refreshGraph();
+        return { ok: true, id: place.id };
+      }
+      const duplicate = places.some((place) => place.race === asRace(input.race) && place.name === name);
+      if (duplicate) return { ok: false, id: '', message: '该地名已存在' };
+      const id = randomUUID();
+      places.unshift({
+        id,
+        name,
+        race: asRace(input.race),
+        structure: normalizeStructure(input.structure),
+        note: asString(input.note).trim(),
+        createdAt: now,
+        updatedAt: now,
+      });
+      await this.writePlaces(places);
+      await this.refreshGraph();
+      return { ok: true, id };
+    });
+  }
+
+  public placeDelete(id: string): Promise<{ ok: boolean; message?: string }> {
+    return this.enqueue(async () => {
+      const [places, sheets, relations] = await Promise.all([this.loadPlaces(), this.loadSheets(), this.loadRelations()]);
+      const remaining = places.filter((place) => place.id !== id);
+      if (remaining.length === places.length) return { ok: false, message: '未找到该地名' };
+      const byId = new Map(remaining.map((place) => [place.id, place.name]));
+      let sheetsChanged = false;
+      sheets.forEach((sheet) => {
+        if (!sheet.hometownIds.includes(id)) return;
+        sheet.hometownIds = sheet.hometownIds.filter((placeId) => placeId !== id);
+        sheet.hometown = sheet.hometownIds
+          .map((placeId) => byId.get(placeId))
+          .filter((name): name is string => Boolean(name))
+          .join('、');
+        sheetsChanged = true;
+      });
+      await this.writePlaces(remaining);
+      if (sheetsChanged) await this.writeSheets(sheets, relations);
+      await this.refreshGraph();
+      return { ok: true };
     });
   }
 
@@ -488,11 +568,8 @@ export class WorkshopStorage {
         gender,
         candidateId: asString(input.candidateId),
         occupation: asString(input.occupation).trim(),
-        office: asString(input.office).trim(),
         hometown: asString(input.hometown).trim(),
-        hometownCandidateId: asString(input.hometownCandidateId),
-        nickname: asString(input.nickname).trim(),
-        contractTitle: asString(input.contractTitle).trim(),
+        hometownIds: Array.isArray(input.hometownIds) ? input.hometownIds.map((id) => asString(id)).filter(Boolean) : [],
         note: asString(input.note).trim(),
         updatedAt: now,
       };
@@ -593,20 +670,25 @@ export class WorkshopStorage {
 
   public graphLayoutSave(positions: Record<string, GraphPoint>): Promise<{ ok: boolean }> {
     return this.enqueue(async () => {
-      const [candidates, sheets, relations] = await Promise.all([this.loadCandidates(), this.loadSheets(), this.loadRelations()]);
+      const [sheets, relations, places] = await Promise.all([this.loadSheets(), this.loadRelations(), this.loadPlaces()]);
       const layout: GraphLayout = {};
       Object.entries(positions ?? {}).forEach(([id, point]) => {
         if (!id || !point) return;
         layout[id] = { x: asNumber(point.x), y: asNumber(point.y) };
       });
-      await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown(layout, candidates, sheets, relations));
+      await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown(layout, sheets, relations, places));
       return { ok: true };
     });
   }
 
   public stats(): Promise<StatsData> {
     return this.enqueue(async () => {
-      const [candidates, sheets, relations] = await Promise.all([this.loadCandidates(), this.loadSheets(), this.loadRelations()]);
+      const [candidates, sheets, relations, places] = await Promise.all([
+        this.loadCandidates(),
+        this.loadSheets(),
+        this.loadRelations(),
+        this.loadPlaces(),
+      ]);
       const group = <T extends string | number>(values: T[]): Record<string, number> => {
         const result: Record<string, number> = {};
         values.forEach((value) => {
@@ -619,6 +701,7 @@ export class WorkshopStorage {
         totalCandidates: candidates.length,
         totalFavorites: candidates.filter((candidate) => candidate.favorite).length,
         totalSheets: sheets.length,
+        totalPlaces: places.length,
         totalRelations: relations.length,
         raceDist: group(candidates.map((candidate) => candidate.race)),
         typeDist: group(candidates.map((candidate) => candidate.nameType)),
@@ -667,6 +750,7 @@ export class WorkshopStorage {
               const characterName = asString(row.characterName ?? row.character_name);
               if (!characterName) return null;
               const gender = asGender(row.gender);
+              const legacyHometownId = asString(row.hometownCandidateId ?? row.hometown_candidate_id);
               return {
                 id: asString(row.id) || randomUUID(),
                 characterName,
@@ -674,11 +758,8 @@ export class WorkshopStorage {
                 ...(gender ? { gender } : {}),
                 candidateId: asString(row.candidateId ?? row.candidate_id),
                 occupation: asString(row.occupation),
-                office: asString(row.office),
                 hometown: asString(row.hometown),
-                hometownCandidateId: asString(row.hometownCandidateId ?? row.hometown_candidate_id),
-                nickname: asString(row.nickname),
-                contractTitle: asString(row.contractTitle ?? row.contract_title),
+                hometownIds: legacyHometownId ? [legacyHometownId] : [],
                 note: asString(row.note),
                 createdAt: asNumber(row.createdAt ?? row.created_at, now),
                 updatedAt: asNumber(row.updatedAt ?? row.updated_at, now),
@@ -712,35 +793,69 @@ export class WorkshopStorage {
         source.preferences && typeof source.preferences === 'object' && !Array.isArray(source.preferences)
           ? clone(source.preferences as Record<string, unknown>)
           : {};
-      await this.writeCandidates(candidates);
+      const personCandidates = candidates.filter((candidate) => candidate.nameType !== 'place');
+      const places: Place[] = candidates
+        .filter((candidate) => candidate.nameType === 'place')
+        .map((candidate) => ({
+          id: candidate.id,
+          name: candidate.nameText,
+          race: candidate.race,
+          structure: candidate.structure,
+          note: candidate.note,
+          createdAt: candidate.createdAt,
+          updatedAt: candidate.updatedAt,
+        }));
+      await this.writeCandidates(personCandidates);
+      await this.writePlaces(places);
       await this.writeSheets(sheets, relations);
       await this.writeRelations(relations);
       await this.writePreferences(preferences);
-      await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown({}, candidates, sheets, relations));
+      await this.writeText(PROJECT_FILES.graph, serializeGraphMarkdown({}, sheets, relations, places));
       await this.refreshSheetsIni();
-      return { candidates: candidates.length, sheets: sheets.length, relations: relations.length };
+      return { candidates: personCandidates.length, sheets: sheets.length, relations: relations.length };
     });
+  }
+
+  /**
+   * 把旧版混在候选库中的地名迁移到独立的 places.md，并从候选库移除。
+   * 打开项目时幂等执行：已有同名/同 ID 地名时跳过。
+   */
+  private async migrateLegacyPlaces(): Promise<void> {
+    const [candidates, places] = await Promise.all([this.loadCandidates(), this.loadPlaces()]);
+    const legacy = candidates.filter((candidate) => candidate.nameType === 'place');
+    if (legacy.length === 0) return;
+    const existingIds = new Set(places.map((place) => place.id));
+    const existingKeys = new Set(places.map((place) => `${place.race}|${place.name}`));
+    legacy.forEach((candidate) => {
+      if (existingIds.has(candidate.id) || existingKeys.has(`${candidate.race}|${candidate.nameText}`)) return;
+      existingIds.add(candidate.id);
+      existingKeys.add(`${candidate.race}|${candidate.nameText}`);
+      places.unshift({
+        id: candidate.id,
+        name: candidate.nameText,
+        race: candidate.race,
+        structure: candidate.structure,
+        note: candidate.note,
+        createdAt: candidate.createdAt,
+        updatedAt: candidate.updatedAt,
+      });
+    });
+    await this.writePlaces(places);
+    await this.writeCandidates(candidates.filter((candidate) => candidate.nameType !== 'place'));
   }
 
   /* ---------------- 内部工具 ---------------- */
 
-  private collectReferences(id: string, sheets: Sheet[], relations: Relation[]): CandidateReferences {
+  private collectReferences(id: string, sheets: Sheet[]): CandidateReferences {
     return {
       asCharacter: sheets.some((sheet) => sheet.candidateId === id),
-      asHometown: sheets.some((sheet) => sheet.hometownCandidateId === id),
-      asPlace: relations.some((relation) => (relation.fromType === 'place' && relation.fromId === id) || (relation.toType === 'place' && relation.toId === id)),
     };
   }
 
-  private referencedIds(sheets: Sheet[], relations: Relation[]): Set<string> {
+  private referencedIds(sheets: Sheet[], _relations: Relation[]): Set<string> {
     const result = new Set<string>();
     sheets.forEach((sheet) => {
       if (sheet.candidateId) result.add(sheet.candidateId);
-      if (sheet.hometownCandidateId) result.add(sheet.hometownCandidateId);
-    });
-    relations.forEach((relation) => {
-      if (relation.fromType === 'place') result.add(relation.fromId);
-      if (relation.toType === 'place') result.add(relation.toId);
     });
     return result;
   }

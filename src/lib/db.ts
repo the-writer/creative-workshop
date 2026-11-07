@@ -1,6 +1,6 @@
 // 桌面数据边界：业务组件只依赖此层，所有持久化请求由 Electron 主进程完成。
 
-import type { Candidate, CandidateFilters, NameGender, NameTypeKey, RaceKey, RarityTier, Relation, Sheet, SourceKey } from '@/lib/types';
+import type { Candidate, CandidateFilters, NameGender, NameTypeKey, Place, RaceKey, RarityTier, Relation, Sheet, SourceKey, StructurePart } from '@/lib/types';
 
 export interface SheetInput {
   id?: string;
@@ -9,19 +9,24 @@ export interface SheetInput {
   gender?: NameGender;
   candidateId: string;
   occupation: string;
-  office: string;
   hometown: string;
-  hometownCandidateId: string;
-  nickname: string;
-  contractTitle: string;
+  hometownIds: string[];
   note: string;
 }
 
+export interface PlaceInput {
+  id?: string;
+  name: string;
+  race: RaceKey;
+  structure?: StructurePart[];
+  note?: string;
+}
+
 export interface RelationInput {
-  fromType: 'sheet' | 'place';
+  fromType: 'sheet';
   fromId: string;
   fromName: string;
-  toType: 'sheet' | 'place';
+  toType: 'sheet';
   toId: string;
   toName: string;
   relationType: string;
@@ -32,6 +37,7 @@ export interface StatsData {
   totalCandidates: number;
   totalFavorites: number;
   totalSheets: number;
+  totalPlaces: number;
   totalRelations: number;
   raceDist: Record<string, number>;
   typeDist: Record<string, number>;
@@ -156,15 +162,30 @@ export async function getCandidateById(id: string): Promise<Candidate | null> {
   return api().candidates.get(id);
 }
 
-export async function getCandidateReferences(id: string): Promise<{ asCharacter: boolean; asHometown: boolean; asPlace: boolean }> {
+export async function getCandidateReferences(id: string): Promise<{ asCharacter: boolean }> {
   return api().candidates.references(id);
 }
 
-export async function deleteCandidate(
-  id: string,
-  force: boolean,
-): Promise<{ ok: boolean; refs: { asCharacter: boolean; asHometown: boolean; asPlace: boolean }; message?: string }> {
+export async function deleteCandidate(id: string, force: boolean): Promise<{ ok: boolean; refs: { asCharacter: boolean }; message?: string }> {
   return api().candidates.remove(id, force);
+}
+
+/* ---------------- 地名 ---------------- */
+
+export async function fetchPlaces(): Promise<Place[]> {
+  return api().places.list();
+}
+
+export async function savePlace(input: PlaceInput): Promise<{ ok: boolean; id: string; message?: string }> {
+  return api().places.save(input);
+}
+
+export async function insertPlace(input: PlaceInput): Promise<{ ok: boolean; id: string; message?: string }> {
+  return api().places.save(input);
+}
+
+export async function deletePlace(id: string): Promise<{ ok: boolean; message?: string }> {
+  return api().places.remove(id);
 }
 
 /* ---------------- 设定与关系 ---------------- */

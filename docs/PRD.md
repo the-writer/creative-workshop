@@ -12,7 +12,7 @@
 
 - 命名由本地词库、性别音系倾向与人口权重规则组合产生，不依赖网络或 AI 服务；人名只保留一个「·」，姓氏固定在后。
 - 规则设置通过模态子窗口调整，与主界面共享并持久化生成偏好。
-- 应用以「项目」为单位组织数据：每个项目目录下的 `.workshop` 中按类别保存 `project.md`、`candidates.md`、`sheets.md`、`relations.md`、`graph.md`、`preferences.md`，并根据设定卡与候选自动生成 `sheets.ini`；项目登记与最近项目记录保存在 `userData/projects.json`。
+- 应用以「项目」为单位组织数据：每个项目目录下的 `.workshop` 中按类别保存 `project.md`、`candidates.md`、`places.md`、`sheets.md`、`relations.md`、`graph.md`、`preferences.md`，并根据设定卡与候选自动生成 `sheets.ini`；项目登记与最近项目记录保存在 `userData/projects.json`。
 - 启动时只驻留系统托盘，不打开主窗口；用户点击托盘后才显示项目门，选定项目后进入主界面。项目门只提供最近项目与「打开项目」，打开时会自动创建目录、自动初始化缺失的 `.workshop`。
 - 渲染进程开启 `contextIsolation`，关闭 `nodeIntegration`；文件与数据能力只通过白名单预加载桥开放。
 - 应用常驻系统托盘；关闭主窗口只隐藏窗口，点击托盘图标在当前桌面重新打开主界面。最近一次打开的项目排在最近列表第一位并显示「上次」TAG。
@@ -27,8 +27,9 @@
 | 调整窗口、应用标识、启动流程或技术架构    | [01-product-architecture.md](prd/01-product-architecture.md) |
 | 修改词库、生成规则或组合量                | [02-name-generation.md](prd/02-name-generation.md)           |
 | 修改候选保存、筛选或删除                  | [03-candidate-library.md](prd/03-candidate-library.md)       |
-| 修改设定卡或人物关系                      | [04-sheets-and-relations.md](prd/04-sheets-and-relations.md) |
-| 修改图谱、布局持久化或统计                | [05-graph-and-stats.md](prd/05-graph-and-stats.md)           |
+| 修改地名库、地名表格或籍贯多选            | [04-sheets-and-relations.md](prd/04-sheets-and-relations.md) |
+| 修改设定卡、地名或人物关系                | [04-sheets-and-relations.md](prd/04-sheets-and-relations.md) |
+| 修改图谱、布局持久化或统计（设置页内）    | [05-graph-and-stats.md](prd/05-graph-and-stats.md)           |
 | 修改不可用能力入口                        | [06-unavailable-features.md](prd/06-unavailable-features.md) |
 | 修改项目选择/打开、`.workshop` 格式或 IPC | [07-persistence-and-ipc.md](prd/07-persistence-and-ipc.md)   |
 | 修改依赖、脚本、打包或发布                | [08-build-and-release.md](prd/08-build-and-release.md)       |
@@ -43,8 +44,8 @@
 | 窗口、应用名、安全边界、进程结构、启动流程           | `prd/01-product-architecture.md` |
 | 词库、规则、性别倾向、组合量算法、人名结构           | `prd/02-name-generation.md`      |
 | 候选字段、筛选、排序、删除流程                       | `prd/03-candidate-library.md`    |
-| 设定字段、关系类型、级联规则                         | `prd/04-sheets-and-relations.md` |
-| 图谱视图、布局持久化、统计指标                       | `prd/05-graph-and-stats.md`      |
+| 设定字段、地名库、关系类型、级联规则                 | `prd/04-sheets-and-relations.md` |
+| 图谱视图、布局持久化、统计指标（设置页内）           | `prd/05-graph-and-stats.md`      |
 | 不可用能力入口                                       | `prd/06-unavailable-features.md` |
 | 项目选择/打开、项目登记、`.workshop` 格式、迁移、IPC | `prd/07-persistence-and-ipc.md`  |
 | 依赖、脚本、打包产物、CI                             | `prd/08-build-and-release.md`    |

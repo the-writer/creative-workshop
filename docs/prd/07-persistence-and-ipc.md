@@ -87,9 +87,10 @@ flowchart TD
 └── .workshop/                 # 目录名来自 creationWorkshop.project.dataDirName，默认 .workshop
     ├── project.md             # 项目名称、格式版本、创建时间
     ├── overview.md            # 项目总览（可选，应用不自动创建；设置页只读展示）
-    ├── candidates.md          # 名称候选
+    ├── candidates.md          # 人物名称候选
+    ├── places.md              # 独立地名库
     ├── sheets.md              # 设定卡
-    ├── relations.md           # 人物与地名关系
+    ├── relations.md           # 人物关系
     ├── graph.md               # 图谱布局坐标 + 节点/连线快照
     ├── preferences.md         # 生成规则与候选库筛选（JSON 片段）
     └── sheets.ini             # 由设定卡派生的 [人物] 清单，候选仅以注释列在 [候选]
@@ -106,7 +107,7 @@ flowchart TD
         └── .workshop/…
 ```
 
-`WorkshopStorage.open(projectPath)` 会创建缺失的 `.workshop` 目录与六个 Markdown 文件（空数据骨架）；已存在的文件不会被覆盖；`overview.md` 不在此列，永远不会被自动创建。缺失文件在读取时按空数据处理。`sheets.ini` 不读取、每次打开时按当前数据重新生成并覆盖。
+`WorkshopStorage.open(projectPath)` 会创建缺失的 `.workshop` 目录与七个 Markdown 文件（空数据骨架）；已存在的文件不会被覆盖；`overview.md` 不在此列，永远不会被自动创建。缺失文件在读取时按空数据处理。`sheets.ini` 不读取、每次打开时按当前数据重新生成并覆盖。打开项目时会把旧版 `candidates.md` 中类型为「地名」的条目迁移到 `places.md` 并从候选库移除（幂等）。
 
 ### 7.4 `.workshop` Markdown 格式
 
@@ -122,7 +123,7 @@ flowchart TD
 - 备注、名称等普通文本原样保存；空字段行写为空值（如 `- 备注: `）。
 - 时间：写出为 ISO 8601（`toISOString()`）；读取无法解析时回退为当前时间。
 - 字数不信任文件：读取时按名称重新计算并忽略 `·` 分隔符，写出的 `- 字数` 仅供人阅读。
-- 枚举接受中文标签或英文 key：族群「人族/human」「精灵族/elf」「妖鬼/yaogui」「混血/mixed」，旧值 `demon`、`妖族` 归一为 `elf`；类型「人名/person」「地名/place」「官职/office」「绰号/nickname」；性别「不限/any」「男性/male」「女性/female」「中性/neutral」；`来源` 只有「手动」视为 `manual`，其余为 `generated`；`收藏` 为「是/true/1」时视为真；`来源类型`/`目标类型` 只有「地名/place」视为地名，其余视为设定卡。
+- 枚举接受中文标签或英文 key：族群「人族/human」「精灵族/elf」「妖鬼/yaogui」「混血/mixed」，旧值 `demon`、`妖族` 归一为 `elf`；类型「人名/person」「地名/place」，旧「官职/office」「绰号/nickname」统一按人名读取；性别「不限/any」「男性/male」「女性/female」「中性/neutral」；`来源` 只有「手动」视为 `manual`，其余为 `generated`；`收藏` 为「是/true/1」时视为真；`来源类型`/`目标类型` 统一视为设定卡（关系只允许人物）。
 - 未知字段、未知分节、无法解析的字段行会被忽略；缺少必需字段的条目被跳过。
 
 #### 7.4.1 `project.md`
@@ -199,11 +200,8 @@ flowchart TD
 - 性别: 男性
 - 候选关联: `1f0f2f5e-…`
 - 职业: 剑修
-- 官职:
-- 籍贯: 青云城
-- 籍贯候选: `0c9a…`
-- 绰号: 白发剑影
-- 契约称号:
+- 籍贯: 青云城、落霞谷
+- 籍贯 ID: `0c9a…`, `7b21…`
 - 备注:
 - 关系: 自己（男主）、兰诺（同僚）
 - 创建时间: 2026-10-26T05:57:48.000Z
@@ -217,8 +215,8 @@ flowchart TD
 | `族群`                                                  | 否       | 缺省 `human`                                                                                      |
 | `性别`                                                  | 否       | 男性 / 女性 / 中性；缺失表示未设定                                                                |
 | `候选关联`                                              | 否       | 为空时不写该行；读取为空字符串                                                                    |
-| `职业` / `官职` / `籍贯` / `绰号` / `契约称号` / `备注` | 否       | 保存时去首尾空白                                                                                  |
-| `籍贯候选`                                              | 否       | 为空时不写该行                                                                                    |
+| `职业` / `籍贯` / `备注`                                | 否       | 保存时去首尾空白；`籍贯` 为多个地名以「、」连接的展示文本                                         |
+| `籍贯 ID`                                               | 否       | 可多个，逗号分隔并加反引号；为空时不写该行                                                        |
 | `关系`                                                  | 否       | 派生字段：由 `relations.md` 汇总，格式 `自己（男主）、兰诺（同僚）`；无关系时不写该行，读取时忽略 |
 | `创建时间` / `更新时间`                                 | 否       | 缺失时回退当前时间                                                                                |
 
@@ -284,10 +282,10 @@ flowchart TD
 | ------------- | ----------------------------------------------------------------------------------------------------------------- |
 | 顶部字段      | `更新时间`、`节点数`、`连线数`；读取只使用 `更新时间`                                                             |
 | `## 节点布局` | Markdown 表格，列为「节点 ID / X / Y」；ID 用反引号包裹；坐标保留两位小数。读取时跳过表头与分隔行，非有限数值忽略 |
-| `## 节点快照` | 由设定卡与地名候选派生的人物/地名清单；**只供阅读，不参与恢复**                                                   |
+| `## 节点快照` | 由设定卡与独立地名库派生的人物/地名清单；**只供阅读，不参与恢复**                                                 |
 | `## 连线快照` | 由关系派生的连线清单（含关联自身，写作 `甲 — 男主 → 甲`）；同上                                                   |
 
-节点 ID 规则：设定卡 `s:<sheetId>`，地名候选 `p:<candidateId>`。快照节点来源：全部设定卡 + 被关系引用或被设定籍贯引用（`hometownCandidateId`）的地名候选；边只在两端节点都存在时写入。
+节点 ID 规则：设定卡 `s:<sheetId>`，地名 `p:<placeId>`。快照节点来源：全部设定卡 + 被设定 `hometownIds` 引用的地名；边只在两端节点都存在时写入。
 
 #### 7.4.6 `preferences.md`
 
@@ -341,9 +339,37 @@ flowchart TD
 
 - 只有设定卡写入 `[人物]` 分组；候选**不再**写入其它分组，仅在 `[候选]` 中以注释列出。
 - 键为名称（换行折叠为空格）；同名只保留第一条。
-- 简介取值：优先 `备注`；备注为空时，设定卡拼接 `职业` / `官职` / `籍贯` / `绰号` / `契约称号` 的非空值（`，` 分隔），候选拼接结构子项 `标签：词`。
+- 简介取值：优先 `备注`；备注为空时，设定卡拼接 `职业` / `籍贯` 的非空值（`，` 分隔），候选拼接结构子项 `标签：词`。
 - `[候选]` 分组始终输出，按候选库顺序以 `; 名称 = 简介` 注释形式列出全部候选。
 - 该文件是派生产物，手动修改会在下次生成时被覆盖。
+
+
+#### 7.4.8 `places.md`
+
+地名库使用与候选相同的「`#` 总标题 + `##` 分节 + `- 字段: 值`」格式：
+
+```markdown
+# 地名
+
+## 青云城
+
+- ID: `0c9a…`
+- 名称: 青云城
+- 族群: 人族
+- 备注: 边境主城
+- 创建时间: 2026-10-26T05:57:48.000Z
+- 更新时间: 2026-10-26T05:57:48.000Z
+```
+
+| 字段                  | 是否必读 | 说明                       |
+| --------------------- | -------- | -------------------------- |
+| `ID`                  | 是       | 缺失则跳过                 |
+| `名称`                | 是       | 缺失时回退 `##` 标题       |
+| `族群`                | 否       | 缺省 `human`               |
+| `备注`                | 否       | 自由文本                   |
+| `创建时间`/`更新时间` | 否       | 缺失时回退当前时间         |
+
+地名与人物候选库完全分离：生成页选择「地名」时保存到 `places.md`，候选库不再保存地名。
 
 ### 7.5 读写与存储策略
 
@@ -354,7 +380,7 @@ flowchart TD
 - **关系摘要刷新**：关系增删后重写 `sheets.md` 中每张设定卡的 `关系` 字段（§7.4.3）；设定卡保存/删除、候选强制删除与旧数据迁移也会同步重写。打开项目时若 `relations.md` 已有关系而 `sheets.md` 缺少摘要，会自动补写。
 - **设定集清单刷新**：候选新增/更新/删除、设定卡保存/删除、旧数据迁移与打开项目后，自动重新生成 `sheets.ini`（§7.4.7）。
 - **布局写入**：`graph.saveLayout` 用提交的坐标表整体覆盖布局表，并同时重建快照。
-- **缺失文件容错**：读取缺失文件返回空字符串并按空数据解析；打开项目时会先补齐六个文件。
+- **缺失文件容错**：读取缺失文件返回空字符串并按空数据解析；打开项目时会先补齐七个文件（含 `places.md`）。
 
 ### 7.6 旧数据自动迁移
 
@@ -412,11 +438,14 @@ flowchart TD
 | `candidates.get(id)`                   | `workshop:candidates:get`          | 不写盘                                                                               | 返回候选或 `null`                                                                                                         |
 | `candidates.create(input)`             | `workshop:candidates:create`       | 写 `candidates.md` + `graph.md` + `sheets.ini`                                       | 新增候选（可带 `gender` / `rarity`）；重复名称返回 `{ ok:false, duplicate:true }`；返回 `{ ok, duplicate, id, message? }` |
 | `candidates.update(id, patch)`         | `workshop:candidates:update`       | 写 `candidates.md` + `sheets.ini`                                                    | 更新 `favorite` / `note`，刷新 `updatedAt`；不刷新图谱快照                                                                |
-| `candidates.references(id)`            | `workshop:candidates:references`   | 不写盘                                                                               | 返回 `{ asCharacter, asHometown, asPlace }`                                                                               |
-| `candidates.remove(id, force)`         | `workshop:candidates:delete`       | 写 `candidates.md`（必要时改 `sheets.md`/`relations.md`）+ `graph.md` + `sheets.ini` | `force=false` 且存在引用时拒绝；`force=true` 时清空引用并删除地名关系                                                     |
+| `candidates.references(id)`            | `workshop:candidates:references`   | 不写盘                                                                               | 返回 `{ asCharacter }`                                                                                                    |
+| `candidates.remove(id, force)`         | `workshop:candidates:delete`       | 写 `candidates.md`（必要时改 `sheets.md`）+ `graph.md` + `sheets.ini`                | `force=false` 且角色名被引用时拒绝；`force=true` 时清空 `候选关联` 后删除                                                 |
 | `sheets.list()`                        | `workshop:sheets:list`             | 不写盘                                                                               | 返回按创建时间倒序、带 `relationCount` 的设定卡                                                                           |
 | `sheets.save(input)`                   | `workshop:sheets:save`             | 写 `sheets.md` + `graph.md` + `sheets.ini`                                           | 新建或按 `id` 更新，可带可选 `gender`；人物名为空拒绝；返回 `{ ok, id, message? }`                                        |
 | `sheets.remove(id)`                    | `workshop:sheets:delete`           | 写 `sheets.md`、`relations.md`、`graph.md`、`sheets.ini`                             | 删除设定卡并级联删除相关关系                                                                                              |
+| `places.list()`                        | `workshop:places:list`             | 不写盘                                                                               | 返回按创建时间倒序的地名列表                                                                                              |
+| `places.save(input)`                   | `workshop:places:save`             | 写 `places.md` + `graph.md`                                                          | 新建或按 `id` 更新；名称为空拒绝；同族群同名拒绝；返回 `{ ok, id, message? }`                                              |
+| `places.remove(id)`                    | `workshop:places:delete`           | 写 `places.md`（必要时改 `sheets.md`）+ `graph.md`                                   | 删除地名并从设定 `hometownIds` / 展示文本中移除引用                                                                       |
 | `relations.list()`                     | `workshop:relations:list`          | 不写盘                                                                               | 返回按创建时间倒序的关系列表                                                                                              |
 | `relations.add(input)`                 | `workshop:relations:add`           | 写 `relations.md` + `sheets.md` + `graph.md`                                         | 空端点/重复关系拒绝；允许来源与目标相同（关联自身）；同步刷新设定卡 `关系` 字段                                           |
 | `relations.remove(id)`                 | `workshop:relations:remove`        | 写 `relations.md` + `sheets.md` + `graph.md`                                         | 删除关系并同步刷新设定卡 `关系` 字段                                                                                      |

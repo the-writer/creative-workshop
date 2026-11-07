@@ -1,6 +1,6 @@
 // 图谱数据构建：由 DB 中的设定卡与关系记录派生节点与边
 
-import type { Candidate, NameTypeKey, RaceKey, Relation, Sheet } from '@/lib/types';
+import type { NameTypeKey, Place, RaceKey, Relation, Sheet } from '@/lib/types';
 
 export type GraphKind = 'person' | 'place';
 
@@ -10,7 +10,7 @@ export interface GraphNode {
   label: string;
   race: RaceKey;
   sheet?: Sheet;
-  candidate?: Candidate;
+  place?: Place;
 }
 
 export interface GraphEdge {
@@ -42,7 +42,7 @@ function placeNodeId(candidateId: string): string {
 export function buildGraphData(
   sheets: Sheet[],
   relations: Relation[],
-  placeCandidates: Candidate[],
+  placeList: Place[],
   viewMode: GraphViewMode,
   typeFilter: NodeTypeFilter,
   raceFilter: RaceKey | 'all',
@@ -58,28 +58,24 @@ export function buildGraphData(
     });
   });
 
-  const placeById = new Map<string, Candidate>();
-  placeCandidates.forEach((c) => {
-    if (c.nameType === 'place') placeById.set(c.id, c);
-  });
+  const placeById = new Map<string, Place>();
+  placeList.forEach((place) => placeById.set(place.id, place));
 
   // 关联自身同样进入图谱：人物节点上用自环表示（如男主/女主标记）
   const graphRelations = relations;
 
   const placeNodeIds = new Set<string>();
-  graphRelations.forEach((r) => {
-    if (r.fromType === 'place') placeNodeIds.add(r.fromId);
-    if (r.toType === 'place') placeNodeIds.add(r.toId);
-  });
   sheets.forEach((s) => {
-    if (s.hometownCandidateId && placeById.has(s.hometownCandidateId)) placeNodeIds.add(s.hometownCandidateId);
+    s.hometownIds.forEach((id) => {
+      if (placeById.has(id)) placeNodeIds.add(id);
+    });
   });
 
   const placeNodes = new Map<string, GraphNode>();
-  placeNodeIds.forEach((cid) => {
-    const c = placeById.get(cid);
-    if (c) {
-      placeNodes.set(placeNodeId(cid), { id: placeNodeId(cid), kind: 'place', label: c.nameText, race: c.race, candidate: c });
+  placeNodeIds.forEach((id) => {
+    const place = placeById.get(id);
+    if (place) {
+      placeNodes.set(placeNodeId(id), { id: placeNodeId(id), kind: 'place', label: place.name, race: place.race, place });
     }
   });
 

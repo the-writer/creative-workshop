@@ -1,19 +1,19 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import './App.css';
-import { BarChart3, Library, PenLine, Settings, Share2, Users } from 'lucide-react';
+import { Library, MapPin, PenLine, Settings, Share2, Users } from 'lucide-react';
 import { GenerateTab, type EditorPrefill } from '@/components/GenerateTab';
 import { LibraryTab } from '@/components/LibraryTab';
 import { SheetsTab } from '@/components/SheetsTab';
 import { SheetEditor } from '@/components/SheetEditor';
 import { GraphTab } from '@/components/GraphTab';
-import { StatsTab } from '@/components/StatsTab';
 import { SettingsTab } from '@/components/SettingsTab';
+import { PlacesTab } from '@/components/PlacesTab';
 import { ProjectGate } from '@/components/ProjectGate';
 import { ToastProvider } from '@/components/common';
 import { getCurrentProject, type ProjectSummary } from '@/lib/db';
 import { cn } from '@/lib/utils';
 
-type PageKey = 'generate' | 'library' | 'sheets' | 'graph' | 'stats' | 'settings';
+type PageKey = 'generate' | 'library' | 'sheets' | 'places' | 'graph' | 'settings';
 
 interface EditorState {
   sheetId: string | null;
@@ -24,8 +24,8 @@ const NAV_ITEMS: Array<{ key: PageKey; label: string; icon: ReactNode }> = [
   { key: 'generate', label: '生成', icon: <PenLine size={20} /> },
   { key: 'library', label: '候选库', icon: <Library size={20} /> },
   { key: 'sheets', label: '设定', icon: <Users size={20} /> },
+  { key: 'places', label: '地名', icon: <MapPin size={20} /> },
   { key: 'graph', label: '图谱', icon: <Share2 size={20} /> },
-  { key: 'stats', label: '统计', icon: <BarChart3 size={20} /> },
   { key: 'settings', label: '设置', icon: <Settings size={20} /> },
 ];
 
@@ -53,9 +53,9 @@ function WorkshopApp({ project, onSwitchProject }: { project: ProjectSummary; on
           </div>
           {page === 'library' ? <LibraryTab refreshKey={refreshKey} onOpenEditor={(p) => openEditor(p)} onGoGenerate={() => setPage('generate')} /> : null}
           {page === 'sheets' ? <SheetsTab refreshKey={refreshKey} onOpenEditor={(p, id) => openEditor(p, id)} /> : null}
+          {page === 'places' ? <PlacesTab refreshKey={refreshKey} /> : null}
           {page === 'graph' ? <GraphTab refreshKey={refreshKey} onGoSheets={() => setPage('sheets')} /> : null}
-          {page === 'stats' ? <StatsTab refreshKey={refreshKey} /> : null}
-          {page === 'settings' ? <SettingsTab project={project} onSwitchProject={onSwitchProject} /> : null}
+          {page === 'settings' ? <SettingsTab project={project} onSwitchProject={onSwitchProject} refreshKey={refreshKey} /> : null}
         </div>
         <nav className="bottom-nav">
           {NAV_ITEMS.map((item) => (

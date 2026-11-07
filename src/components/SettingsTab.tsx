@@ -7,13 +7,15 @@ import { computeCombinationTotals, formatCombination } from '@/data/lexicon';
 import { cn } from '@/lib/utils';
 import { SectionTitle, useAppToast } from '@/components/common';
 import { MarkdownView } from '@/components/MarkdownView';
+import { StatsTab } from '@/components/StatsTab';
 
 interface SettingsTabProps {
   project: ProjectSummary;
   onSwitchProject: () => void;
+  refreshKey: number;
 }
 
-export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
+export function SettingsTab({ project, onSwitchProject, refreshKey }: SettingsTabProps) {
   const toast = useAppToast();
   const [opening, setOpening] = useState<'vscode' | 'clion' | 'finder' | null>(null);
   const [overview, setOverview] = useState('');
@@ -105,13 +107,14 @@ export function SettingsTab({ project, onSwitchProject }: SettingsTabProps) {
         <SectionTitle>关于</SectionTitle>
         <div className="settings-card">
           <p className="settings-about-name">创作工坊</p>
-          <p className="settings-desc">为小说世界观生成人名、地名、官职与绰号，并组织候选、设定卡、关系图谱与统计。</p>
+          <p className="settings-desc">为小说世界观生成人名与地名，并组织候选、设定卡、地名库与关系图谱。</p>
           <p className="settings-desc" data-testid="settings-lexicon-scale">
             当前词库理论组合量：{formatCombination(lexiconScale.grandTotal)}（人名 {formatCombination(lexiconScale.detail.person)} · 地名{' '}
-            {formatCombination(lexiconScale.detail.place)} · 官职 {formatCombination(lexiconScale.detail.office)} · 绰号{' '}
-            {formatCombination(lexiconScale.detail.nickname)}）
+            {formatCombination(lexiconScale.detail.place)}）
           </p>
         </div>
+
+        <StatsTab refreshKey={refreshKey} />
 
         {overview.trim() ? (
           <>

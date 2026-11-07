@@ -1,4 +1,4 @@
-// 统计页：概览卡、多维分布柱状图、词库规模
+// 统计区块：嵌入设置页的概览卡、多维分布柱状图与词库规模
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { fetchStats, type StatsData } from '@/lib/db';
@@ -43,7 +43,7 @@ function BarChart({
   );
 }
 
-const OVERVIEW_COLORS = ['#B23A2E', '#B98A3A', '#3E4A5A', '#4A7C59'];
+const OVERVIEW_COLORS = ['#B23A2E', '#B98A3A', '#3E4A5A', '#4A7C59', '#5A4468'];
 
 export function StatsTab({ refreshKey }: StatsTabProps) {
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -76,111 +76,95 @@ export function StatsTab({ refreshKey }: StatsTabProps) {
     { label: '候选命名', value: stats?.totalCandidates ?? 0 },
     { label: '已收藏', value: stats?.totalFavorites ?? 0 },
     { label: '设定卡', value: stats?.totalSheets ?? 0 },
+    { label: '地名', value: stats?.totalPlaces ?? 0 },
     { label: '关系', value: stats?.totalRelations ?? 0 },
   ];
 
   return (
-    <div className="page-shell stats-page">
-      <div className="app-scroll">
-        <div className="stats-header">
-          <p className="sheets-title">统计</p>
+    <div className="stats-section" data-testid="stats-section">
+      <SectionTitle
+        right={
           <button type="button" className="icon-btn" title="刷新" data-testid="stats-refresh" onClick={() => void reload({ silent: true })}>
-            <RefreshCw size={16} className={cn(refreshing && 'spin')} />
+            <RefreshCw size={15} className={cn(refreshing && 'spin')} />
+          </button>
+        }
+      >
+        统计
+      </SectionTitle>
+
+      {error ? (
+        <div className="error-bar" data-testid="stats-error">
+          {error}
+          <button type="button" className="retry-link" onClick={() => void reload()}>
+            重试
           </button>
         </div>
+      ) : null}
 
-        {error ? (
-          <div className="error-bar" data-testid="stats-error">
-            {error}
-            <button type="button" className="retry-link" onClick={() => void reload()}>
-              重试
-            </button>
+      {loading ? (
+        <div className="list-loading">正在清点谱系…</div>
+      ) : stats ? (
+        <>
+          <div className="stat-cards stat-cards-compact">
+            {overviews.map((o, i) => (
+              <div key={o.label} className="stat-card" data-testid={`stat-card-${o.label}`}>
+                <p className="stat-card-value" style={{ color: OVERVIEW_COLORS[i] }}>
+                  {o.value}
+                </p>
+                <p className="stat-card-label">{o.label}</p>
+              </div>
+            ))}
           </div>
-        ) : null}
 
-        {loading ? (
-          <div className="list-loading">正在清点谱系…</div>
-        ) : stats ? (
-          <>
-            {/* 概览卡 */}
-            <div className="stat-cards">
-              {overviews.map((o, i) => (
-                <div key={o.label} className="stat-card" data-testid={`stat-card-${o.label}`}>
-                  <p className="stat-card-value" style={{ color: OVERVIEW_COLORS[i] }}>
-                    {o.value}
-                  </p>
-                  <p className="stat-card-label">{o.label}</p>
-                </div>
-              ))}
-            </div>
+          <div className="stat-chart-card">
+            <SectionTitle>族群分布</SectionTitle>
+            <BarChart
+              data={stats.raceDist}
+              order={RACE_KEYS}
+              labels={RACE_LABELS}
+              color="#B23A2E"
+              colorMap={{ human: '#B23A2E', elf: '#3E4A5A', yaogui: '#5A4468', mixed: '#4A7C59' }}
+            />
+          </div>
+          <div className="stat-chart-card">
+            <SectionTitle>字数分布</SectionTitle>
+            <BarChart
+              data={stats.charDist}
+              order={Object.keys(stats.charDist)
+                .map(Number)
+                .sort((a, b) => a - b)
+                .slice(0, 14)
+                .map(String)}
+              labels={{}}
+              color="#B98A3A"
+            />
+          </div>
+          <div className="stat-chart-card">
+            <SectionTitle>关系类型分布</SectionTitle>
+            <BarChart data={stats.relationTypeDist} order={Array.from(RELATION_TYPES)} labels={{}} color="#3E4A5A" />
+          </div>
 
-            {/* 分布 */}
-            <div className="stat-chart-card">
-              <SectionTitle>族群分布</SectionTitle>
-              <BarChart
-                data={stats.raceDist}
-                order={RACE_KEYS}
-                labels={RACE_LABELS}
-                color="#B23A2E"
-                colorMap={{ human: '#B23A2E', elf: '#3E4A5A', yaogui: '#5A4468', mixed: '#4A7C59' }}
-              />
-            </div>
-            <div className="stat-chart-card">
-              <SectionTitle>类型分布</SectionTitle>
-              <BarChart data={stats.typeDist} order={TYPE_KEYS} labels={TYPE_LABELS} color="#4A7C59" />
-            </div>
-            <div className="stat-chart-card">
-              <SectionTitle>字数分布</SectionTitle>
-              <BarChart
-                data={stats.charDist}
-                order={Object.keys(stats.charDist)
-                  .map(Number)
-                  .sort((a, b) => a - b)
-                  .slice(0, 14)
-                  .map(String)}
-                labels={{}}
-                color="#B98A3A"
-              />
-            </div>
-            <div className="stat-chart-card">
-              <SectionTitle>关系类型分布</SectionTitle>
-              <BarChart data={stats.relationTypeDist} order={Array.from(RELATION_TYPES)} labels={{}} color="#3E4A5A" />
-            </div>
-
-            {/* 词库规模 */}
-            <div className="stat-chart-card lexicon-card">
-              <SectionTitle>词库规模</SectionTitle>
-              <div className="lexicon-row">
-                <span>人族组合量</span>
-                <strong>{formatCombination(combo.perRace.human.total)}</strong>
+          <div className="stat-chart-card lexicon-card">
+            <SectionTitle>词库规模</SectionTitle>
+            {RACE_KEYS.map((race) => (
+              <div key={race} className="lexicon-row">
+                <span>{RACE_LABELS[race]}组合量</span>
+                <strong>{formatCombination(combo.perRace[race].total)}</strong>
               </div>
-              <div className="lexicon-row">
-                <span>精灵族组合量</span>
-                <strong>{formatCombination(combo.perRace.elf.total)}</strong>
-              </div>
-              <div className="lexicon-row">
-                <span>妖鬼组合量</span>
-                <strong>{formatCombination(combo.perRace.yaogui.total)}</strong>
-              </div>
-              <div className="lexicon-row">
-                <span>混血组合量</span>
-                <strong>{formatCombination(combo.perRace.mixed.total)}</strong>
-              </div>
-              <div className="lexicon-row lexicon-row-total">
-                <span>理论组合总量</span>
-                <strong>{formatCombination(combo.grandTotal)}</strong>
-              </div>
-              <p className="lexicon-badge">按本地资料库实时估算，理论组合已超过安全整数，采用精确大整数计数</p>
-              <p className="lexicon-detail">
-                人名 {formatCombination(combo.detail.person)} · 地名 {formatCombination(combo.detail.place)} · 官职 {formatCombination(combo.detail.office)} ·
-                绰号 {formatCombination(combo.detail.nickname)}
-              </p>
+            ))}
+            <div className="lexicon-row lexicon-row-total">
+              <span>理论组合总量</span>
+              <strong>{formatCombination(combo.grandTotal)}</strong>
             </div>
-          </>
-        ) : (
-          <EmptyState title="暂无统计数据" desc="先去生成一批命名，统计会自动铺开" testId="stats-empty" />
-        )}
-      </div>
+            <p className="lexicon-badge">按本地资料库实时估算，理论组合已超过安全整数，采用精确大整数计数</p>
+            <p className="lexicon-detail">
+              人名 {formatCombination(combo.detail.person)} · 地名 {formatCombination(combo.detail.place)}
+            </p>
+          </div>
+        </>
+      ) : (
+        <EmptyState title="暂无统计数据" desc="先去生成一批命名，统计会自动铺开" testId="stats-empty" />
+      )}
     </div>
   );
 }

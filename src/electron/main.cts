@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { app, BrowserWindow, Menu, Tray, nativeImage, dialog, session, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, Menu, Tray, nativeImage, dialog, screen, session, type MenuItemConstructorOptions } from 'electron';
 import { IPC, registerWorkshopIpc } from './ipc/workshop-ipc.cjs';
 import { ProjectManager } from './services/project-manager.cjs';
 import { WorkshopStorage } from './services/workshop-storage.cjs';
@@ -9,6 +9,10 @@ interface CreationWorkshopConfig {
   window?: {
     width?: number;
     height?: number;
+    minWidth?: number;
+    minHeight?: number;
+    maxWidth?: number;
+    maxHeight?: number;
     titleBarStyle?: 'default' | 'hidden' | 'hiddenInset' | 'customButtonsOnHover';
     alwaysOnTop?: boolean;
     alwaysOnTopLevel?: 'normal' | 'floating' | 'torn-off-menu' | 'modal-panel' | 'main-menu' | 'status' | 'pop-up-menu' | 'screen-saver';
@@ -29,6 +33,10 @@ const APP_NAME = '创作工坊';
 // 窗口常量集中在此（配置项缺省时的回退值），业务代码不散落魔法值
 const DEFAULT_WINDOW_WIDTH = 800;
 const DEFAULT_WINDOW_HEIGHT = 600;
+const DEFAULT_WINDOW_MIN_WIDTH = 320;
+const DEFAULT_WINDOW_MIN_HEIGHT = 240;
+const DEFAULT_WINDOW_MAX_WIDTH = 1024;
+const DEFAULT_WINDOW_MAX_HEIGHT = 768;
 const DEFAULT_TITLE_BAR_STYLE = 'hiddenInset';
 const DEFAULT_ALWAYS_ON_TOP_LEVEL = 'floating';
 // 独立窗口模式：窗口绑定在打开时所在的桌面，打开期间切换桌面不跟随。
@@ -46,6 +54,10 @@ const packageJson = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json
 const config = packageJson.creationWorkshop ?? {};
 const windowWidth = config.window?.width ?? DEFAULT_WINDOW_WIDTH;
 const windowHeight = config.window?.height ?? DEFAULT_WINDOW_HEIGHT;
+const windowMinWidth: number = config.window?.minWidth ?? DEFAULT_WINDOW_MIN_WIDTH;
+const windowMinHeight: number = config.window?.minHeight ?? DEFAULT_WINDOW_MIN_HEIGHT;
+const windowMaxWidth: number = config.window?.maxWidth ?? DEFAULT_WINDOW_MAX_WIDTH;
+const windowMaxHeight: number = config.window?.maxHeight ?? DEFAULT_WINDOW_MAX_HEIGHT;
 const titleBarStyle = config.window?.titleBarStyle ?? DEFAULT_TITLE_BAR_STYLE;
 const windowAlwaysOnTop = config.window?.alwaysOnTop ?? false;
 const windowAlwaysOnTopLevel = config.window?.alwaysOnTopLevel ?? DEFAULT_ALWAYS_ON_TOP_LEVEL;
@@ -105,6 +117,29 @@ function bindWindowToCurrentDesktop(win: BrowserWindow): void {
   win.setVisibleOnAllWorkspaces(false, WINDOW_COLLECTION_BEHAVIOR);
 }
 
+/**
+ * 把窗口移动到鼠标所在的显示器并居中，使重新打开时落在用户当前操作的桌面。
+ * 仅调整位置，不小于最小尺寸，且不超出该显示器工作区。
+ */
+function moveWindowToCursorDisplay(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  try {
+    const cursor = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursor);
+    const area = display.workArea;
+    const size = win.getSize();
+    const width = size[0] ?? windowWidth;
+    const height = size[1] ?? windowHeight;
+    const safeWidth = Math.min(Math.max(width, windowMinWidth), Math.min(windowMaxWidth, area.width));
+    const safeHeight = Math.min(Math.max(height, windowMinHeight), Math.min(windowMaxHeight, area.height));
+    const x = Math.round(area.x + Math.max(0, (area.width - safeWidth) / 2));
+    const y = Math.round(area.y + Math.max(0, (area.height - safeHeight) / 2));
+    win.setBounds({ x, y, width: safeWidth, height: safeHeight });
+  } catch {
+    // 位置调整失败时保持系统默认位置
+  }
+}
+
 function cancelDesktopBind(): void {
   if (desktopBindTimer) {
     clearTimeout(desktopBindTimer);
@@ -130,8 +165,9 @@ function showMainWindow(forceForeground = false): void {
   const alreadyVisible = win.isVisible();
   applyNormalWindowLevel(win);
   cancelDesktopBind();
-  if (!alreadyVisible && process.platform === 'darwin') {
-    win.setVisibleOnAllWorkspaces(true, WINDOW_COLLECTION_BEHAVIOR);
+  if (!alreadyVisible) {
+    moveWindowToCursorDisplay(win);
+    if (process.platform === 'darwin') win.setVisibleOnAllWorkspaces(true, WINDOW_COLLECTION_BEHAVIOR);
   }
 
   win.show();
@@ -278,7 +314,11 @@ function createWindow(): BrowserWindow {
     height: windowHeight,
     // 普通独立窗口：不置顶，绑定在打开时所在的桌面，切换桌面不跟随（见 bindWindowToCurrentDesktop）
     useContentSize: true,
-    resizable: false,
+    resizable: true,
+    minWidth: windowMinWidth,
+    minHeight: windowMinHeight,
+    maxWidth: windowMaxWidth,
+    maxHeight: windowMaxHeight,
     maximizable: false,
     fullscreenable: false,
     show: false,

@@ -2,10 +2,10 @@
 // 文件为「标题 + 字段行」的可读 Markdown；解析时容错，跳过不完整条目。
 
 export type RaceKey = 'human' | 'elf' | 'yaogui' | 'mixed';
-export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
+export type NameTypeKey = 'person' | 'place';
 export type NameGender = 'any' | 'male' | 'female' | 'neutral';
 export type RarityTier = 'S' | 'SS' | 'SSS' | 'SSSR';
-export type EntityType = 'sheet' | 'place';
+export type EntityType = 'sheet';
 
 export interface StructurePart {
   label: string;
@@ -28,6 +28,17 @@ export interface Candidate {
   updatedAt: number;
 }
 
+/** 独立的地名条目，保存在 `.workshop/places.md`。 */
+export interface Place {
+  id: string;
+  name: string;
+  race: RaceKey;
+  structure: StructurePart[];
+  note: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Sheet {
   id: string;
   characterName: string;
@@ -35,11 +46,10 @@ export interface Sheet {
   gender?: NameGender;
   candidateId: string;
   occupation: string;
-  office: string;
+  /** 展示用籍贯文本（多个地名以「、」连接） */
   hometown: string;
-  hometownCandidateId: string;
-  nickname: string;
-  contractTitle: string;
+  /** 关联地名 ID，可多选 */
+  hometownIds: string[];
   note: string;
   createdAt: number;
   updatedAt: number;
@@ -86,10 +96,10 @@ export interface CandidateFilters {
 export const SCHEMA_VERSION = 1;
 
 const RACE_LABELS: Record<RaceKey, string> = { human: '人族', elf: '精灵族', yaogui: '妖鬼', mixed: '混血' };
-const TYPE_LABELS: Record<NameTypeKey, string> = { person: '人名', place: '地名', office: '官职', nickname: '绰号' };
+const TYPE_LABELS: Record<NameTypeKey, string> = { person: '人名', place: '地名' };
 const INI_PEOPLE_GROUP = '人物';
 const GENDER_LABELS: Record<NameGender, string> = { any: '不限', male: '男性', female: '女性', neutral: '中性' };
-const ENTITY_LABELS: Record<EntityType, string> = { sheet: '设定卡', place: '地名' };
+const ENTITY_LABELS: Record<EntityType, string> = { sheet: '设定卡' };
 
 function parseRace(value: string): RaceKey {
   if (value === '混血' || value === 'mixed') return 'mixed';
@@ -100,9 +110,8 @@ function parseRace(value: string): RaceKey {
 }
 
 function parseNameType(value: string): NameTypeKey {
+  // 官职 / 绰号已下线，历史数据统一按人名保留。
   if (value === '地名' || value === 'place') return 'place';
-  if (value === '官职' || value === 'office') return 'office';
-  if (value === '绰号' || value === 'nickname') return 'nickname';
   return 'person';
 }
 
@@ -118,8 +127,9 @@ function parseRarity(value: string): RarityTier | undefined {
   return value === 'S' || value === 'SS' || value === 'SSS' || value === 'SSSR' ? value : undefined;
 }
 
-function parseEntityType(value: string): EntityType {
-  return value === '地名' || value === 'place' ? 'place' : 'sheet';
+function parseEntityType(_value: string): EntityType {
+  // 关系只允许关联人物；历史地名关系在读取时归为设定卡来源。
+  return 'sheet';
 }
 
 function parseBoolean(value: string): boolean {
@@ -351,6 +361,49 @@ export function serializeCandidatesMarkdown(candidates: Candidate[]): string {
   return out.join('\n');
 }
 
+/* ---------------- 地名 ---------------- */
+
+export function parsePlacesMarkdown(text: string): Place[] {
+  const { sections } = splitSections(text);
+  const result: Place[] = [];
+  for (const section of sections) {
+    const fields = toFieldMap(parseFields(section.body));
+    const id = fieldValue(fields, 'ID', 'id');
+    const name = fieldValue(fields, '名称', 'name') || cleanHeading(section.heading);
+    if (!id || !name) continue;
+    result.push({
+      id,
+      name,
+      race: parseRace(fieldValue(fields, '族群')),
+      structure: normalizeStructure(fields.get('结构')?.children ?? []),
+      note: fieldValue(fields, '备注'),
+      createdAt: parseTimestamp(fieldValue(fields, '创建时间', 'createdAt')),
+      updatedAt: parseTimestamp(fieldValue(fields, '更新时间', 'updatedAt')),
+    });
+  }
+  return result;
+}
+
+export function serializePlacesMarkdown(places: Place[]): string {
+  const out: string[] = ['# 地名', '', '> 由「创作工坊」自动维护。每个地名以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
+  places.forEach((place) => {
+    out.push(`## ${headingText(place.name)}`);
+    out.push('');
+    out.push(`- ID: ${encodeId(place.id)}`);
+    out.push(`- 名称: ${encodeValue(place.name)}`);
+    out.push(`- 族群: ${RACE_LABELS[place.race]}`);
+    out.push(`- 备注: ${encodeValue(place.note)}`);
+    out.push(`- 创建时间: ${timestamp(place.createdAt)}`);
+    out.push(`- 更新时间: ${timestamp(place.updatedAt)}`);
+    if (place.structure.length > 0) {
+      out.push('- 结构:');
+      place.structure.forEach((part) => out.push(`  - ${part.label}: ${encodeValue(part.word)}`));
+    }
+    out.push('');
+  });
+  return out.join('\n');
+}
+
 /* ---------------- 设定卡 ---------------- */
 
 export function parseSheetsMarkdown(text: string): Sheet[] {
@@ -363,6 +416,10 @@ export function parseSheetsMarkdown(text: string): Sheet[] {
     if (!id || !characterName) continue;
     const createdAt = parseTimestamp(fieldValue(fields, '创建时间', 'createdAt'));
     const gender = parseGender(fieldValue(fields, '性别'));
+    const hometownIds = fieldValue(fields, '籍贯 ID', '籍贯ID', '籍贯候选', 'hometownIds', 'hometownCandidateId')
+      .split(/[,，、]/)
+      .map((value) => value.replace(/`/g, '').trim())
+      .filter(Boolean);
     result.push({
       id,
       characterName,
@@ -370,11 +427,8 @@ export function parseSheetsMarkdown(text: string): Sheet[] {
       ...(gender ? { gender } : {}),
       candidateId: fieldValue(fields, '候选关联', 'candidateId'),
       occupation: fieldValue(fields, '职业'),
-      office: fieldValue(fields, '官职'),
       hometown: fieldValue(fields, '籍贯'),
-      hometownCandidateId: fieldValue(fields, '籍贯候选', 'hometownCandidateId'),
-      nickname: fieldValue(fields, '绰号'),
-      contractTitle: fieldValue(fields, '契约称号'),
+      hometownIds,
       note: fieldValue(fields, '备注'),
       createdAt,
       updatedAt: parseTimestamp(fieldValue(fields, '更新时间', 'updatedAt')) || createdAt,
@@ -411,11 +465,8 @@ export function serializeSheetsMarkdown(sheets: Sheet[], relations: Relation[] =
     if (sheet.gender) out.push(`- 性别: ${GENDER_LABELS[sheet.gender]}`);
     if (sheet.candidateId) out.push(`- 候选关联: ${encodeId(sheet.candidateId)}`);
     out.push(`- 职业: ${encodeValue(sheet.occupation)}`);
-    out.push(`- 官职: ${encodeValue(sheet.office)}`);
     out.push(`- 籍贯: ${encodeValue(sheet.hometown)}`);
-    if (sheet.hometownCandidateId) out.push(`- 籍贯候选: ${encodeId(sheet.hometownCandidateId)}`);
-    out.push(`- 绰号: ${encodeValue(sheet.nickname)}`);
-    out.push(`- 契约称号: ${encodeValue(sheet.contractTitle)}`);
+    if (sheet.hometownIds.length > 0) out.push(`- 籍贯 ID: ${sheet.hometownIds.map(encodeId).join(', ')}`);
     out.push(`- 备注: ${encodeValue(sheet.note)}`);
     const relationsText = sheetRelationsText(sheet, relations);
     if (relationsText) out.push(`- 关系: ${encodeValue(relationsText)}`);
@@ -437,7 +488,7 @@ function iniText(value: string): string {
 function sheetSummary(sheet: Sheet): string {
   const note = iniText(sheet.note);
   if (note) return note;
-  return [sheet.occupation, sheet.office, sheet.hometown, sheet.nickname, sheet.contractTitle].map(iniText).filter(Boolean).join('，');
+  return [sheet.occupation, sheet.hometown].map(iniText).filter(Boolean).join('，');
 }
 
 function candidateSummary(candidate: Candidate): string {
@@ -584,44 +635,34 @@ export interface GraphSnapshotEdge {
 
 const LAYOUT_HEADING = '节点布局';
 
-export function buildGraphSnapshot(
-  candidates: Candidate[],
-  sheets: Sheet[],
-  relations: Relation[],
-): { nodes: GraphSnapshotNode[]; edges: GraphSnapshotEdge[] } {
+export function buildGraphSnapshot(sheets: Sheet[], relations: Relation[], places: Place[] = []): { nodes: GraphSnapshotNode[]; edges: GraphSnapshotEdge[] } {
   const nodes: GraphSnapshotNode[] = sheets.map((sheet) => ({
     id: `s:${sheet.id}`,
     kind: 'person',
     label: sheet.characterName || '未命名人物',
     race: sheet.race,
   }));
-  const placeById = new Map<string, Candidate>();
-  candidates.forEach((candidate) => {
-    if (candidate.nameType === 'place') placeById.set(candidate.id, candidate);
-  });
-  // 关联自身同样写入图谱快照，由前端渲染为节点自环
-  const graphRelations = relations;
+  const placeById = new Map<string, Place>();
+  places.forEach((place) => placeById.set(place.id, place));
   const placeIds = new Set<string>();
-  graphRelations.forEach((relation) => {
-    if (relation.fromType === 'place') placeIds.add(relation.fromId);
-    if (relation.toType === 'place') placeIds.add(relation.toId);
-  });
   sheets.forEach((sheet) => {
-    if (sheet.hometownCandidateId && placeById.has(sheet.hometownCandidateId)) placeIds.add(sheet.hometownCandidateId);
+    sheet.hometownIds.forEach((placeId) => {
+      if (placeById.has(placeId)) placeIds.add(placeId);
+    });
   });
   Array.from(placeIds)
     .sort()
     .forEach((placeId) => {
-      const candidate = placeById.get(placeId);
-      if (!candidate) return;
-      nodes.push({ id: `p:${placeId}`, kind: 'place', label: candidate.nameText, race: candidate.race });
+      const place = placeById.get(placeId);
+      if (!place) return;
+      nodes.push({ id: `p:${placeId}`, kind: 'place', label: place.name, race: place.race });
     });
 
   const nodeIds = new Set(nodes.map((node) => node.id));
   const edges: GraphSnapshotEdge[] = [];
-  graphRelations.forEach((relation) => {
-    const source = relation.fromType === 'sheet' ? `s:${relation.fromId}` : `p:${relation.fromId}`;
-    const target = relation.toType === 'sheet' ? `s:${relation.toId}` : `p:${relation.toId}`;
+  relations.forEach((relation) => {
+    const source = `s:${relation.fromId}`;
+    const target = `s:${relation.toId}`;
     if (!nodeIds.has(source) || !nodeIds.has(target)) return;
     edges.push({ fromName: relation.fromName, relationType: relation.relationType, toName: relation.toName });
   });
@@ -652,8 +693,8 @@ export function parseGraphMarkdown(text: string): { layout: GraphLayout; updated
   return { layout, updatedAt: parseTimestamp(fieldValue(fields, '更新时间')) };
 }
 
-export function serializeGraphMarkdown(layout: GraphLayout, candidates: Candidate[], sheets: Sheet[], relations: Relation[]): string {
-  const snapshot = buildGraphSnapshot(candidates, sheets, relations);
+export function serializeGraphMarkdown(layout: GraphLayout, sheets: Sheet[], relations: Relation[], places: Place[] = []): string {
+  const snapshot = buildGraphSnapshot(sheets, relations, places);
   const out: string[] = [
     '# 图谱',
     '',

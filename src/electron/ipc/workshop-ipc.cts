@@ -2,9 +2,10 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, type IpcMainInvokeEvent
 import { ProjectManager } from '../services/project-manager.cjs';
 import {
   WorkshopStorage,
-  type CandidateFilters,
+  type   CandidateFilters,
   type CandidateInput,
   type GraphPoint,
+  type PlaceInput,
   type RelationInput,
   type SheetInput,
 } from '../services/workshop-storage.cjs';
@@ -33,6 +34,9 @@ export const IPC = {
   sheetList: 'workshop:sheets:list',
   sheetSave: 'workshop:sheets:save',
   sheetDelete: 'workshop:sheets:delete',
+  placeList: 'workshop:places:list',
+  placeSave: 'workshop:places:save',
+  placeDelete: 'workshop:places:delete',
   relationList: 'workshop:relations:list',
   relationAdd: 'workshop:relations:add',
   relationRemove: 'workshop:relations:remove',
@@ -124,6 +128,9 @@ export function registerWorkshopIpc(storage: WorkshopStorage, projects: ProjectM
   registerHandler(IPC.sheetList, () => storage.sheetsList());
   registerHandler(IPC.sheetSave, (_event, input: SheetInput) => storage.sheetSave(input));
   registerHandler(IPC.sheetDelete, (_event, id: string) => storage.sheetDelete(id));
+  registerHandler(IPC.placeList, () => storage.placesList());
+  registerHandler(IPC.placeSave, (_event, input: PlaceInput) => storage.placeSave(input));
+  registerHandler(IPC.placeDelete, (_event, id: string) => storage.placeDelete(id));
   registerHandler(IPC.relationList, () => storage.relationsList());
   registerHandler(IPC.relationAdd, (_event, input: RelationInput) => storage.relationAdd(input));
   registerHandler(IPC.relationRemove, (_event, id: string) => storage.relationRemove(id));

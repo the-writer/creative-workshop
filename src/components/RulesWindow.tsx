@@ -16,19 +16,10 @@ import { SURNAME_BIAS_STEP } from '@/lib/generator-rules';
 import { Chip, SectionTitle } from '@/components/common';
 import { cn } from '@/lib/utils';
 
-const NICK_SOURCE_OPTIONS: Array<[string, string]> = [
-  ['profession', '职业'],
-  ['appearance', '外貌'],
-  ['deed', '事迹'],
-  ['terrain', '地形'],
-  ['contract', '契约'],
-];
-
 const PERSON_SUFFIX_OPTIONS: Array<[PersonSuffix, string]> = [
   ['father', '父名'],
   ['place', '地名'],
   ['profession', '职业'],
-  ['contract', '契约称号'],
   ['blood', '血统'],
   ['title', '贵族封号'],
 ];
@@ -71,7 +62,6 @@ export function RulesWindow() {
   const { race, types, params } = prefs;
   const usesPerson = types.includes('person');
   const hasPerson = types.includes('person');
-  const showNickRules = types.includes('nickname') || (hasPerson && params.nicknamePrefix);
   const setParams = (patch: Partial<GenParams>) => setPrefs((current) => ({ ...current, params: { ...current.params, ...patch } }));
 
   const toggleProfession = (word: string) =>
@@ -91,17 +81,6 @@ export function RulesWindow() {
       params: {
         ...current.params,
         abilities: current.params.abilities.includes(word) ? current.params.abilities.filter((value) => value !== word) : [...current.params.abilities, word],
-      },
-    }));
-
-  const toggleNickSource = (key: string) =>
-    setPrefs((current) => ({
-      ...current,
-      params: {
-        ...current.params,
-        nicknameSources: current.params.nicknameSources.includes(key)
-          ? current.params.nicknameSources.filter((value) => value !== key)
-          : [...current.params.nicknameSources, key],
       },
     }));
 
@@ -206,58 +185,10 @@ export function RulesWindow() {
                   ))}
                 </div>
               </div>
-
-              <div className="rule-row">
-                <span className="rule-label">绰号前置</span>
-                <button
-                  type="button"
-                  className={cn('switch-btn', params.nicknamePrefix && 'switch-btn-on')}
-                  data-testid="nickname-prefix"
-                  onClick={() => setParams({ nicknamePrefix: !params.nicknamePrefix })}
-                >
-                  <span className="switch-knob" />
-                </button>
-              </div>
             </>
           ) : null}
 
-          {showNickRules ? (
-            <>
-              <div className="rule-row">
-                <span className="rule-label">绰号字数</span>
-                <div className="segmented">
-                  {([2, 3, 4, 5, 6, 7, 8] as const).map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={cn('seg-btn', params.nicknameChars === value && 'seg-btn-active')}
-                      data-testid={`nickchars-${value}`}
-                      onClick={() => setParams({ nicknameChars: value })}
-                    >
-                      {value}字
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              <div className="rule-row">
-                <span className="rule-label">绰号来源</span>
-                <div className="segmented">
-                  {NICK_SOURCE_OPTIONS.map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      className={cn('seg-btn', params.nicknameSources.includes(key) && 'seg-btn-active')}
-                      data-testid={`nicksrc-${key}`}
-                      onClick={() => toggleNickSource(key)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : null}
 
           <div className="rule-row">
             <span className="rule-label">人名全名字数</span>
@@ -287,7 +218,7 @@ export function RulesWindow() {
                   if (!Number.isNaN(value)) setParams({ maxChars: Math.max(2, Math.min(8, Math.round(value))) });
                 }}
               />
-              <span className="range-note">字（名字与外号最大均 8 字）</span>
+              <span className="range-note">字（名字最大 8 字）</span>
             </div>
           </div>
 

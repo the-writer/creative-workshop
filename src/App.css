@@ -2954,3 +2954,229 @@ body {
   background: var(--app-paper);
   padding: 4px 14px 14px;
 }
+
+/* ============ 紧凑表格与地名管理（v1.15） ============ */
+
+.sheets-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sheets-search {
+  flex: 1 1 180px;
+  min-width: 150px;
+}
+
+.data-table-wrap {
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  overflow: auto;
+  background: var(--app-paper);
+}
+
+.data-table {
+  min-width: 560px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
+}
+
+.data-table th,
+.data-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--app-line);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data-table thead th {
+  color: var(--app-ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(46, 38, 32, 0.04);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(46, 38, 32, 0.03);
+}
+
+.data-table-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.data-table-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data-table-note {
+  color: var(--app-ink-2);
+}
+
+.data-table-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.data-table-actions-head {
+  width: 64px;
+}
+
+.sheets-table th:nth-child(1),
+.sheets-table td:nth-child(1) {
+  width: 18%;
+}
+.sheets-table th:nth-child(2),
+.sheets-table td:nth-child(2) {
+  width: 9%;
+}
+.sheets-table th:nth-child(3),
+.sheets-table td:nth-child(3) {
+  width: 8%;
+}
+.sheets-table th:nth-child(4),
+.sheets-table td:nth-child(4) {
+  width: 14%;
+}
+.sheets-table th:nth-child(5),
+.sheets-table td:nth-child(5) {
+  width: 15%;
+}
+.sheets-table th:nth-child(6),
+.sheets-table td:nth-child(6) {
+  width: 7%;
+}
+.sheets-table th:nth-child(7),
+.sheets-table td:nth-child(7) {
+  width: 21%;
+}
+.sheets-table th:nth-child(8),
+.sheets-table td:nth-child(8) {
+  width: 8%;
+}
+
+.places-table th:nth-child(1),
+.places-table td:nth-child(1) {
+  width: 32%;
+}
+.places-table th:nth-child(2),
+.places-table td:nth-child(2) {
+  width: 14%;
+}
+.places-table th:nth-child(3),
+.places-table td:nth-child(3) {
+  width: 10%;
+}
+.places-table th:nth-child(4),
+.places-table td:nth-child(4) {
+  width: 32%;
+}
+
+.place-dialog {
+  width: min(420px, 92vw);
+}
+
+.place-dialog .form-row {
+  grid-template-columns: 52px 1fr;
+}
+
+.form-row-top {
+  align-items: flex-start;
+}
+
+.hometown-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.stat-cards-compact {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+@media (max-width: 560px) {
+  .stat-cards-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.stats-section {
+  margin-top: 4px;
+}
+
+/* ============ 整体紧凑化与字号微调 ============ */
+
+.app-scroll {
+  padding: 12px 12px calc(18px + env(safe-area-inset-bottom, 0px));
+}
+
+.desktop-titlebar {
+  height: 28px;
+  flex-basis: 28px;
+  font-size: 11px;
+}
+
+.bottom-nav-btn {
+  font-size: 10px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.section-title-row {
+  margin: 8px 0 4px;
+}
+
+.section-title {
+  font-size: 14px;
+}
+
+.sheets-header,
+.stats-header {
+  margin-bottom: 8px;
+}
+
+.editor-section {
+  padding: 8px 0;
+}
+
+.form-row {
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.form-input,
+.form-textarea {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.result-table {
+  font-size: 12px;
+}
+
+.result-table th,
+.result-table td {
+  padding: 5px 6px;
+}
+
+.filter-chips {
+  gap: 5px;
+}

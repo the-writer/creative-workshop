@@ -1,7 +1,7 @@
 // 生成页：族群/类型/规则选择 + 批量生成引擎 + 名称笺结果区 + 单条保存/收藏/复制/换一批
 
 import { type ReactNode, useEffect, useState } from 'react';
-import { Badge, Check, Copy, MapPin, PenLine, Save, ScrollText, SlidersHorizontal, UserPlus, UserRound } from 'lucide-react';
+import { Check, Copy, MapPin, PenLine, Save, SlidersHorizontal, UserPlus, UserRound } from 'lucide-react';
 import {
   DEFAULT_GEN_PARAMS,
   GEN_PREFS_SCHEMA_VERSION,
@@ -13,7 +13,7 @@ import {
   rerollOne,
 } from '@/lib/generator';
 import { LEXICON, SURNAME_MAX_BIAS, SURNAME_NATURAL_BIAS } from '@/data/lexicon';
-import { insertCandidate, onRulesChanged, openRulesWindow } from '@/lib/db';
+import { insertCandidate, insertPlace, onRulesChanged, openRulesWindow } from '@/lib/db';
 import type { Candidate, NameGender, NameTypeKey, RaceKey } from '@/lib/types';
 import { candidateToSheetFields, GENDER_KEYS, GENDER_LABELS, RACE_LABELS, TYPE_LABELS } from '@/lib/types';
 import { Chip, copyText, Seal, SectionTitle, StructureTags, useAppToast } from '@/components/common';
@@ -25,10 +25,6 @@ export interface EditorPrefill {
   gender?: NameGender;
   candidateId: string;
   occupation?: string;
-  office?: string;
-  hometown?: string;
-  nickname?: string;
-  contractTitle?: string;
   note?: string;
 }
 
@@ -43,8 +39,6 @@ function defaultPrefs(): GenPrefs {
 const TYPE_ICONS: Record<NameTypeKey, ReactNode> = {
   person: <UserRound size={15} />,
   place: <MapPin size={15} />,
-  office: <ScrollText size={15} />,
-  nickname: <Badge size={15} />,
 };
 
 export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
@@ -88,42 +82,12 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   const setType = (t: NameTypeKey) => setPrefs((p) => ({ ...p, types: [t] }));
   const setParams = (patch: Partial<GenParams>) => setPrefs((p) => ({ ...p, params: { ...p.params, ...patch } }));
 
-  const toggleProfession = (p: string) =>
-    setPrefs((s) => ({
-      ...s,
-      params: {
-        ...s.params,
-        professions: s.params.professions.includes(p) ? s.params.professions.filter((x) => x !== p) : [...s.params.professions, p],
-      },
-    }));
-
-  const toggleAbility = (a: string) =>
-    setPrefs((s) => ({
-      ...s,
-      params: {
-        ...s.params,
-        abilities: s.params.abilities.includes(a) ? s.params.abilities.filter((x) => x !== a) : [...s.params.abilities, a],
-      },
-    }));
-
-  const toggleNickSource = (k: string) =>
-    setPrefs((s) => ({
-      ...s,
-      params: {
-        ...s.params,
-        nicknameSources: s.params.nicknameSources.includes(k) ? s.params.nicknameSources.filter((x) => x !== k) : [...s.params.nicknameSources, k],
-      },
-    }));
-
   const batchKey = (c: Candidate) => `${c.race}|${c.nameType}|${c.nameText}`;
 
   const validate = (): string => {
     if (types.length === 0) return '请选择一种名称类型';
     if (params.count < 5 || params.count > 100) return '生成数量需在 5 到 100 之间';
     if (params.minChars > params.maxChars) return '全名字数范围冲突：最少字数不能大于最多字数';
-    if (params.nicknamePrefix && types.includes('person') && params.nicknameChars + 3 > params.maxChars) {
-      return '绰号前置时，绰号加至少 1 字姓氏和 2 字短名已超出全名字数上限，请调低绰号字数或放宽上限';
-    }
     if (params.surnameBias < SURNAME_NATURAL_BIAS || params.surnameBias > SURNAME_MAX_BIAS) return '姓氏权重需在 0 到 100 之间';
     return '';
   };
@@ -153,21 +117,24 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
   const saveOne = async (c: Candidate, favorite: boolean) => {
     const key = batchKey(c);
     if (savedKeys.has(key)) {
-      toast.show('该名称已在库中', 'info');
+      toast.show(c.nameType === 'place' ? '该地名已存在' : '该名称已在库中', 'info');
       return;
     }
     setSavingKeys((prev) => new Set(prev).add(key));
-    const res = await insertCandidate({
-      race: c.race,
-      nameType: c.nameType,
-      nameText: c.nameText,
-      structure: c.structure,
-      gender: c.gender,
-      rarity: c.rarity,
-      source: 'generated',
-      favorite,
-      note: c.note,
-    });
+    const res =
+      c.nameType === 'place'
+        ? await insertPlace({ name: c.nameText, race: c.race, structure: c.structure, note: c.note })
+        : await insertCandidate({
+            race: c.race,
+            nameType: c.nameType,
+            nameText: c.nameText,
+            structure: c.structure,
+            gender: c.gender,
+            rarity: c.rarity,
+            source: 'generated',
+            favorite,
+            note: c.note,
+          });
     setSavingKeys((prev) => {
       const next = new Set(prev);
       next.delete(key);
@@ -175,8 +142,8 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
     });
     if (res.ok) {
       setSavedKeys((prev) => new Set(prev).add(key));
-      toast.show(favorite ? '已收藏入候选库' : '已藏入候选库', 'success');
-    } else if (res.duplicate) {
+      toast.show(c.nameType === 'place' ? '已加入地名' : favorite ? '已收藏入候选库' : '已藏入候选库', 'success');
+    } else if (('duplicate' in res && res.duplicate) || (c.nameType === 'place' && res.message === '该地名已存在')) {
       setSavedKeys((prev) => new Set(prev).add(key));
       toast.show(res.message || '该名称已在库中', 'info');
     } else {
@@ -228,10 +195,6 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
       gender: c.gender && c.gender !== 'any' ? c.gender : undefined,
       candidateId: c.id.startsWith('tmp_') ? '' : c.id,
       occupation: f.occupation,
-      office: f.office,
-      hometown: f.hometown,
-      nickname: f.nickname,
-      contractTitle: f.contractTitle,
       note: f.note,
     });
   };
@@ -337,6 +300,7 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                       const key = batchKey(c);
                       const isSaved = savedKeys.has(key);
                       const isSaving = savingKeys.has(key);
+                      const isPlace = c.nameType === 'place';
                       return (
                         <tr key={`${c.id}-${c.nameText}`} data-testid={`name-row-${idx}`}>
                           <td>
@@ -355,34 +319,29 @@ export function GenerateTab({ onOpenEditor }: GenerateTabProps) {
                               <button
                                 type="button"
                                 className={cn('icon-btn', isSaved && 'result-saved-btn')}
-                                title={isSaved ? '已入谱' : '保存入谱'}
-                                aria-label={isSaved ? '已入谱' : '保存入谱'}
+                                title={isSaved ? (isPlace ? '已加入地名' : '已入谱') : isPlace ? '加入地名' : '保存入谱'}
+                                aria-label={isSaved ? (isPlace ? '已加入地名' : '已入谱') : isPlace ? '加入地名' : '保存入谱'}
                                 data-testid={`save-${idx}`}
                                 disabled={isSaving || isSaved}
                                 onClick={() => void saveOne(c, false)}
                               >
                                 {isSaved ? <Check size={16} /> : <Save size={16} />}
                               </button>
-                              <button
-                                type="button"
-                                className="icon-btn"
-                                title="复制"
-                                aria-label="复制"
-                                data-testid={`copy-${idx}`}
-                                onClick={() => void copyItem(c)}
-                              >
+                              <button type="button" className="icon-btn" title="复制" aria-label="复制" data-testid={`copy-${idx}`} onClick={() => void copyItem(c)}>
                                 <Copy size={15} />
                               </button>
-                              <button
-                                type="button"
-                                className="icon-btn"
-                                title="加入设定"
-                                aria-label="加入设定"
-                                data-testid={`tosheet-${idx}`}
-                                onClick={() => addToSheet(c)}
-                              >
-                                <UserPlus size={16} />
-                              </button>
+                              {isPlace ? null : (
+                                <button
+                                  type="button"
+                                  className="icon-btn"
+                                  title="加入设定"
+                                  aria-label="加入设定"
+                                  data-testid={`tosheet-${idx}`}
+                                  onClick={() => addToSheet(c)}
+                                >
+                                  <UserPlus size={16} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

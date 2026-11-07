@@ -24,15 +24,12 @@ import {
 } from '@/lib/types';
 
 export type ShortMode = 'two' | 'three' | 'mix';
-export type PersonSuffix = 'father' | 'place' | 'profession' | 'contract' | 'blood' | 'title';
+export type PersonSuffix = 'father' | 'place' | 'profession' | 'blood' | 'title';
 
 export interface GenParams {
   count: number; // 5-100
   shortMode: ShortMode;
   personSuffix: PersonSuffix;
-  nicknamePrefix: boolean; // 绰号前置
-  nicknameChars: number; // 2-8
-  nicknameSources: string[]; // 绰号来源多选（profession/appearance/deed/terrain/contract），空数组=随机抽取
   minChars: number; // 人名全名字数下限（最大 8）
   maxChars: number; // 人名全名字数上限（最大 8）
   professions: string[]; // 职业多选，空数组=随机抽取
@@ -45,9 +42,6 @@ export const DEFAULT_GEN_PARAMS: GenParams = {
   count: 5,
   shortMode: 'mix',
   personSuffix: 'father',
-  nicknamePrefix: false,
-  nicknameChars: 2,
-  nicknameSources: [],
   minChars: 4,
   maxChars: 8,
   professions: [],
@@ -65,7 +59,7 @@ export interface GenPrefs {
   params: GenParams;
 }
 
-const NAME_TYPE_KEYS: NameTypeKey[] = ['person', 'place', 'office', 'nickname'];
+const NAME_TYPE_KEYS: NameTypeKey[] = ['person', 'place'];
 
 // 读取历史偏好：无版本号的旧数据把默认性别「不限」迁移为「中性」，
 // 写入新版偏好后即可按用户当次选择（含手动选回的「不限」）正常持久化。
@@ -86,9 +80,6 @@ export function normalizeGenPrefs(raw: unknown): GenPrefs {
     const params = { ...DEFAULT_GEN_PARAMS, ...(parsed.params ?? {}) };
     params.professions = Array.isArray(params.professions) ? params.professions.filter((s) => typeof s === 'string') : [];
     params.abilities = Array.isArray(params.abilities) ? params.abilities.filter((s) => typeof s === 'string') : [];
-    params.nicknameSources = Array.isArray(params.nicknameSources) ? params.nicknameSources.filter((s) => typeof s === 'string') : [];
-    params.nicknameChars =
-      typeof params.nicknameChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.nicknameChars))) : DEFAULT_GEN_PARAMS.nicknameChars;
     params.minChars = typeof params.minChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.minChars))) : DEFAULT_GEN_PARAMS.minChars;
     params.maxChars = typeof params.maxChars === 'number' ? Math.max(2, Math.min(8, Math.round(params.maxChars))) : DEFAULT_GEN_PARAMS.maxChars;
     params.gender = GENDER_KEYS.includes(params.gender) ? params.gender : DEFAULT_GEN_PARAMS.gender;
@@ -98,6 +89,8 @@ export function normalizeGenPrefs(raw: unknown): GenPrefs {
         ? Math.max(SURNAME_NATURAL_BIAS, Math.min(SURNAME_MAX_BIAS, Math.round(params.surnameBias)))
         : DEFAULT_GEN_PARAMS.surnameBias;
     if (isBeforeGenderPrefs && params.minChars === 4 && params.maxChars === 6) params.maxChars = DEFAULT_GEN_PARAMS.maxChars;
+    // 已下线的「契约称号」后缀回退为父名。
+    if ((params.personSuffix as string) === 'contract') params.personSuffix = 'father';
     const validTypes = Array.isArray(parsed.types) ? parsed.types.filter((t) => NAME_TYPE_KEYS.includes(t)) : [];
     return {
       schemaVersion: GEN_PREFS_SCHEMA_VERSION,
@@ -232,82 +225,6 @@ export function genPlace(race: RaceKey): { name: string; structure: StructurePar
   };
 }
 
-export function genOffice(race: RaceKey): { name: string; structure: StructurePart[] } {
-  const roots = LEXICON[race];
-  const terr = pick(roots.officeTerritories);
-  const power = pick(roots.officePowers);
-  const level = pick(roots.officeLevels);
-  return {
-    name: `${terr}${power}${level}`,
-    structure: [
-      { label: '属地', word: terr },
-      { label: '职权', word: power },
-      { label: '层级', word: level },
-    ],
-  };
-}
-
-const NICK_SOURCES: Array<{ key: string; label: string; get: (r: RaceKey) => string[] }> = [
-  { key: 'profession', label: '职业', get: (r) => LEXICON[r].nickProfession },
-  { key: 'appearance', label: '外貌', get: (r) => LEXICON[r].nickAppearance },
-  { key: 'deed', label: '事迹', get: (r) => LEXICON[r].nickDeed },
-  { key: 'terrain', label: '地形', get: (r) => LEXICON[r].nickTerrain },
-  { key: 'contract', label: '契约', get: (r) => LEXICON[r].nickContract },
-];
-
-export const NICK_SOURCE_KEYS = NICK_SOURCES.map((s) => s.key);
-
-type LexiconLike = {
-  nickProfession: string[];
-  nickAppearance: string[];
-  nickDeed: string[];
-  nickTerrain: string[];
-  nickContract: string[];
-  nickSingles: string[];
-};
-
-// 绰号 2-8 字：双字词根 2 字/词 + 单字补字；来源多选时只从所选来源取词
-function nickWordPool(race: RaceKey, sources: string[]): Array<{ word: string; label: string }> {
-  const pool: Array<{ word: string; label: string }> = [];
-  const seen = new Set<string>();
-  for (const src of NICK_SOURCES) {
-    if (sources.length > 0 && !sources.includes(src.key)) continue;
-    for (const w of src.get(race)) {
-      if (seen.has(w)) continue;
-      seen.add(w);
-      pool.push({ word: w, label: src.label });
-    }
-  }
-  if (pool.length === 0) {
-    for (const src of NICK_SOURCES) {
-      for (const w of src.get(race)) {
-        if (seen.has(w)) continue;
-        seen.add(w);
-        pool.push({ word: w, label: src.label });
-      }
-    }
-  }
-  return pool;
-}
-
-export function genNickname(race: RaceKey, chars: number, sources: string[] = []): { name: string; structure: StructurePart[]; sourceLabel: string } {
-  const roots = LEXICON[race] as LexiconLike;
-  const charCount = Math.max(2, Math.min(8, Math.round(chars) || 2));
-  const pool = nickWordPool(race, sources);
-  const wordCount = Math.floor(charCount / 2);
-  const singleCount = charCount % 2;
-  const words = pickMany(pool, wordCount);
-  const parts: StructurePart[] = words.map((w) => ({ label: `${w.label}来源`, word: w.word }));
-  let name = words.map((w) => w.word).join('');
-  if (singleCount > 0) {
-    const extra = pick(roots.nickSingles);
-    name += extra;
-    parts.push({ label: '补字', word: extra });
-  }
-  const labels = Array.from(new Set(words.map((w) => w.label)));
-  return { name, structure: parts, sourceLabel: labels.length > 0 ? labels.join('·') : '综合' };
-}
-
 export interface GeneratedName {
   name: string;
   structure: StructurePart[];
@@ -329,15 +246,6 @@ export function genPerson(race: RaceKey, params: GenParams): GeneratedName | nul
   const short = genShortName(race, params.shortMode, gender);
   // 姓氏不再作为结构 TAG 展示；名称里姓氏只出现在最后一个「·」之后。
   const personParts: StructurePart[] = [];
-  if (params.nicknamePrefix) {
-    const nick = genNickname(race, params.nicknameChars, params.nicknameSources);
-    return {
-      name: personName(`${nick.name}${short}`, surname.name),
-      structure: [...personParts, ...nick.structure],
-      gender,
-      rarity: surname.rarity,
-    };
-  }
   switch (params.personSuffix) {
     case 'father': {
       let father = genShortName(race, params.shortMode);
@@ -371,15 +279,6 @@ export function genPerson(race: RaceKey, params: GenParams): GeneratedName | nul
         rarity: surname.rarity,
       };
     }
-    case 'contract': {
-      const contract = pick(LEXICON[race].contractTitles);
-      return {
-        name: personName(`${short}${contract}`, surname.name),
-        structure: [...personParts, { label: '契约称号', word: contract }],
-        gender,
-        rarity: surname.rarity,
-      };
-    }
     case 'blood': {
       const blood = pick(LEXICON[race].bloodTitles);
       return {
@@ -405,11 +304,6 @@ export function genPerson(race: RaceKey, params: GenParams): GeneratedName | nul
 
 export function genOne(race: RaceKey, type: NameTypeKey, params: GenParams): GeneratedName | null {
   if (type === 'place') return genPlace(race);
-  if (type === 'office') return genOffice(race);
-  if (type === 'nickname') {
-    const nick = genNickname(race, params.nicknameChars, params.nicknameSources);
-    return { name: nick.name, structure: nick.structure };
-  }
   return genPerson(race, params);
 }
 
@@ -426,10 +320,6 @@ export function genCombo(race: RaceKey, types: NameTypeKey[], params: GenParams)
   const short = genShortName(race, params.shortMode, gender);
   // 性别由候选的 gender 字段独立成标签；名称同样保持单点、姓氏在后：「短名·姓氏」。
   const parts: StructurePart[] = [{ label: '人名', word: short }];
-  if (types.includes('office')) {
-    const office = genOffice(race);
-    parts.push({ label: '官职', word: office.name });
-  }
   if (types.includes('place')) {
     const place = genPlace(race);
     parts.push({ label: '居地', word: place.name });
@@ -441,10 +331,6 @@ export function genCombo(race: RaceKey, types: NameTypeKey[], params: GenParams)
   {
     const abilities = pickAbilities(race, params.abilities);
     parts.push({ label: '特殊能力', word: abilities.join('、') });
-  }
-  if (types.includes('nickname')) {
-    const nick = genNickname(race, params.nicknameChars, params.nicknameSources);
-    parts.push({ label: '绰号', word: nick.name });
   }
   return { name: personName(short, surname.name), structure: parts, gender, rarity: surname.rarity };
 }

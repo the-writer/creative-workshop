@@ -1,11 +1,11 @@
 // 规范业务对象与枚举定义（内部 key 与中文展示 label 分离）
 
 export type RaceKey = 'human' | 'elf' | 'yaogui' | 'mixed';
-export type NameTypeKey = 'person' | 'place' | 'office' | 'nickname';
+export type NameTypeKey = 'person' | 'place';
 export type NameGender = 'any' | 'male' | 'female' | 'neutral';
 export type RarityTier = 'S' | 'SS' | 'SSS' | 'SSSR';
 export type SourceKey = 'generated' | 'manual';
-export type EntityType = 'sheet' | 'place';
+export type EntityType = 'sheet';
 export type SortKey = 'latest' | 'charCount' | 'nameText';
 
 export interface StructurePart {
@@ -23,14 +23,25 @@ export interface Candidate {
   source: SourceKey;
   favorite: boolean;
   note: string;
-  /** 人名（含组合设定）的真实性别标签；地名/官职/绰号等类型没有性别 */
+  /** 人名的真实性别标签；地名没有性别 */
   gender?: NameGender;
-  /** 姓氏稀有度标签；地名/官职/绰号等没有姓氏的类型不带该字段 */
+  /** 姓氏稀有度标签；地名没有姓氏 */
   rarity?: RarityTier;
   createdAt: number;
   updatedAt: number;
   referenced?: boolean;
   combo?: boolean; // 多选类型生成的组合设定句
+}
+
+/** 独立的地名条目（与人物候选库分离）。 */
+export interface Place {
+  id: string;
+  name: string;
+  race: RaceKey;
+  structure: StructurePart[];
+  note: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Sheet {
@@ -40,11 +51,10 @@ export interface Sheet {
   gender?: NameGender;
   candidateId: string;
   occupation: string;
-  office: string;
+  /** 展示用籍贯文本：多个地名以「、」连接 */
   hometown: string;
-  hometownCandidateId: string;
-  nickname: string;
-  contractTitle: string;
+  /** 关联的地名 ID，可多选；顺序与展示文本一致 */
+  hometownIds: string[];
   note: string;
   createdAt: number;
   updatedAt: number;
@@ -107,14 +117,12 @@ export const SHEET_GENDER_KEYS: NameGender[] = ['male', 'female', 'neutral'];
 export const TYPE_LABELS: Record<NameTypeKey, string> = {
   person: '人名',
   place: '地名',
-  office: '官职',
-  nickname: '绰号',
 };
-export const TYPE_KEYS: NameTypeKey[] = ['person', 'place', 'office', 'nickname'];
+export const TYPE_KEYS: NameTypeKey[] = ['person', 'place'];
 
 export const RARITY_TIERS: RarityTier[] = ['S', 'SS', 'SSS', 'SSSR'];
 
-export const RELATION_TYPES = ['师徒', '父子', '同僚', '敌对', '隶属', '契约', '配偶', '仰慕者', '暗恋', '男主', '女主', '女配', '男配', '其他'] as const;
+export const RELATION_TYPES = ['师徒', '父子', '同僚', '敌对', '隶属', '配偶', '仰慕者', '暗恋', '男主', '女主', '女配', '男配', '其他'] as const;
 
 // 新建尚未保存的设定卡关联自身时使用的临时目标 ID，保存后替换为真实设定卡 ID。
 export const SELF_RELATION_TARGET_ID = '__self__';
@@ -140,14 +148,10 @@ export function typeLabel(type: NameTypeKey): string {
   return TYPE_LABELS[type] ?? '';
 }
 
-// 候选 → 设定卡字段映射：把候选库中除名字外的设定项（职业/官职/绰号/契约/居地/能力等）提取出来，
+// 候选 → 设定卡字段映射：把候选库中除名字外的设定项（职业/能力等）提取出来，
 // 供“加入设定 / 新建设定”预填使用；能力等设定卡没有独立字段的内容合并进备注。
 export interface CandidateSheetFields {
   occupation: string;
-  office: string;
-  hometown: string;
-  nickname: string;
-  contractTitle: string;
   note: string;
 }
 
@@ -168,10 +172,6 @@ export function candidateToSheetFields(c: Candidate): CandidateSheetFields {
   const note = extraText ? (baseNote ? `${baseNote}\n\n${extraText}` : extraText) : baseNote;
   return {
     occupation: pick('营生', '职业'),
-    office: pick('官职'),
-    hometown: pick('居地', '属地'),
-    nickname: pick('绰号'),
-    contractTitle: pick('契约称号', '契约'),
     note,
   };
 }
