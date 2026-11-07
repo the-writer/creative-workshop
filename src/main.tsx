@@ -23,7 +23,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryS
     if (this.state.message) {
       return (
         <main className="fatal-error">
-          <h1>创作工坊暂时无法显示</h1>
+          <h1>Creation Workshop暂时无法显示</h1>
           <p>{this.state.message}</p>
           <button type="button" onClick={() => window.location.reload()}>
             重新载入

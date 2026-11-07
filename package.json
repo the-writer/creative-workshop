@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "productName": "创作工坊",
+  "productName": "Creation Workshop",
   "author": "stdout.com.cn",
   "description": "面向小说世界观创作的人名、地名、官职与绰号生成工具",
   "main": "release/electron/main.cjs",
@@ -12,7 +12,7 @@
     "dev:renderer": "vite",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build:extension": "pnpm --dir vscode-extension run package",
-    "install:extension": "code --install-extension \"vscode-extension/type-stats-v$(node -p \"require('./vscode-extension/package.json').version\").vsix\" --force",
+    "install:extension": "code --install-extension \"vscode-extension/creation-workshop-v$(node -p \"require('./vscode-extension/package.json').version\").vsix\" --force",
     "build": "pnpm run typecheck && vite build && tsc -p tsconfig.electron.json && pnpm run build:extension",
     "dist:mac": "sh scripts/dist-mac.sh",
     "install:mac": "sh scripts/install-mac.sh",
@@ -77,10 +77,10 @@
   },
   "build": {
     "appId": "cn.com.stdout.creation-workshop",
-    "productName": "创作工坊",
+    "productName": "Creation Workshop",
     "protocols": [
       {
-        "name": "创作工坊项目链接",
+        "name": "Creation Workshop 项目链接",
         "schemes": [
           "workshop"
         ]

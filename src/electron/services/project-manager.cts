@@ -150,7 +150,7 @@ export class ProjectManager {
     const normalized = name.toLocaleLowerCase();
     const recent = await this.listRecent();
     const match = recent.find((project) => project.name.toLocaleLowerCase() === normalized || basename(project.path).toLocaleLowerCase() === normalized);
-    if (!match) return { ok: false, message: `未找到项目「${name}」，请先在创作工坊中打开该项目` };
+    if (!match) return { ok: false, message: `未找到项目「${name}」，请先在Creation Workshop中打开该项目` };
     return this.open(match.path);
   }
 
@@ -216,10 +216,10 @@ export class ProjectManager {
     try {
       await this.remember(project);
     } catch (error) {
-      console.error(`[创作工坊] 最近项目写入失败：${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[Creation Workshop] 最近项目写入失败：${error instanceof Error ? error.message : String(error)}`);
     }
-    console.info(`[创作工坊] 项目：${project.path}`);
-    console.info(`[创作工坊] 项目数据目录：${opened.workshopPath}`);
+    console.info(`[Creation Workshop] 项目：${project.path}`);
+    console.info(`[Creation Workshop] 项目数据目录：${opened.workshopPath}`);
     return { ok: true, project: clone(project) };
   }
 
@@ -325,9 +325,9 @@ export class ProjectManager {
       };
       await this.saveState();
       await this.storage.close();
-      console.info(`[创作工坊] 已迁移旧数据到项目：${opened.path}（候选 ${imported.candidates} · 设定 ${imported.sheets} · 关系 ${imported.relations}）`);
+      console.info(`[Creation Workshop] 已迁移旧数据到项目：${opened.path}（候选 ${imported.candidates} · 设定 ${imported.sheets} · 关系 ${imported.relations}）`);
     } catch (error) {
-      console.error(`[创作工坊] 旧数据迁移失败：${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[Creation Workshop] 旧数据迁移失败：${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

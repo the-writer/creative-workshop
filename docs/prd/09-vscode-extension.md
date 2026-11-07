@@ -1,8 +1,8 @@
-# 9. VS Code 插件（Type Stats）
+# 9. VS Code 插件（Creation Workshop）
 
 ### 9.1 定位与目录
 
-`vscode-extension/` 是创作工坊配套的 VS Code 插件 `type-stats`（publisher `border-writer`），面向中文长文写作场景：状态栏字数统计、码字计时/速率，以及 `.workshop/sheets.ini` 设定集关键词高亮。插件版本与主应用版本保持同步（当前 `2.0.0`）。插件作为 pnpm workspace 成员随主项目一起安装依赖，并在主项目构建时自动打包 VSIX。
+`vscode-extension/` 是Creation Workshop配套的 VS Code 插件 `creation-workshop`（publisher `border-writer`），面向中文长文写作场景：状态栏字数统计、码字计时/速率，以及 `.workshop/sheets.ini` 设定集关键词高亮。插件版本与主应用版本保持同步（当前 `2.0.0`）。插件作为 pnpm workspace 成员随主项目一起安装依赖，并在主项目构建时自动打包 VSIX。
 
 ```text
 vscode-extension/
@@ -11,7 +11,7 @@ vscode-extension/
 │   ├── stats.ts       # 字符统计、状态栏条目、计时器、净输入与速率
 │   ├── sheets.ts      # sheets.ini / sheets.md 解析、装饰器与高亮刷新
 │   └── explorer.ts    # 「设定集」树视图与条目跳转
-├── scripts/build.sh   # 类型检查、打包、生成 type-stats-v<version>.vsix
+├── scripts/build.sh   # 类型检查、打包、生成 creation-workshop-v<version>.vsix
 ├── package.json       # 插件清单、配置项、命令与视图声明
 └── tsconfig.json
 ```
@@ -28,7 +28,7 @@ vscode-extension/
 | `pnpm --dir vscode-extension run typecheck` | 仅 TypeScript 类型检查                                       |
 | `pnpm --dir vscode-extension run compile`   | 仅打包到 `vscode-extension/dist/extension.js`                |
 
-VSIX 文件名由构建脚本自动拼接当前插件版本：`type-stats-v<version>.vsix`；产物不参与源码提交，执行 `pnpm dist:mac` 时会同时复制到 `release/`。
+VSIX 文件名由构建脚本自动拼接当前插件版本：`creation-workshop-v<version>.vsix`；产物不参与源码提交，执行 `pnpm dist:mac` 时会同时复制到 `release/`。
 
 插件与应用共用同一应用图标：构建时从根目录 `src/assets/imgs/app-icon.png` 复制到 `vscode-extension/assets/imgs/app-icon.png`，并通过 `package.json` 的 `icon` 字段打包进 VSIX；复制产物不参与源码提交。安装：
 
@@ -102,15 +102,15 @@ pnpm run install:extension
 | 计时 | `hh:mm:ss` 累计码字时间             | 打开操作菜单 |
 | 速率 | `<净输入速率> 字/h`                 | 打开操作菜单 |
 
-详细统计弹窗展示：有效字符、中文字数、英文字数、耗时、速率、净输入、打开时间、上次保存，并可一键复制到剪贴板。操作菜单提供：在工坊中打开、查看详细统计、重新加载设定集、重置计时与速率、打开 Type Stats 设置页。
+详细统计弹窗展示：有效字符、中文字数、英文字数、耗时、速率、净输入、打开时间、上次保存，并可一键复制到剪贴板。操作菜单提供：在工坊中打开、查看详细统计、重新加载设定集、重置计时与速率、打开 Creation Workshop 设置页。
 
 编辑器右键菜单在 `typeStats.active` 时提供「在工坊中打开」，命令面板中隐藏全部插件命令。
 
-### 9.8 与创作工坊的集成
+### 9.8 与Creation Workshop的集成
 
 - 「在工坊中打开」不再直接启动应用，而是用工作区根目录名构造系统协议链接 `workshop://project/open?name=<encodeURIComponent(工作区目录名)>`，通过 VS Code 的 `env.openExternal` 交给系统处理（`src/extension.ts`）。应用未安装 / 协议未注册时以错误提示反馈；未打开工作区时提示先打开项目文件夹。
-- 创作工坊收到协议后按名称匹配最近项目并加载，同时自动把应用与主窗口置于前台（见 §1.9），无需插件关心应用安装路径。
-- 插件只读取工作区 `.workshop/sheets.ini` 与 `.workshop/sheets.md`，不写入任何文件；由创作工坊在项目目录中生成并维护这两个文件（见 §4）。
+- Creation Workshop收到协议后按名称匹配最近项目并加载，同时自动把应用与主窗口置于前台（见 §1.9），无需插件关心应用安装路径。
+- 插件只读取工作区 `.workshop/sheets.ini` 与 `.workshop/sheets.md`，不写入任何文件；由Creation Workshop在项目目录中生成并维护这两个文件（见 §4）。
 - 插件与主应用无 IPC 或网络通信，二者通过系统协议与工作区文件解耦。
 
 ### 9.9 常见陷阱

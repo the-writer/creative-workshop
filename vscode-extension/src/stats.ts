@@ -78,15 +78,15 @@ export class WritingStats implements vscode.Disposable {
   constructor() {
     this.charsItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 103);
     this.charsItem.command = 'typeStats.showDetails';
-    this.charsItem.name = 'Type Stats: 字符';
+    this.charsItem.name = 'Creation Workshop: 字符';
 
     this.timerItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 102);
     this.timerItem.command = 'typeStats.showMenu';
-    this.timerItem.name = 'Type Stats: 计时';
+    this.timerItem.name = 'Creation Workshop: 计时';
 
     this.rateItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
     this.rateItem.command = 'typeStats.showMenu';
-    this.rateItem.name = 'Type Stats: 速率';
+    this.rateItem.name = 'Creation Workshop: 速率';
 
     this.disposables.push(
       this.charsItem,
@@ -140,20 +140,20 @@ export class WritingStats implements vscode.Disposable {
 
   async showDetails(): Promise<void> {
     if (!vscode.window.activeTextEditor) {
-      void vscode.window.showInformationMessage('Type Stats: 当前没有打开的编辑器。');
+      void vscode.window.showInformationMessage('Creation Workshop: 当前没有打开的编辑器。');
       return;
     }
 
     const content = this.detailLines().join('\n');
     const copyLabel = '复制';
     const picked = await vscode.window.showInformationMessage(
-      'Type Stats 详细统计',
+      'Creation Workshop 详细统计',
       { modal: true, detail: content },
       copyLabel
     );
     if (picked === copyLabel) {
       await vscode.env.clipboard.writeText(content);
-      void vscode.window.showInformationMessage('Type Stats: 详细统计已复制到剪贴板。');
+      void vscode.window.showInformationMessage('Creation Workshop: 详细统计已复制到剪贴板。');
     }
   }
 

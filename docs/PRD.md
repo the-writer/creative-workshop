@@ -1,8 +1,8 @@
-# 创作工坊 PRD 索引
+# Creation Workshop PRD 索引
 
 | 项目     | 值                                                                        |
 | -------- | ------------------------------------------------------------------------- |
-| 应用名称 | 创作工坊                                                                  |
+| 应用名称 | Creation Workshop                                                                  |
 | 当前版本 | 2.0.0                                                                    |
 | 应用 ID  | `cn.com.stdout.creation-workshop`                                         |
 | 技术形态 | Electron 桌面应用 + React 渲染层                                          |
@@ -18,7 +18,7 @@
 - 应用常驻系统托盘；关闭主窗口只隐藏窗口，点击托盘图标在当前桌面重新打开主界面。最近一次打开的项目排在最近列表第一位并显示「上次」TAG。
 - 主窗口为普通独立窗口：不置顶，打开期间切换桌面不跟随；关闭后从其它桌面重新打开时落在当前桌面。启动与重新打开均不显示 Dock 图标。
 - 不提供导出（JSON / TXT / Markdown / PNG）与分享；AI 详细设定入口保留，点击后以弹窗明确说明，不发起网络请求。
-- 仓库内附带配套 VS Code 插件 `vscode-extension/`（Type Stats）：读取工作区 `.workshop/sheets.ini` / `sheets.md` 提供字数统计、码字计时/速率与设定集高亮；随主项目构建自动打包 VSIX。
+- 仓库内附带配套 VS Code 插件 `vscode-extension/`（Creation Workshop）：读取工作区 `.workshop/sheets.ini` / `sheets.md` 提供字数统计、码字计时/速率与设定集高亮；随主项目构建自动打包 VSIX。
 
 ## 阅读指南
 

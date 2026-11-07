@@ -294,7 +294,7 @@ export function serializeProjectMarkdown(name: string): string {
   return [
     `# 项目：${headingText(name)}`,
     '',
-    '> 本文件由「创作工坊」维护；项目数据保存在同目录的 `.workshop` 中。',
+    '> 本文件由「Creation Workshop」维护；项目数据保存在同目录的 `.workshop` 中。',
     '',
     `- 格式版本: ${SCHEMA_VERSION}`,
     `- 创建时间: ${timestamp(Date.now())}`,
@@ -336,7 +336,7 @@ export function parseCandidatesMarkdown(text: string): Candidate[] {
 }
 
 export function serializeCandidatesMarkdown(candidates: Candidate[]): string {
-  const out: string[] = ['# 名称候选', '', '> 由「创作工坊」自动维护。每条候选以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
+  const out: string[] = ['# 名称候选', '', '> 由「Creation Workshop」自动维护。每条候选以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
   candidates.forEach((candidate) => {
     out.push(`## ${headingText(candidate.nameText)}`);
     out.push('');
@@ -385,7 +385,7 @@ export function parsePlacesMarkdown(text: string): Place[] {
 }
 
 export function serializePlacesMarkdown(places: Place[]): string {
-  const out: string[] = ['# 地名', '', '> 由「创作工坊」自动维护。每个地名以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
+  const out: string[] = ['# 地名', '', '> 由「Creation Workshop」自动维护。每个地名以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
   places.forEach((place) => {
     out.push(`## ${headingText(place.name)}`);
     out.push('');
@@ -455,7 +455,7 @@ function sheetRelationsText(sheet: Sheet, relations: Relation[]): string {
 }
 
 export function serializeSheetsMarkdown(sheets: Sheet[], relations: Relation[] = []): string {
-  const out: string[] = ['# 设定卡', '', '> 由「创作工坊」自动维护。每张设定卡以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
+  const out: string[] = ['# 设定卡', '', '> 由「Creation Workshop」自动维护。每张设定卡以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
   sheets.forEach((sheet) => {
     out.push(`## ${headingText(sheet.characterName || '未命名人物')}`);
     out.push('');
@@ -552,7 +552,7 @@ export function parseRelationsMarkdown(text: string): Relation[] {
 }
 
 export function serializeRelationsMarkdown(relations: Relation[]): string {
-  const out: string[] = ['# 人物与地名关系', '', '> 由「创作工坊」自动维护。每条关系以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
+  const out: string[] = ['# 人物与地名关系', '', '> 由「Creation Workshop」自动维护。每条关系以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。', ''];
   relations.forEach((relation) => {
     out.push(`## ${headingText(relation.fromName)} — ${headingText(relation.relationType)} → ${headingText(relation.toName)}`);
     out.push('');

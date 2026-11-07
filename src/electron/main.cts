@@ -28,7 +28,7 @@ interface CreationWorkshopConfig {
   };
 }
 
-const APP_NAME = '创作工坊';
+const APP_NAME = 'Creation Workshop';
 
 // 窗口常量集中在此（配置项缺省时的回退值），业务代码不散落魔法值
 const DEFAULT_WINDOW_WIDTH = 800;

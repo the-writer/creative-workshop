@@ -85,7 +85,7 @@ export function ProjectGate({ onOpened }: ProjectGateProps) {
         <header className="project-gate-brand">
           <span className="project-gate-seal">创</span>
           <div className="project-gate-heading-row">
-            <h1 className="project-gate-title">创作工坊</h1>
+            <h1 className="project-gate-title">Creation Workshop</h1>
             <p className="project-gate-desc">选择一个项目开始创作。</p>
           </div>
         </header>

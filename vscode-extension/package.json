@@ -1,6 +1,6 @@
 {
-  "name": "type-stats",
-  "displayName": "Type Stats",
+  "name": "creation-workshop",
+  "displayName": "Creation Workshop",
   "description": "Writing statistics and setting-sheet highlighting for .txt and .md files.",
   "version": "2.0.0",
   "publisher": "border-writer",
@@ -62,7 +62,7 @@
       ]
     },
     "configuration": {
-      "title": "Type Stats",
+      "title": "Creation Workshop",
       "order": 1,
       "properties": {
         "typeStats.enabled": {

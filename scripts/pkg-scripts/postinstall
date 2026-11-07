@@ -1,7 +1,7 @@
 #!/bin/bash
 set -u
 
-APP="/Applications/创作工坊.app"
+APP="/Applications/Creation Workshop.app"
 [ -d "$APP" ] || exit 0
 
 CONSOLE_USER="$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"

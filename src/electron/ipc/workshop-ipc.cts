@@ -83,7 +83,7 @@ async function pickDirectory(
           properties: ['openDirectory', 'createDirectory'] as const,
         }
       : {
-          title: '选择或新建创作工坊项目文件夹',
+          title: '选择或新建Creation Workshop项目文件夹',
           buttonLabel: '打开项目',
           defaultPath: app.getPath('documents'),
           properties: ['openDirectory', 'createDirectory'] as const,

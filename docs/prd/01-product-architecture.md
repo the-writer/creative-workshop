@@ -2,7 +2,7 @@
 
 ### 1.1 产品定位
 
-创作工坊面向小说作者、世界观构建者与桌游设定作者，用于离线生成和整理人族、精灵族、妖鬼与混血的人名与地名。应用不依赖远程业务页面、AI 服务或账号体系。
+Creation Workshop面向小说作者、世界观构建者与桌游设定作者，用于离线生成和整理人族、精灵族、妖鬼与混血的人名与地名。应用不依赖远程业务页面、AI 服务或账号体系。
 
 当前版本为 **2.0.0**（`package.json` → `version`）。
 
@@ -74,12 +74,12 @@ flowchart TD
 | 可调整尺寸     | 是（限制在 320×240 – 1024×768） | `src/electron/main.cts` → `resizable/minWidth/minHeight/maxWidth/maxHeight`                   |
 | 使用内容尺寸   | 是                         | `src/electron/main.cts` → `useContentSize: true`                                              |
 | 窗口背景色     | `#f5efe2`                  | `src/electron/main.cts` → `backgroundColor`                                                   |
-| 应用名         | 创作工坊                   | `package.json` → `productName`；`app.setName`                                                 |
+| 应用名         | Creation Workshop                   | `package.json` → `productName`；`app.setName`                                                 |
 | 拖拽标题栏高度 | 32 px                      | `src/App.css` → `.desktop-titlebar`                                                           |
 
 应用加载 `release/renderer/index.html`（主进程为 `release/electron/main.cjs`）；开发调试可通过 `VITE_DEV_SERVER_URL` 指向本地 Vite 服务，并在该模式下自动打开独立 DevTools。
 
-启动完成后没有窗口；用户首次点击托盘时 `createWindow` 创建窗口，`ready-to-show` 后再调用 `showMainWindow()`，因此不会闪白屏。主窗口系统关闭按钮只隐藏窗口（`close` 事件阻止默认并 `hide()`），应用继续由托盘驻留；托盘左键与右键菜单「打开主界面」、应用菜单「窗口 → 显示主界面」重新打开。托盘右键菜单提供「打开主界面」和「退出创作工坊」。应用无 Dock 图标，因此 `activate`（点击 Dock）不是常规入口。
+启动完成后没有窗口；用户首次点击托盘时 `createWindow` 创建窗口，`ready-to-show` 后再调用 `showMainWindow()`，因此不会闪白屏。主窗口系统关闭按钮只隐藏窗口（`close` 事件阻止默认并 `hide()`），应用继续由托盘驻留；托盘左键与右键菜单「打开主界面」、应用菜单「窗口 → 显示主界面」重新打开。托盘右键菜单提供「打开主界面」和「退出Creation Workshop」。应用无 Dock 图标，因此 `activate`（点击 Dock）不是常规入口。
 
 主窗口是**普通独立窗口**（不是 macOS `panel`）：打开后绑定在显示时所在的桌面，**切换桌面时不会自动跟随**；关闭后重新打开时先把窗口移动到鼠标所在显示器并居中，再临时加入所有桌面、显示聚焦后绑定当前桌面，因此会出现在鼠标当前所在的桌面，而不是关闭时的桌面。窗口始终不置顶（`alwaysOnTop: false` 时不会调用任何 `setAlwaysOnTop`）。
 

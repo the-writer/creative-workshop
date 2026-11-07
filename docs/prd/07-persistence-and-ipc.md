@@ -34,9 +34,9 @@ flowchart TD
 - 项目门最近项目按 `lastOpenedAt` 倒序，第一条显示「上次」TAG（`ProjectGate.tsx`）。
 - `projects.create({ parentDir, name })` IPC 与 `ProjectManager.create` 仍保留以兼容旧调用；项目名称校验与非空目录限制仍在该路径生效，但当前 UI 不再调用。日常新建项目使用「打开项目」选择一个新目录。
 - 打开项目成功后主进程输出日志（`console.info`）：
-  - `[创作工坊] 项目登记文件：<userData>/projects.json`（启动时）
-  - `[创作工坊] 项目：<项目目录绝对路径>`
-  - `[创作工坊] 项目数据目录：<项目目录>/.workshop`
+  - `[Creation Workshop] 项目登记文件：<userData>/projects.json`（启动时）
+  - `[Creation Workshop] 项目：<项目目录绝对路径>`
+  - `[Creation Workshop] 项目数据目录：<项目目录>/.workshop`
 - 设置页「切换项目」只把渲染层项目置空并回到项目门；没有关闭项目的 IPC，主进程内当前项目在下次 `open`/`create` 时被替换。
 - **从最近列表移除**：项目门每条最近项目右侧有删除图标按钮（`data-testid="project-delete-<项目名>"`），二次确认（`project-remove-confirm`）后调用 `projects.removeRecent(path)`。该操作只从 `projects.json` 的 `recentProjects` 删除对应条目，**不删除项目目录或 `.workshop` 文件**；若移除的是当前项目，主进程同时关闭数据服务并清空当前项目。
 - 设置页「总览」为只读 Markdown 视图：调用 `projects.overview()` 直接读取当前项目 `.workshop/overview.md` 全文并渲染，可点击刷新（`settings-overview-refresh`）；文件不存在或正文为空时**整块「总览」区域（标题、刷新按钮与提示）都不渲染**，不写盘。
@@ -131,7 +131,7 @@ flowchart TD
 ```markdown
 # 项目：我的小说
 
-> 本文件由「创作工坊」维护；项目数据保存在同目录的 `.workshop` 中。
+> 本文件由「Creation Workshop」维护；项目数据保存在同目录的 `.workshop` 中。
 
 - 格式版本: 1
 - 创建时间: 2026-10-26T05:57:48.000Z
@@ -152,7 +152,7 @@ flowchart TD
 ```markdown
 # 名称候选
 
-> 由「创作工坊」自动维护。每条候选以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。
+> 由「Creation Workshop」自动维护。每条候选以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。
 
 ## 雷·恩医·珂希
 
@@ -190,7 +190,7 @@ flowchart TD
 ```markdown
 # 设定卡
 
-> 由「创作工坊」自动维护。每张设定卡以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。
+> 由「Creation Workshop」自动维护。每张设定卡以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。
 
 ## 雷恩
 
@@ -225,7 +225,7 @@ flowchart TD
 ```markdown
 # 人物与地名关系
 
-> 由「创作工坊」自动维护。每条关系以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。
+> 由「Creation Workshop」自动维护。每条关系以 `##` 分隔，字段行请保持 `- 字段: 值` 格式。
 
 ## 雷恩 — 同僚 → 兰诺
 
@@ -410,7 +410,7 @@ flowchart TD
 - 关系：读取 `fromId`/`from_id`、`toId`/`to_id` 等；来源与目标同一 ID 表示关联自身，保留该关系。
 - 旧 `preferences` 对象**原样写入** `preferences.md`，不在迁移时规范化；生成偏好在渲染层读取时按 §2.6 迁移（如旧 `race: demon` → `elf`、旧 `gender: any` → `neutral`）。
 - 迁移后旧 `workshop.json` 保留，不删除、不改名；不存在「损坏 JSON 改名为 `.corrupt-*`」的行为。
-- 迁移失败只输出 `console.error('[创作工坊] 旧数据迁移失败：…')`，不阻塞启动。
+- 迁移失败只输出 `console.error('[Creation Workshop] 旧数据迁移失败：…')`，不阻塞启动。
 - `importLegacyData` 不通过 IPC 暴露，仅供主进程迁移使用。
 
 ### 7.7 IPC 清单（`window.workshop`）
@@ -504,4 +504,4 @@ await window.workshop.graph.saveLayout({ [`s:${result.id}`]: { x: 120, y: 88.5 }
 - 渲染层不能提交任意文件路径；项目路径只能来自系统目录选择或登记文件。
 - 偏好键白名单仅 `generator`、`libraryFilters`；新增偏好键需同步更新主进程白名单、预加载类型与本章节。
 - 新增 IPC 通道必须在预加载白名单（`src/electron/preload.cts`）、类型声明（`src/workshop.d.ts`）、主进程处理器（`src/electron/ipc/workshop-ipc.cts`）与本章节同时登记。
-- 项目数据目录名可通过 `creationWorkshop.project.dataDirName` 改名；改名后旧项目目录需要手动重命名，否则会被判定为「不是创作工坊项目」。
+- 项目数据目录名可通过 `creationWorkshop.project.dataDirName` 改名；改名后旧项目目录需要手动重命名，否则会被判定为「不是Creation Workshop项目」。

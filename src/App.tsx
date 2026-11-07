@@ -109,12 +109,12 @@ function App() {
     <div id="container" className="app-root">
       <header className="desktop-titlebar" aria-label="窗口标题栏">
         <span className="desktop-titlebar-mark">创</span>
-        <span>{project ? project.name : '创作工坊'}</span>
+        <span>{project ? project.name : 'Creation Workshop'}</span>
       </header>
       <ToastProvider>
         {project === undefined ? (
           <div className="app-booting" data-testid="app-booting">
-            正在打开创作工坊…
+            正在打开Creation Workshop…
           </div>
         ) : project === null ? (
           <ProjectGate onOpened={setProject} />

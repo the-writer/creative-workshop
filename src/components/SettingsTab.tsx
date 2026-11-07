@@ -106,7 +106,7 @@ export function SettingsTab({ project, onSwitchProject, refreshKey }: SettingsTa
 
         <SectionTitle>关于</SectionTitle>
         <div className="settings-card">
-          <p className="settings-about-name">创作工坊</p>
+          <p className="settings-about-name">Creation Workshop</p>
           <p className="settings-desc">为小说世界观生成人名与地名，并组织候选、设定卡、地名库与关系图谱。</p>
           <p className="settings-desc" data-testid="settings-lexicon-scale">
             当前词库理论组合量：{formatCombination(lexiconScale.grandTotal)}（人名 {formatCombination(lexiconScale.detail.person)} · 地名{' '}

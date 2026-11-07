@@ -8,13 +8,13 @@ const WORKSHOP_PROTOCOL = 'workshop://project/open';
 const openWorkshop = async (): Promise<void> => {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
-    void vscode.window.showErrorMessage('Type Stats: 请先打开创作工坊项目文件夹。');
+    void vscode.window.showErrorMessage('Creation Workshop: 请先打开Creation Workshop项目文件夹。');
     return;
   }
   const link = vscode.Uri.parse(`${WORKSHOP_PROTOCOL}?name=${encodeURIComponent(folder.name)}`);
   const opened = await vscode.env.openExternal(link);
   if (!opened) {
-    void vscode.window.showErrorMessage('Type Stats: 无法打开创作工坊，请确认已安装并注册 workshop:// 协议。');
+    void vscode.window.showErrorMessage('Creation Workshop: 无法打开Creation Workshop，请确认已安装并注册 workshop:// 协议。');
   }
 };
 
@@ -72,7 +72,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await highlighter.reload();
     }
     void vscode.window.showInformationMessage(
-      active ? 'Type Stats: 设定集已重新加载。' : 'Type Stats: 未找到 .workshop/sheets.ini，插件未启用。'
+      active ? 'Creation Workshop: 设定集已重新加载。' : 'Creation Workshop: 未找到 .workshop/sheets.ini，插件未启用。'
     );
   };
 
@@ -88,18 +88,18 @@ export function activate(context: vscode.ExtensionContext): void {
         label: '$(history) 重置计时与速率',
         action: () => {
           stats.reset();
-          void vscode.window.showInformationMessage('Type Stats: 计时与速率已重置。');
+          void vscode.window.showInformationMessage('Creation Workshop: 计时与速率已重置。');
         }
       },
       {
         label: '$(gear) 打开设置',
-        description: '在 VS Code 设置界面修改 Type Stats 配置',
-        action: () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:border-writer.type-stats')
+        description: '在 VS Code 设置界面修改 Creation Workshop 配置',
+        action: () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:border-writer.creation-workshop')
       }
     ];
 
     const picked = await vscode.window.showQuickPick(items, {
-      title: 'Type Stats',
+      title: 'Creation Workshop',
       placeHolder: '选择操作'
     });
     if (picked) {
