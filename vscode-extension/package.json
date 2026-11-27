@@ -2,7 +2,7 @@
   "name": "creation-workshop",
   "displayName": "Creation Workshop",
   "description": "Writing statistics and setting-sheet highlighting for .txt and .md files.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "publisher": "border-writer",
   "license": "MIT",
   "icon": "assets/imgs/app-icon.png",
