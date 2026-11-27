@@ -19,7 +19,7 @@
 - 主窗口为普通独立窗口：不置顶，打开期间切换桌面不跟随；关闭后从其它桌面重新打开时落在当前桌面。启动与重新打开均不显示 Dock 图标。
 - 不提供导出（JSON / TXT / Markdown / PNG）与分享；AI 详细设定入口保留，点击后以弹窗明确说明，不发起网络请求。
 - 仓库内附带配套 VS Code 插件 `vscode-extension/`（Creation Workshop）：读取工作区 `.workshop/sheets.ini` / `sheets.md` 提供字数统计、码字计时/速率与设定集高亮；随主项目构建自动打包 VSIX。
-- 附带命令行工具 `workshop`：脚本只负责拉起工具并转发参数，生成名称、查看角色库、把角色写回当前目录 `.workshop` 均在 CLI 内完成；打包后由 pkg 安装脚本在 PATH 可达目录建立 `workshop` 软连接。
+- 附带命令行工具 `workshop`：脚本只负责拉起工具并转发参数，生成名称、查看项目数据、把名称写回当前目录 `.workshop` 均在 CLI 内完成；CLI 必须给出子命令，直接运行只输出用法。CLI 的数据读写统一调用桌面应用的数据服务，不自行解析 Markdown；默认参数取自项目 `preferences.md` 中保存的生成规则，生成结果保留在 `.workshop/temp.md`，可用 `workshop add <ID>` 收录。打包后由 pkg 安装脚本在 PATH 可达目录建立 `workshop` 软连接，并按登录用户的 shell 自动注册命令补全。
 
 ## 阅读指南
 

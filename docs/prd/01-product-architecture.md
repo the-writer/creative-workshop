@@ -17,7 +17,7 @@ Creation Workshop面向小说作者、世界观构建者与桌游设定作者，
 | 预加载桥        | `src/electron/preload.cts`                    | 通过 `contextBridge` 暴露白名单 `window.workshop`                                                    |
 | IPC 边界        | `src/electron/ipc/workshop-ipc.cts`           | 校验调用来源、处理项目/数据/剪贴板请求                                                               |
 | 渲染层          | `src/`                                        | React 界面、项目门与纯本地命名生成                                                                   |
-| 命令行工具      | `src/cli/`、`runtime/workshop.sh`             | 生成名称、读取与写入角色库、拉起应用；与渲染层共用生成引擎（§10）                                     |
+| 命令行工具      | `src/cli/`、`runtime/workshop.sh`             | 生成名称、读取与写入项目数据、收录生成结果、拉起应用、输出命令补全；与渲染层共用生成引擎与数据服务（§10） |
 | 打包脚本        | `scripts/`                                    | 清理旧产物、打包后处理与安装脚本                                                                     |
 
 渲染进程禁止直接访问 Node.js、文件系统与子进程；`nodeIntegration=false`、`contextIsolation=true`、`sandbox=true`（`src/electron/main.cts`）。

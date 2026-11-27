@@ -51,11 +51,11 @@ PKG 安装脚本目录为 `scripts/pkg-scripts`：
 | 阶段          | 行为                                                                                                                                              |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `preinstall`  | 在 `/dev/console` 对应当前登录用户会话中请求“Creation Workshop”退出；等待 5 秒后仍运行则强制结束                                                           |
-| `postinstall` | 安装完成后通过 `launchctl asuser` 从登录用户会话执行 `open -j /Applications/Creation Workshop.app`，隐藏启动新版本；应用仅在菜单栏显示托盘图标，不抢占前台；同时在 PATH 可达目录建立命令行工具软连接 `workshop`（详见 §10.7） |
+| `postinstall` | 安装完成后通过 `launchctl asuser` 从登录用户会话执行 `open -j /Applications/Creation Workshop.app`，隐藏启动新版本；应用仅在菜单栏显示托盘图标，不抢占前台；同时在 PATH 可达目录建立命令行工具软连接 `workshop`，并按登录用户的 shell 注册命令补全脚本（详见 §10.9） |
 
 不配置 Installer 的 `must-close` 交互声明；关闭旧进程完全由 `preinstall` 自动完成，避免安装时要求用户手动关闭应用。
 
-命令行工具随应用打包：`runtime/` 目录通过 `build.extraResources` 安装到 `Creation Workshop.app/Contents/Resources/runtime`（`workshop.sh` 保留可执行权限），`release/cli/**/*` 进入 `app.asar`。`postinstall` 依次尝试在 `/usr/local/bin`、`/opt/homebrew/bin` 建立指向 `Contents/Resources/runtime/workshop.sh` 的 `workshop` 软连接；目录不可写时跳过，不影响安装结果（见 §10.6、§10.7）。
+命令行工具随应用打包：`runtime/` 目录通过 `build.extraResources` 安装到 `Creation Workshop.app/Contents/Resources/runtime`（`workshop.sh` 保留可执行权限，`runtime/completions/` 为命令补全脚本），`release/cli/**/*` 进入 `app.asar`。`postinstall` 依次尝试在 `/usr/local/bin`、`/opt/homebrew/bin` 建立指向 `Contents/Resources/runtime/workshop.sh` 的 `workshop` 软连接，并把补全脚本复制到对应 shell 的补全目录；目录不可写时跳过，不影响安装结果（见 §10.9）。
 
 未配置 Developer ID Application / Developer ID Installer 证书时，`.app` 使用 ad-hoc 签名，PKG 本身未签名；
 仍需正式分发时应同时配置两类 Developer ID 证书。
@@ -88,6 +88,6 @@ pnpm run build
 涉及桌面窗口、托盘或 IPC 的改动还需进行一次 Electron 启动验证，并在同一轮检查：启动时只有托盘且不弹主窗口、点击托盘后出现项目门与「上次」TAG、打开目录自动初始化 `.workshop`、主界面、规则设置模态子窗口、托盘图标加载与桌面切换不跟随。
 构建变更还应确认 `pnpm run build` 后存在 `release/renderer/index.html`、`release/electron/main.cjs` 与 `release/cli/cli.cjs`；打包变更还应确认 `release/` 中只有 `.pkg` 与 `creation-workshop-v<version>.vsix`，并检查安装脚本已被打入安装包。
 
-命令行工具改动还需确认 `pnpm run build:cli` 通过、`node release/cli/cli.cjs --count 3` 输出表格、`runtime/workshop.sh` 能正确转发参数（含软连接场景），打包后 `Contents/Resources/runtime/workshop.sh` 存在且可执行。
+命令行工具改动还需确认 `pnpm run build:cli` 通过、`node release/cli/cli.cjs gen --count 3` 输出带 ID 的表格、`node release/cli/cli.cjs` 只输出用法、`node release/cli/cli.cjs completion zsh` 输出补全脚本、`runtime/workshop.sh` 能正确转发参数（含软连接场景），打包后 `Contents/Resources/runtime/workshop.sh` 存在且可执行、`Contents/Resources/runtime/completions/` 随包分发。
 
 插件改动还需确认 `pnpm run build:extension` 通过，且 `vscode-extension/creation-workshop-v<version>.vsix` 包含 `package.json`、`README.md`、`LICENSE.txt`、`assets/imgs/app-icon.png` 与 `dist/extension.js`，不包含 `src/` 与 `scripts/`。

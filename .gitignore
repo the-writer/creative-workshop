@@ -1,4 +1,5 @@
 /release
+/.workshop
 /node_modules
 /vscode-extension/node_modules
 /vscode-extension/dist

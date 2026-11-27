@@ -6,6 +6,10 @@ APP="/Applications/Creation Workshop.app"
 
 CONSOLE_USER="$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"
 CONSOLE_UID="$(/usr/bin/stat -f '%u' /dev/console 2>/dev/null || true)"
+CONSOLE_HOME=""
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ]; then
+  CONSOLE_HOME="$(/usr/bin/dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
+fi
 
 # 命令行工具：runtime 目录随应用安装在 Contents/Resources/runtime，
 # 这里在 PATH 可达的目录建立名为 workshop 的软连接（与 docs/prd/10-cli.md 一致）。
@@ -21,6 +25,50 @@ if [ -x "$CLI_SCRIPT" ]; then
       break
     fi
   done
+fi
+
+# 命令补全：把随应用分发的补全脚本注册到登录用户使用的 shell。
+COMPLETION_SRC_DIR="$APP/Contents/Resources/runtime/completions"
+
+register_completion() {
+  shell_name="$1"
+  case "$shell_name" in
+    zsh)
+      target_dir="/usr/local/share/zsh/site-functions"
+      mkdir -p "$target_dir" 2>/dev/null || return
+      cp -f "$COMPLETION_SRC_DIR/_workshop" "$target_dir/_workshop" 2>/dev/null || return
+      chmod 644 "$target_dir/_workshop" 2>/dev/null || true
+      echo "已注册命令补全（zsh）：$target_dir/_workshop"
+      ;;
+    bash)
+      target_dir="/usr/local/etc/bash_completion.d"
+      [ -d "$target_dir" ] || return
+      cp -f "$COMPLETION_SRC_DIR/workshop.bash" "$target_dir/workshop" 2>/dev/null || return
+      chmod 644 "$target_dir/workshop" 2>/dev/null || true
+      echo "已注册命令补全（bash）：$target_dir/workshop"
+      ;;
+    fish)
+      [ -n "$CONSOLE_HOME" ] || return
+      target_dir="$CONSOLE_HOME/.config/fish/completions"
+      mkdir -p "$target_dir" 2>/dev/null || return
+      cp -f "$COMPLETION_SRC_DIR/workshop.fish" "$target_dir/workshop.fish" 2>/dev/null || return
+      chown "$CONSOLE_USER" "$target_dir" "$target_dir/workshop.fish" 2>/dev/null || true
+      echo "已注册命令补全（fish）：$target_dir/workshop.fish"
+      ;;
+  esac
+}
+
+if [ -d "$COMPLETION_SRC_DIR" ]; then
+  USER_SHELL_NAME=""
+  if [ -n "$CONSOLE_USER" ]; then
+    USER_SHELL_PATH="$(/usr/bin/dscl . -read "/Users/$CONSOLE_USER" UserShell 2>/dev/null | /usr/bin/awk '{print $2}')"
+    USER_SHELL_NAME="$(/usr/bin/basename "$USER_SHELL_PATH" 2>/dev/null || true)"
+  fi
+  # 未识别到登录 shell 时按 macOS 默认的 zsh 注册
+  case "$USER_SHELL_NAME" in
+    zsh|bash|fish) register_completion "$USER_SHELL_NAME" ;;
+    *) register_completion "zsh" ;;
+  esac
 fi
 
 if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ] && [ -n "$CONSOLE_UID" ]; then

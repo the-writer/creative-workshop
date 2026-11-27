@@ -1,0 +1,63 @@
+#compdef workshop
+# Creation Workshop 命令行工具补全（安装脚本自动注册到 zsh 的 fpath）。
+
+_workshop() {
+  local curcontext="$curcontext" state line
+  local -a commands
+
+  commands=(
+    'gen:生成随机名称并以表格输出'
+    'list:列出项目数据（sheets / places / candidates）'
+    'add:把名称写入角色库'
+    'open:后台拉起桌面应用'
+    'help:显示帮助'
+    'completion:输出命令补全脚本'
+  )
+
+  _arguments -C \
+    '1:命令:->command' \
+    '*::参数:->args'
+
+  case $state in
+    command)
+      _describe -t commands 'workshop 命令' commands
+      ;;
+    args)
+      case $words[1] in
+        gen)
+          _arguments \
+            '--race[族群]:族群:(human elf yaogui mixed)' \
+            '--type[类型]:类型:(person place)' \
+            '--gender[性别]:性别:(any male female neutral)' \
+            '--weight[姓氏稀有倾向 0-1]:权重:' \
+            '--count[生成数量]:数量:' \
+            '--dir[项目目录]:目录:_files -/'
+          ;;
+        list)
+          _arguments \
+            '1:数据类别:(sheets places candidates)' \
+            '--dir[项目目录]:目录:_files -/'
+          ;;
+        add)
+          _arguments \
+            '1:生成结果 ID:' \
+            '--name[名称]:名称:' \
+            '--race[族群]:族群:(human elf yaogui mixed)' \
+            '--type[类型]:类型:(person place)' \
+            '--gender[性别]:性别:(any male female neutral)' \
+            '--note[备注]:备注:' \
+            '--favorite[标记为收藏]' \
+            '--dir[项目目录]:目录:_files -/'
+          ;;
+        completion)
+          _values 'shell' zsh bash fish
+          ;;
+        help)
+          _values '命令' gen list add open help completion
+          ;;
+      esac
+      ;;
+  esac
+}
+
+compdef _workshop workshop

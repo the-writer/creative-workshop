@@ -77,15 +77,21 @@ app.setName(APP_NAME);
  */
 const CLI_FLAG = '--cli';
 const cliFlagIndex = process.argv.indexOf(CLI_FLAG);
-if (cliFlagIndex >= 0) {
-  let exitCode = 1;
+const isCliMode = cliFlagIndex >= 0;
+if (isCliMode) {
   try {
-    const cliModule = require(join(__dirname, '..', 'cli', 'cli.cjs')) as { runCli: (args: string[]) => number };
-    exitCode = cliModule.runCli(process.argv.slice(cliFlagIndex + 1));
+    const cliModule = require(join(__dirname, '..', 'cli', 'cli.cjs')) as { runCli: (args: string[]) => Promise<number> };
+    void cliModule
+      .runCli(process.argv.slice(cliFlagIndex + 1))
+      .then((exitCode) => app.exit(exitCode))
+      .catch((error: unknown) => {
+        console.error(`[${APP_NAME}] 命令行模式启动失败：${(error as Error)?.message ?? String(error)}`);
+        app.exit(1);
+      });
   } catch (error) {
     console.error(`[${APP_NAME}] 命令行模式启动失败：${(error as Error)?.message ?? String(error)}`);
+    app.exit(1);
   }
-  app.exit(exitCode);
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -459,7 +465,8 @@ function registerProtocol(): void {
   if (!registered) console.warn(`[${APP_NAME}] 未能注册系统协议：${PROTOCOL_SCHEME}://`);
 }
 
-const singleInstanceLock = app.requestSingleInstanceLock();
+// 命令行模式不占用单实例锁：桌面应用正在运行时 CLI 仍可正常使用。
+const singleInstanceLock = isCliMode ? true : app.requestSingleInstanceLock();
 if (!singleInstanceLock) {
   app.quit();
 } else {
@@ -470,18 +477,23 @@ if (!singleInstanceLock) {
   });
 }
 
-registerProtocol();
+// 命令行模式只跑 CLI：不注册系统协议、不初始化窗口与托盘。
+if (!isCliMode) {
+  registerProtocol();
 
-// macOS 通过 `open-url` 投递协议链接；Windows / Linux 通过启动参数传入。
-app.on('open-url', (event, url) => {
-  event.preventDefault();
-  handleProjectLink(url);
-});
+  // macOS 通过 `open-url` 投递协议链接；Windows / Linux 通过启动参数传入。
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    handleProjectLink(url);
+  });
 
-const startupProjectLink = findProjectLink(process.argv);
-if (startupProjectLink) handleProjectLink(startupProjectLink);
+  const startupProjectLink = findProjectLink(process.argv);
+  if (startupProjectLink) handleProjectLink(startupProjectLink);
+}
 
 app.whenReady().then(async () => {
+  // 命令行模式只跑 CLI：不创建窗口、托盘与 IPC
+  if (isCliMode) return;
   if (!singleInstanceLock) return;
   // 启动即隐藏 Dock 图标（macOS）：应用只驻留托盘，启动时不打开主窗口
   hideDockIcon();

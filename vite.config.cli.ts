@@ -9,6 +9,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  esbuild: {
+    include: /\.[cm]?tsx?$/,
+  },
   build: {
     ssr: 'src/cli/index.ts',
     outDir: 'release/cli',

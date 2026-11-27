@@ -1,12 +1,10 @@
 // 命令行参数解析：把 argv 解析成结构化选项，参数错误只记录不抛异常。
 
 import {
-  DEFAULT_COUNT,
-  DEFAULT_GENDER,
-  DEFAULT_RACE,
-  DEFAULT_TYPE,
-  DEFAULT_WEIGHT,
+  DEFAULT_LIST_TARGET,
   GENDER_ALIASES,
+  LIST_TARGET_ALIASES,
+  LIST_TARGETS,
   MAX_COUNT,
   MAX_WEIGHT,
   MIN_COUNT,
@@ -14,20 +12,35 @@ import {
   RACE_ALIASES,
   TYPE_ALIASES,
 } from '@/cli/constants';
+import type { ListTarget } from '@/cli/constants';
 import type { NameGender, NameTypeKey, RaceKey } from '@/lib/types';
 
-export type CliCommand = 'gen' | 'list' | 'add' | 'open' | 'help';
+export type CliCommand = 'gen' | 'list' | 'add' | 'open' | 'help' | 'completion';
 export type ColorMode = 'auto' | 'always' | 'never';
 
 export interface CliOptions {
-  command: CliCommand;
+  /** 子命令；未给出子命令时为空字符串（此时直接输出用法） */
+  command: CliCommand | '';
   /** `help <命令>` 的主题 */
   helpTopic: string;
-  race: RaceKey;
-  type: NameTypeKey;
-  gender: NameGender;
-  weight: number;
-  count: number;
+  /** `list <类别>` 的数据类别 */
+  listTarget: ListTarget;
+  /** 数据类别是否由命令行显式指定 */
+  listTargetProvided: boolean;
+  /** `add <ID>` 的生成结果 ID */
+  addId: string;
+  /** `completion <shell>` 的 shell */
+  completionShell: string;
+  /** 族群；未指定时为 undefined（由项目偏好或默认值决定） */
+  race?: RaceKey;
+  /** 名称类型；未指定时为 undefined（由项目偏好或默认值决定） */
+  type?: NameTypeKey;
+  /** 性别；未指定时为 undefined（由项目偏好或默认值决定） */
+  gender?: NameGender;
+  /** 姓氏稀有倾向（0–1）；未指定时为 undefined */
+  weight?: number;
+  /** 生成数量；未指定时为 undefined */
+  count?: number;
   name: string;
   note: string;
   favorite: boolean;
@@ -47,17 +60,17 @@ const COMMAND_ALIASES: Record<string, CliCommand> = {
   add: 'add',
   open: 'open',
   help: 'help',
+  completion: 'completion',
 };
 
 export function defaultOptions(): CliOptions {
   return {
-    command: 'gen',
+    command: '',
     helpTopic: '',
-    race: DEFAULT_RACE,
-    type: DEFAULT_TYPE,
-    gender: DEFAULT_GENDER,
-    weight: DEFAULT_WEIGHT,
-    count: DEFAULT_COUNT,
+    listTarget: DEFAULT_LIST_TARGET,
+    listTargetProvided: false,
+    addId: '',
+    completionShell: '',
     name: '',
     note: '',
     favorite: false,
@@ -86,11 +99,16 @@ function parseNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/** 解析 list 的数据类别 */
+function lookupListTarget(value: string): ListTarget | undefined {
+  return lookup(LIST_TARGET_ALIASES, value);
+}
+
 /**
  * 解析命令行参数。
  *
  * 支持 `--flag value` 与 `--flag=value` 两种写法；命令可写成子命令（`gen` / `list` / `add` / `open`），
- * 也可写成等价开关（`--list` / `--add`）。
+ * 也可写成等价开关（`--list` / `--add`）。未给出子命令时 `command` 为空字符串。
  */
 export function parseArgs(argv: string[]): CliOptions {
   const options = defaultOptions();
@@ -119,6 +137,15 @@ export function parseArgs(argv: string[]): CliOptions {
       switch (flag) {
         case '--list':
           options.command = 'list';
+          if (inline !== undefined) {
+            const target = lookupListTarget(inline);
+            if (!target) {
+              options.error = `未知数据类别「${inline}」，可选：${LIST_TARGETS.join('、')}`;
+              break;
+            }
+            options.listTarget = target;
+            options.listTargetProvided = true;
+          }
           break;
         case '--add':
           options.command = 'add';
@@ -235,18 +262,43 @@ export function parseArgs(argv: string[]): CliOptions {
       continue;
     }
 
-    const command = COMMAND_ALIASES[normalizeKey(arg)];
-    if (!command) {
-      options.error = `未知命令：${arg}`;
+    // 位置参数：第一个是子命令，之后按子命令接收
+    if (!options.command) {
+      const command = COMMAND_ALIASES[normalizeKey(arg)];
+      if (!command) {
+        options.error = `未知命令：${arg}`;
+        continue;
+      }
+      options.command = command;
       continue;
     }
-    options.command = command;
-    if (command === 'help') {
-      const topic = argv[index];
-      if (topic && !topic.startsWith('-')) {
-        options.helpTopic = topic;
-        index += 1;
+
+    switch (options.command) {
+      case 'help':
+        if (!options.helpTopic) options.helpTopic = arg;
+        else options.error = `未知参数：${arg}`;
+        break;
+      case 'list': {
+        const target = lookupListTarget(arg);
+        if (!target) {
+          options.error = `未知数据类别「${arg}」，可选：${LIST_TARGETS.join('、')}`;
+          break;
+        }
+        options.listTarget = target;
+        options.listTargetProvided = true;
+        break;
       }
+      case 'add':
+        if (!options.addId) options.addId = arg;
+        else options.error = `未知参数：${arg}`;
+        break;
+      case 'completion':
+        if (!options.completionShell) options.completionShell = arg;
+        else options.error = `未知参数：${arg}`;
+        break;
+      default:
+        options.error = `未知参数：${arg}`;
+        break;
     }
   }
 

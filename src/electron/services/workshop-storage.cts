@@ -13,6 +13,7 @@ import {
   parsePreferencesMarkdown,
   parseRelationsMarkdown,
   parseSheetsMarkdown,
+  parseTempMarkdown,
   parseProjectMarkdown,
   serializeCandidatesMarkdown,
   serializeGraphMarkdown,
@@ -22,6 +23,7 @@ import {
   serializeRelationsMarkdown,
   serializeSheetsIni,
   serializeSheetsMarkdown,
+  serializeTempMarkdown,
   type Candidate,
   type CandidateFilters,
   type EntityType,
@@ -36,9 +38,10 @@ import {
   type Relation,
   type Sheet,
   type StructurePart,
+  type TempEntry,
 } from './workshop-markdown.cjs';
 
-export type { Candidate, CandidateFilters, EntityType, GraphLayout, GraphPoint, NameGender, NameTypeKey, Place, RaceKey, RarityTier, Relation, Sheet, StructurePart };
+export type { Candidate, CandidateFilters, EntityType, GraphLayout, GraphPoint, NameGender, NameTypeKey, Place, RaceKey, RarityTier, Relation, Sheet, StructurePart, TempEntry };
 
 /** .workshop 目录内的固定文件名（项目数据分类保存） */
 export const PROJECT_FILES = {
@@ -51,6 +54,7 @@ export const PROJECT_FILES = {
   graph: 'graph.md',
   preferences: 'preferences.md',
   sheetsIni: 'sheets.ini',
+  temp: 'temp.md',
 } as const;
 
 export interface ProjectConfig {
@@ -190,14 +194,26 @@ export class WorkshopStorage {
     return this.workshopPath;
   }
 
+  /**
+   * 关联项目目录：不创建、不迁移任何文件，只把读写定位到项目的 `.workshop`。
+   *
+   * 命令行工具用它按需读写单个数据文件（如 `temp.md`），避免打开项目时的整目录初始化。
+   */
+  public attach(projectPath: string): OpenedProject {
+    const resolved = resolve(projectPath);
+    const workshopPath = join(resolved, this.dataDirName);
+    this.projectPath = resolved;
+    this.workshopPath = workshopPath;
+    this.projectName = basename(resolved);
+    return { path: resolved, name: this.projectName, workshopPath };
+  }
+
   /** 打开项目：创建缺失的 .workshop 与分类文件，返回项目信息 */
   public open(projectPath: string): Promise<OpenedProject> {
     return this.enqueue(async () => {
-      const resolved = resolve(projectPath);
-      const workshopPath = join(resolved, this.dataDirName);
+      const opened = this.attach(projectPath);
+      const { workshopPath } = opened;
       await mkdir(workshopPath, { recursive: true });
-      this.projectPath = resolved;
-      this.workshopPath = workshopPath;
       await this.ensureFile(PROJECT_FILES.project, null);
       await this.ensureFile(PROJECT_FILES.candidates, serializeCandidatesMarkdown([]));
       await this.ensureFile(PROJECT_FILES.places, serializePlacesMarkdown([]));
@@ -206,7 +222,7 @@ export class WorkshopStorage {
       await this.ensureFile(PROJECT_FILES.preferences, serializePreferencesMarkdown(EMPTY_PREFERENCES));
       await this.ensureFile(PROJECT_FILES.graph, serializeGraphMarkdown({}, [], [], []));
       const projectText = await this.readText(PROJECT_FILES.project);
-      const fallbackName = basename(resolved);
+      const fallbackName = basename(opened.path);
       const info = parseProjectMarkdown(projectText, fallbackName);
       if (!projectText.trim()) await this.writeText(PROJECT_FILES.project, serializeProjectMarkdown(fallbackName));
       this.projectName = info.name || fallbackName;
@@ -215,7 +231,7 @@ export class WorkshopStorage {
       const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
       if (sheets.length > 0 && relations.length > 0) await this.writeSheets(sheets, relations);
       await this.refreshSheetsIni();
-      return { path: resolved, name: this.projectName, workshopPath };
+      return opened;
     });
   }
 
@@ -362,6 +378,23 @@ export class WorkshopStorage {
       const preferences = await this.loadPreferences();
       preferences[key] = clone(value);
       await this.writePreferences(preferences);
+    });
+  }
+
+  /* ---------------- 临时生成结果 ---------------- */
+
+  /** 读取命令行工具最近几次生成的结果（`.workshop/temp.md`） */
+  public tempList(): Promise<TempEntry[]> {
+    return this.enqueue(async () => {
+      const entries = await this.readText(PROJECT_FILES.temp);
+      return parseTempMarkdown(entries);
+    });
+  }
+
+  /** 覆盖写入临时生成结果（`.workshop/temp.md`） */
+  public tempSave(entries: TempEntry[]): Promise<void> {
+    return this.enqueue(async () => {
+      await this.writeText(PROJECT_FILES.temp, serializeTempMarkdown(entries));
     });
   }
 
@@ -542,7 +575,7 @@ export class WorkshopStorage {
 
   /* ---------------- 设定卡 ---------------- */
 
-  public sheetsList(): Promise<Sheet[]> {
+  public sheetsList(): Promise<Array<Sheet & { relationCount: number }>> {
     return this.enqueue(async () => {
       const [sheets, relations] = await Promise.all([this.loadSheets(), this.loadRelations()]);
       const countMap = new Map<string, number>();

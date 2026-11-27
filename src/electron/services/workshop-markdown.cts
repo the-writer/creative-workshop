@@ -404,6 +404,81 @@ export function serializePlacesMarkdown(places: Place[]): string {
   return out.join('\n');
 }
 
+/* ---------------- 临时生成结果（命令行工具） ---------------- */
+
+/** 命令行工具最近几次 `workshop gen` 的结果条目，保存在 `.workshop/temp.md`。 */
+export interface TempEntry {
+  id: string;
+  nameText: string;
+  race: RaceKey;
+  nameType: NameTypeKey;
+  gender?: NameGender;
+  rarity?: RarityTier;
+  charCount: number;
+  structure: StructurePart[];
+  /** 生成批次：同一次 `workshop gen` 的结果共享同一个批次标识 */
+  batch: string;
+  createdAt: number;
+}
+
+/** 解析 `temp.md` 文本 */
+export function parseTempMarkdown(text: string): TempEntry[] {
+  const { sections } = splitSections(text);
+  const result: TempEntry[] = [];
+  for (const section of sections) {
+    const fields = toFieldMap(parseFields(section.body));
+    const id = fieldValue(fields, 'ID', 'id');
+    const nameText = fieldValue(fields, '名称', 'nameText') || cleanHeading(section.heading);
+    if (!id || !nameText) continue;
+    const createdAt = parseTimestamp(fieldValue(fields, '生成时间', 'createdAt'));
+    const gender = parseGender(fieldValue(fields, '性别'));
+    const rarity = parseRarity(fieldValue(fields, '稀有度'));
+    const structureEntry = fields.get('结构');
+    result.push({
+      id,
+      nameText,
+      race: parseRace(fieldValue(fields, '族群')),
+      nameType: parseNameType(fieldValue(fields, '类型')),
+      ...(gender ? { gender } : {}),
+      ...(rarity ? { rarity } : {}),
+      charCount: nameCharCount(nameText),
+      structure: normalizeStructure(structureEntry?.children ?? []),
+      batch: fieldValue(fields, '批次', 'batch'),
+      createdAt,
+    });
+  }
+  return result;
+}
+
+/** 序列化 `temp.md` 文本（最新批次在前） */
+export function serializeTempMarkdown(entries: TempEntry[]): string {
+  const out: string[] = [
+    '# 临时生成结果',
+    '',
+    '> 由「Creation Workshop」命令行工具维护：记录最近几次 `workshop gen` 的结果，可用 `workshop add <ID>` 直接收录。',
+    '',
+  ];
+  entries.forEach((entry) => {
+    out.push(`## ${headingText(entry.nameText)}`);
+    out.push('');
+    out.push(`- ID: ${encodeId(entry.id)}`);
+    out.push(`- 名称: ${encodeValue(entry.nameText)}`);
+    out.push(`- 族群: ${RACE_LABELS[entry.race]}`);
+    out.push(`- 类型: ${TYPE_LABELS[entry.nameType]}`);
+    if (entry.gender) out.push(`- 性别: ${GENDER_LABELS[entry.gender]}`);
+    if (entry.rarity) out.push(`- 稀有度: ${entry.rarity}`);
+    out.push(`- 字数: ${nameCharCount(entry.nameText)}`);
+    if (entry.structure.length > 0) {
+      out.push('- 结构:');
+      entry.structure.forEach((part) => out.push(`  - ${part.label}: ${encodeValue(part.word)}`));
+    }
+    if (entry.batch) out.push(`- 批次: ${encodeId(entry.batch)}`);
+    out.push(`- 生成时间: ${timestamp(entry.createdAt)}`);
+    out.push('');
+  });
+  return out.join('\n');
+}
+
 /* ---------------- 设定卡 ---------------- */
 
 export function parseSheetsMarkdown(text: string): Sheet[] {

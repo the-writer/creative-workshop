@@ -5,6 +5,7 @@
 
 import { parseArgs } from '@/cli/args';
 import { runAdd } from '@/cli/commands/add';
+import { runCompletion } from '@/cli/commands/completion';
 import { runGenerate } from '@/cli/commands/generate';
 import { runList } from '@/cli/commands/list';
 import { runOpen } from '@/cli/commands/open';
@@ -13,7 +14,7 @@ import { readCliConfig } from '@/cli/config';
 import { createPalette, writeErr, writeOut } from '@/cli/format';
 import { helpText } from '@/cli/help';
 
-export function runCli(argv: string[]): number {
+export async function runCli(argv: string[]): Promise<number> {
   const options = parseArgs(argv);
   const palette = createPalette(options.color);
   const write = (text: string): void => writeOut(text);
@@ -37,15 +38,23 @@ export function runCli(argv: string[]): number {
     return 0;
   }
 
+  // 至少需要一个子命令：直接运行 workshop 时只输出用法
+  if (!options.command) {
+    write(helpText(''));
+    return 0;
+  }
+
   switch (options.command) {
     case 'gen':
-      return runGenerate(options, palette, write);
+      return runGenerate(options, palette, config.dataDirName, write, writeError);
     case 'list':
       return runList(options, palette, config.dataDirName, write, writeError);
     case 'add':
       return runAdd(options, config.dataDirName, write, writeError);
     case 'open':
       return runOpen(write, writeError);
+    case 'completion':
+      return runCompletion(options, write, writeError);
     default:
       writeError(`未知命令：${options.command}`);
       return 1;
@@ -54,5 +63,7 @@ export function runCli(argv: string[]): number {
 
 // 直接以 node 运行构建产物时自动执行；被桌面应用 require 时只导出函数，由主进程决定退出码。
 if (typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module) {
-  process.exitCode = runCli(process.argv.slice(2));
+  void runCli(process.argv.slice(2)).then((code) => {
+    process.exitCode = code;
+  });
 }

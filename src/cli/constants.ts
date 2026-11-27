@@ -1,5 +1,6 @@
 // 命令行工具常量：默认值、取值范围与别名集中在此，业务代码不散落字面量。
 
+import type { PersonSuffix, ShortMode } from '@/lib/generator';
 import type { NameGender, NameTypeKey, RaceKey } from '@/lib/types';
 
 /** 命令名（错误提示前缀、帮助文案使用） */
@@ -9,13 +10,23 @@ export const CLI_NAME = 'workshop';
 export const APP_NAME = 'Creation Workshop';
 export const APP_BUNDLE_ID = 'cn.com.stdout.creation-workshop';
 
-/** 生成参数默认值 */
+/** 生成参数默认值（项目没有 preferences.md 时使用） */
 export const DEFAULT_RACE: RaceKey = 'human';
 export const DEFAULT_TYPE: NameTypeKey = 'person';
 export const DEFAULT_GENDER: NameGender = 'any';
 /** 姓氏稀有倾向：0 = 按人口，1 = 极稀有 */
 export const DEFAULT_WEIGHT = 0.6;
 export const DEFAULT_COUNT = 10;
+
+/** CLI 内置的生成规则；项目 preferences.md 存在时以其保存的定义为准 */
+export const DEFAULT_GEN_RULES = {
+  shortMode: 'mix' as ShortMode,
+  personSuffix: 'father' as PersonSuffix,
+  minChars: 4,
+  maxChars: 8,
+  professions: [] as string[],
+  abilities: [] as string[],
+};
 
 /** 取值范围 */
 export const MIN_COUNT = 1;
@@ -62,6 +73,29 @@ export const GENDER_ALIASES: Record<string, NameGender> = {
   中性: 'neutral',
 };
 
-/** 角色库文件名：人名写入候选库，地名写入地名库 */
-export const CANDIDATES_FILE = 'candidates.md';
-export const PLACES_FILE = 'places.md';
+/** list 支持的数据类别：分别对应 .workshop 下的 sheets.md / places.md / candidates.md */
+export const LIST_TARGETS = ['sheets', 'places', 'candidates'] as const;
+export type ListTarget = (typeof LIST_TARGETS)[number];
+export const DEFAULT_LIST_TARGET: ListTarget = 'sheets';
+
+/** 数据类别别名：英文 key 与中文名均可传入 */
+export const LIST_TARGET_ALIASES: Record<string, ListTarget> = {
+  sheets: 'sheets',
+  sheet: 'sheets',
+  设定卡: 'sheets',
+  人物: 'sheets',
+  places: 'places',
+  place: 'places',
+  地名: 'places',
+  candidates: 'candidates',
+  candidate: 'candidates',
+  候选: 'candidates',
+  人名: 'candidates',
+};
+
+/** 支持输出补全脚本的 shell */
+export const COMPLETION_SHELLS = ['zsh', 'bash', 'fish'] as const;
+export type CompletionShell = (typeof COMPLETION_SHELLS)[number];
+
+/** 临时生成结果（.workshop/temp.md）保留的批次数量 */
+export const TEMP_MAX_BATCHES = 3;
