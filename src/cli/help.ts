@@ -90,7 +90,7 @@ Examples:
   workshop add --type place --name "青云城" --dir ~/novels/star-sea`,
   open: `Usage: workshop open
 
-拉起 ${APP_NAME} 桌面应用（仅 macOS）；应用已在运行时直接切到前台。
+后台拉起 ${APP_NAME} 桌面应用（仅 macOS）：应用已在运行时不会重复启动，也不会抢前台。
 
 Examples:
   workshop open`,

@@ -31,7 +31,7 @@
 | `gen`（默认） | 生成随机名称并以表格输出                | —             |
 | `list`        | 列出当前目录 `.workshop` 中的角色数据   | `--list`      |
 | `add`         | 把角色写入当前目录 `.workshop` 的角色库 | `--add`       |
-| `open`        | 拉起桌面应用（仅 macOS）                | —             |
+| `open`        | 后台拉起桌面应用（仅 macOS，不抢前台）  | —             |
 | `help [命令]` | 显示帮助或某个命令的详细说明            | `-h`/`--help` |
 
 参数（`--flag value` 与 `--flag=value` 两种写法均可；中文别名与英文别名等价）：
@@ -125,6 +125,6 @@ flowchart TD
   H -- gen --> I[generateBatch 生成名称并输出表格]
   H -- list --> J[读取 .workshop 并输出表格]
   H -- add --> K[追加记录到 .workshop]
-  H -- open --> L[open -b 拉起桌面应用]
+  H -- open --> L[open -g -b 后台拉起桌面应用]
   H -- help --> M[输出帮助文案]
 ```
