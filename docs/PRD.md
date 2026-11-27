@@ -19,6 +19,7 @@
 - 主窗口为普通独立窗口：不置顶，打开期间切换桌面不跟随；关闭后从其它桌面重新打开时落在当前桌面。启动与重新打开均不显示 Dock 图标。
 - 不提供导出（JSON / TXT / Markdown / PNG）与分享；AI 详细设定入口保留，点击后以弹窗明确说明，不发起网络请求。
 - 仓库内附带配套 VS Code 插件 `vscode-extension/`（Creation Workshop）：读取工作区 `.workshop/sheets.ini` / `sheets.md` 提供字数统计、码字计时/速率与设定集高亮；随主项目构建自动打包 VSIX。
+- 附带命令行工具 `workshop`：脚本只负责拉起工具并转发参数，生成名称、查看角色库、把角色写回当前目录 `.workshop` 均在 CLI 内完成；打包后由 pkg 安装脚本在 PATH 可达目录建立 `workshop` 软连接。
 
 ## 阅读指南
 
@@ -34,6 +35,7 @@
 | 修改项目选择/打开、`.workshop` 格式或 IPC | [07-persistence-and-ipc.md](prd/07-persistence-and-ipc.md)   |
 | 修改依赖、脚本、打包或发布                | [08-build-and-release.md](prd/08-build-and-release.md)       |
 | 修改 VS Code 插件、统计口径或设定集高亮   | [09-vscode-extension.md](prd/09-vscode-extension.md)         |
+| 修改命令行工具、参数或角色库读写         | [10-cli.md](prd/10-cli.md)                                     |
 
 ## 维护规则
 
@@ -50,6 +52,7 @@
 | 项目选择/打开、项目登记、`.workshop` 格式、迁移、IPC | `prd/07-persistence-and-ipc.md`  |
 | 依赖、脚本、打包产物、CI                             | `prd/08-build-and-release.md`    |
 | VS Code 插件、统计规则、设定集高亮、插件命令与配置   | `prd/09-vscode-extension.md`     |
+| 命令行工具、参数、角色库读写、软连接安装           | `prd/10-cli.md`                 |
 
 ### 编号与书写约束
 

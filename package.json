@@ -11,13 +11,14 @@
     "start": "pnpm run build && electron .",
     "dev:renderer": "vite",
     "build:electron": "tsc -p tsconfig.electron.json",
+    "build:cli": "vite build --config vite.config.cli.ts",
     "build:extension": "pnpm --dir vscode-extension run package",
     "install:extension": "code --install-extension \"vscode-extension/creation-workshop-v$(node -p \"require('./vscode-extension/package.json').version\").vsix\" --force",
-    "build": "pnpm run typecheck && vite build && tsc -p tsconfig.electron.json && pnpm run build:extension",
+    "build": "pnpm run typecheck && vite build && vite build --config vite.config.cli.ts && tsc -p tsconfig.electron.json && pnpm run build:extension",
     "dist:mac": "sh scripts/dist-mac.sh",
     "install:mac": "sh scripts/install-mac.sh",
-    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
-    "test": "vitest run && pnpm run build:electron && node --test tests/storage.test.mjs",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "test": "vitest run && pnpm run build:electron && pnpm run build:cli && node --test tests/storage.test.mjs tests/cli.test.mjs",
     "format": "prettier --write \"{src,electron,tests,scripts}/**/*.{ts,tsx,cts,cjs,mjs,json,css,md}\" \"docs/**/*.md\" \"package.json\" \"*.config.js\"",
     "format:check": "prettier --check \"{src,electron,tests,scripts}/**/*.{ts,tsx,cts,cjs,mjs,json,css,md}\" \"docs/**/*.md\" \"package.json\" \"*.config.js\"",
     "lint": "eslint .",
@@ -94,8 +95,15 @@
     "files": [
       "release/renderer/**/*",
       "release/electron/**/*",
+      "release/cli/**/*",
       "src/assets/imgs/trayTemplate*.png",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "runtime",
+        "to": "runtime"
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",

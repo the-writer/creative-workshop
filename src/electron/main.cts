@@ -68,6 +68,26 @@ const WINDOW_COLLECTION_BEHAVIOR = { visibleOnFullScreen: true, skipTransformPro
 
 app.setName(APP_NAME);
 
+/**
+ * 命令行模式：以 `--cli` 参数启动时只执行命令行工具的逻辑并退出。
+ *
+ * - 不创建窗口与托盘，不占用单实例锁（桌面应用正在运行时同样可用）；
+ * - 参数原样转发给 CLI，CLI 自行解析并输出结果，退出码即进程退出码；
+ * - CLI 构建产物与主进程同在 `release/` 下，缺失时给出明确提示而不是静默退出。
+ */
+const CLI_FLAG = '--cli';
+const cliFlagIndex = process.argv.indexOf(CLI_FLAG);
+if (cliFlagIndex >= 0) {
+  let exitCode = 1;
+  try {
+    const cliModule = require(join(__dirname, '..', 'cli', 'cli.cjs')) as { runCli: (args: string[]) => number };
+    exitCode = cliModule.runCli(process.argv.slice(cliFlagIndex + 1));
+  } catch (error) {
+    console.error(`[${APP_NAME}] 命令行模式启动失败：${(error as Error)?.message ?? String(error)}`);
+  }
+  app.exit(exitCode);
+}
+
 let mainWindow: BrowserWindow | null = null;
 let rulesWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;

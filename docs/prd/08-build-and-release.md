@@ -8,10 +8,11 @@ VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `p
 | ------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `pnpm start`             | 构建渲染层与主进程后启动 Electron                                                                      |
 | `pnpm dev:renderer`      | 启动 Vite 渲染层开发服务器                                                                             |
-| `pnpm build`             | 类型检查、Vite 构建、Electron CommonJS 编译，并自动构建 VS Code 插件 VSIX                              |
+| `pnpm build`             | 类型检查、Vite 构建、命令行工具打包、Electron CommonJS 编译，并自动构建 VS Code 插件 VSIX               |
+| `pnpm build:cli`         | 仅构建命令行工具：`vite build --config vite.config.cli.ts` → `release/cli/cli.cjs`                        |
 | `pnpm build:extension`   | 仅构建 `vscode-extension/`：类型检查、esbuild 打包、生成 `creation-workshop-v<version>.vsix`                  |
 | `pnpm install:extension` | 按当前版本号把 `vscode-extension/creation-workshop-v<version>.vsix` 安装到 VS Code（`--force`）               |
-| `pnpm test`              | 运行 Vitest 单测 + 编译 Electron + Markdown 存储测试（`tests/storage.test.mjs`）                       |
+| `pnpm test`              | 运行 Vitest 单测 + 编译 Electron + 编译命令行工具 + Markdown 存储与命令行工具测试                      |
 | `pnpm dist:mac`          | 清理旧产物、重新构建并生成 macOS arm64 PKG，同时把 VSIX 复制到 `release/`                              |
 | `pnpm install:mac`       | 全新执行 `dist:mac`，自动安装 VS Code 插件，再用系统 `installer` 静默安装 PKG（非 root 时调用 `sudo`） |
 
@@ -19,6 +20,7 @@ VS Code 插件版本与主应用版本同步：版本更新时同时修改根 `p
 
 - `release/renderer/`：渲染层（`vite.config.ts` → `build.outDir`）。
 - `release/electron/`：主进程与预加载脚本（`tsconfig.electron.json` → `outDir`）。
+- `release/cli/cli.cjs`：命令行工具（`vite.config.cli.ts` → `build.outDir`，单文件 CommonJS）。
 - `vscode-extension/dist/extension.js`：插件运行时代码。
 - `vscode-extension/creation-workshop-v<version>.vsix`：插件安装包。
 - `release/`：同时作为 electron-builder 输出目录；`dist:mac` 后只保留应用 PKG 与插件 VSIX。整个目录不参与源码提交。
@@ -49,9 +51,11 @@ PKG 安装脚本目录为 `scripts/pkg-scripts`：
 | 阶段          | 行为                                                                                                                                              |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `preinstall`  | 在 `/dev/console` 对应当前登录用户会话中请求“Creation Workshop”退出；等待 5 秒后仍运行则强制结束                                                           |
-| `postinstall` | 安装完成后通过 `launchctl asuser` 从登录用户会话执行 `open -j /Applications/Creation Workshop.app`，隐藏启动新版本；应用仅在菜单栏显示托盘图标，不抢占前台 |
+| `postinstall` | 安装完成后通过 `launchctl asuser` 从登录用户会话执行 `open -j /Applications/Creation Workshop.app`，隐藏启动新版本；应用仅在菜单栏显示托盘图标，不抢占前台；同时在 PATH 可达目录建立命令行工具软连接 `workshop`（详见 §10.7） |
 
 不配置 Installer 的 `must-close` 交互声明；关闭旧进程完全由 `preinstall` 自动完成，避免安装时要求用户手动关闭应用。
+
+命令行工具随应用打包：`runtime/` 目录通过 `build.extraResources` 安装到 `Creation Workshop.app/Contents/Resources/runtime`（`workshop.sh` 保留可执行权限），`release/cli/**/*` 进入 `app.asar`。`postinstall` 依次尝试在 `/usr/local/bin`、`/opt/homebrew/bin` 建立指向 `Contents/Resources/runtime/workshop.sh` 的 `workshop` 软连接；目录不可写时跳过，不影响安装结果（见 §10.6、§10.7）。
 
 未配置 Developer ID Application / Developer ID Installer 证书时，`.app` 使用 ad-hoc 签名，PKG 本身未签名；
 仍需正式分发时应同时配置两类 Developer ID 证书。
@@ -82,6 +86,8 @@ pnpm run build
 ```
 
 涉及桌面窗口、托盘或 IPC 的改动还需进行一次 Electron 启动验证，并在同一轮检查：启动时只有托盘且不弹主窗口、点击托盘后出现项目门与「上次」TAG、打开目录自动初始化 `.workshop`、主界面、规则设置模态子窗口、托盘图标加载与桌面切换不跟随。
-构建变更还应确认 `pnpm run build` 后存在 `release/renderer/index.html` 与 `release/electron/main.cjs`；打包变更还应确认 `release/` 中只有 `.pkg` 与 `creation-workshop-v<version>.vsix`，并检查安装脚本已被打入安装包。
+构建变更还应确认 `pnpm run build` 后存在 `release/renderer/index.html`、`release/electron/main.cjs` 与 `release/cli/cli.cjs`；打包变更还应确认 `release/` 中只有 `.pkg` 与 `creation-workshop-v<version>.vsix`，并检查安装脚本已被打入安装包。
+
+命令行工具改动还需确认 `pnpm run build:cli` 通过、`node release/cli/cli.cjs --count 3` 输出表格、`runtime/workshop.sh` 能正确转发参数（含软连接场景），打包后 `Contents/Resources/runtime/workshop.sh` 存在且可执行。
 
 插件改动还需确认 `pnpm run build:extension` 通过，且 `vscode-extension/creation-workshop-v<version>.vsix` 包含 `package.json`、`README.md`、`LICENSE.txt`、`assets/imgs/app-icon.png` 与 `dist/extension.js`，不包含 `src/` 与 `scripts/`。

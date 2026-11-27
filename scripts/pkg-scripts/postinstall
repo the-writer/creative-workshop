@@ -7,6 +7,22 @@ APP="/Applications/Creation Workshop.app"
 CONSOLE_USER="$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"
 CONSOLE_UID="$(/usr/bin/stat -f '%u' /dev/console 2>/dev/null || true)"
 
+# 命令行工具：runtime 目录随应用安装在 Contents/Resources/runtime，
+# 这里在 PATH 可达的目录建立名为 workshop 的软连接（与 docs/prd/10-cli.md 一致）。
+CLI_SCRIPT="$APP/Contents/Resources/runtime/workshop.sh"
+CLI_LINK_NAME="workshop"
+CLI_LINK_DIRS="/usr/local/bin /opt/homebrew/bin"
+
+if [ -x "$CLI_SCRIPT" ]; then
+  for CLI_LINK_DIR in $CLI_LINK_DIRS; do
+    [ -d "$CLI_LINK_DIR" ] || mkdir -p "$CLI_LINK_DIR" 2>/dev/null || continue
+    if ln -sfn "$CLI_SCRIPT" "$CLI_LINK_DIR/$CLI_LINK_NAME" 2>/dev/null; then
+      echo "已建立命令行工具：$CLI_LINK_DIR/$CLI_LINK_NAME -> $CLI_SCRIPT"
+      break
+    fi
+  done
+fi
+
 if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ] && [ -n "$CONSOLE_UID" ]; then
   /bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/open -j "$APP" >/dev/null 2>&1 || \
     /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/open -j "$APP" >/dev/null 2>&1 || true
